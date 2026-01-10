@@ -1,0 +1,192 @@
+import axios, { type AxiosInstance, type AxiosResponse, type AxiosError } from 'axios'
+
+// API 配置
+const API_CONFIG = {
+  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
+  timeout: 10000,
+}
+
+// 创建 Axios 实例
+const api: AxiosInstance = axios.create(API_CONFIG)
+
+// 请求拦截器
+api.interceptors.request.use(
+  (config) => {
+    // 从 localStorage 获取 token
+    const token = localStorage.getItem('auth_token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+
+    // 添加请求时间戳
+    config.params = {
+      ...config.params,
+      _t: Date.now(),
+    }
+
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+// 响应拦截器
+api.interceptors.response.use(
+  (response: AxiosResponse) => {
+    return response.data
+  },
+  (error: AxiosError) => {
+    const { response } = error
+
+    if (response?.status === 401) {
+      // Token 过期或无效，清除本地存储并跳转到登录页
+      localStorage.removeItem('auth_token')
+      localStorage.removeItem('user_info')
+      window.location.href = '/login'
+    }
+
+    return Promise.reject(error)
+  }
+)
+
+// 通用请求方法
+export const request = {
+  get<T = any>(url: string, params?: any): Promise<T> {
+    return api.get(url, { params })
+  },
+
+  post<T = any>(url: string, data?: any): Promise<T> {
+    return api.post(url, data)
+  },
+
+  put<T = any>(url: string, data?: any): Promise<T> {
+    return api.put(url, data)
+  },
+
+  delete<T = any>(url: string): Promise<T> {
+    return api.delete(url)
+  },
+}
+
+// 认证相关 API
+export const authAPI = {
+  register: (data: { username: string; email: string; password: string }) =>
+    request.post('/auth/register', data),
+
+  login: (data: { username: string; password: string }) =>
+    request.post('/auth/login', data),
+
+  logout: () =>
+    request.post('/auth/logout'),
+}
+
+// 用户相关 API
+export const userAPI = {
+  getProfile: () =>
+    request.get('/users/me'),
+
+  updateProfile: (data: any) =>
+    request.put('/users/me', data),
+}
+
+// 组织相关 API
+export const organizationAPI = {
+  list: () =>
+    request.get('/organizations'),
+
+  create: (data: { name: string; description?: string }) =>
+    request.post('/organizations', data),
+
+  getDetail: (id: string) =>
+    request.get(`/organizations/${id}`),
+
+  update: (id: string, data: any) =>
+    request.put(`/organizations/${id}`, data),
+
+  delete: (id: string) =>
+    request.delete(`/organizations/${id}`),
+}
+
+// 数据库相关 API
+export const databaseAPI = {
+  list: () =>
+    request.get('/databases'),
+
+  create: (data: { name: string; description?: string; isPublic?: boolean; isPersonal?: boolean }) =>
+    request.post('/databases', data),
+
+  getDetail: (id: string) =>
+    request.get(`/databases/${id}`),
+
+  update: (id: string, data: { name: string; description?: string; isPublic?: boolean }) =>
+    request.put(`/databases/${id}`, data),
+
+  delete: (id: string) =>
+    request.delete(`/databases/${id}`),
+
+  getTables: (dbId: string) =>
+    request.get(`/databases/${dbId}/tables`),
+
+  share: (id: string, data: { user_id: string; role: string }) =>
+    request.post(`/databases/${id}/share`, data),
+
+  getUsers: (id: string) =>
+    request.get(`/databases/${id}/users`),
+
+  removeUser: (dbId: string, userId: string) =>
+    request.delete(`/databases/${dbId}/users/${userId}`),
+
+  updateUserRole: (dbId: string, userId: string, role: string) =>
+    request.put(`/databases/${dbId}/users/${userId}/role`, { role }),
+}
+
+// 表相关 API
+export const tableAPI = {
+  create: (data: { database_id: string; name: string; description?: string }) =>
+    request.post('/tables', data),
+
+  get: (id: string) =>
+    request.get(`/tables/${id}`),
+
+  delete: (id: string) =>
+    request.delete(`/tables/${id}`),
+
+  getFields: (tableId: string) =>
+    request.get(`/tables/${tableId}/fields`),
+}
+
+// 字段相关 API
+export const fieldAPI = {
+  create: (data: { table_id: string; name: string; type: string; required?: boolean; options?: string }) =>
+    request.post('/fields', data),
+
+  get: (id: string) =>
+    request.get(`/fields/${id}`),
+
+  update: (id: string, data: { name: string; type: string; required?: boolean; options?: string }) =>
+    request.put(`/fields/${id}`, data),
+
+  delete: (id: string) =>
+    request.delete(`/fields/${id}`),
+}
+
+// 记录相关 API
+export const recordAPI = {
+  create: (data: { table_id: string; data: Record<string, any> }) =>
+    request.post('/records', data),
+
+  list: (params: { table_id: string; limit?: number; offset?: number; filter?: string }) =>
+    request.get('/records', { table_id: params.table_id, limit: params.limit, offset: params.offset }),
+
+  get: (id: string) =>
+    request.get(`/records/${id}`),
+
+  update: (id: string, data: { data: Record<string, any>; version?: number }) =>
+    request.put(`/records/${id}`, data),
+
+  delete: (id: string) =>
+    request.delete(`/records/${id}`),
+}
+
+export default api
