@@ -64,7 +64,9 @@
       "mcp__playwright__browser_wait_for",
       "mcp__playwright__browser_press_key",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git remote add:*)",
+      "Bash(git push:*)"
     ]
   }
 }
