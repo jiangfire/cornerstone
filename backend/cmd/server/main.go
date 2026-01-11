@@ -135,6 +135,13 @@ func main() {
 			protected.PUT("/records/:id", handlers.UpdateRecord)
 			protected.DELETE("/records/:id", handlers.DeleteRecord)
 			protected.POST("/records/batch", handlers.BatchCreateRecords)
+
+			// 文件相关
+			protected.POST("/files/upload", handlers.UploadFile)
+			protected.GET("/files/:id", handlers.GetFile)
+			protected.GET("/files/:id/download", handlers.DownloadFile)
+			protected.DELETE("/files/:id", handlers.DeleteFile)
+			protected.GET("/records/:id/files", handlers.ListRecordFiles)
 		}
 	}
 
