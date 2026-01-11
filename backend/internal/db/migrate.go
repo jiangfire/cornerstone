@@ -39,6 +39,9 @@ func Migrate() error {
 		&models.Field{},
 		&models.Record{},
 
+		// 字段级权限模型
+		&models.FieldPermission{},
+
 		// 文件和插件模型
 		&models.File{},
 		&models.Plugin{},
@@ -116,6 +119,15 @@ func createIndexes(db *gorm.DB) error {
 
 	// plugin_bindings复合索引
 	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_plugin_bindings_plugin_table ON plugin_bindings(plugin_id, table_id)").Error; err != nil {
+		return err
+	}
+
+	// field_permissions复合索引（权限查询优化）
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_field_permissions_table_field_role ON field_permissions(table_id, field_id, role)").Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_field_permissions_role ON field_permissions(role)").Error; err != nil {
 		return err
 	}
 

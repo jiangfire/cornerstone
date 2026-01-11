@@ -79,6 +79,8 @@ func main() {
 		{
 			// 用户相关
 			protected.GET("/users/me", handlers.GetUserInfo)
+			protected.GET("/users", handlers.ListUsers)
+			protected.GET("/users/search", handlers.SearchUsers)
 			protected.POST("/auth/logout", handlers.Logout)
 
 			// 组织相关
@@ -120,6 +122,11 @@ func main() {
 			protected.GET("/fields/:id", handlers.GetField)
 			protected.PUT("/fields/:id", handlers.UpdateField)
 			protected.DELETE("/fields/:id", handlers.DeleteField)
+
+			// 字段权限相关 - 必须在字段相关之后，避免路由冲突
+			protected.GET("/tables/:id/field-permissions", handlers.GetFieldPermissions)
+			protected.PUT("/tables/:id/field-permissions", handlers.SetFieldPermission)
+			protected.PUT("/tables/:id/field-permissions/batch", handlers.BatchSetFieldPermissions)
 
 			// 记录相关
 			protected.POST("/records", handlers.CreateRecord)

@@ -88,6 +88,14 @@ export const userAPI = {
 
   updateProfile: (data: any) =>
     request.put('/users/me', data),
+
+  // 获取用户列表（用于选择成员/共享用户）
+  list: (params?: { org_id?: string; db_id?: string }) =>
+    request.get('/users', params),
+
+  // 搜索用户
+  search: (query: string) =>
+    request.get('/users/search', { q: query }),
 }
 
 // 组织相关 API
@@ -106,6 +114,19 @@ export const organizationAPI = {
 
   delete: (id: string) =>
     request.delete(`/organizations/${id}`),
+
+  // 组织成员管理
+  getMembers: (id: string) =>
+    request.get(`/organizations/${id}/members`),
+
+  addMember: (id: string, data: { user_id: string; role: string }) =>
+    request.post(`/organizations/${id}/members`, data),
+
+  removeMember: (orgId: string, memberId: string) =>
+    request.delete(`/organizations/${orgId}/members/${memberId}`),
+
+  updateMemberRole: (orgId: string, memberId: string, role: string) =>
+    request.put(`/organizations/${orgId}/members/${memberId}/role`, { role }),
 }
 
 // 数据库相关 API
@@ -149,6 +170,9 @@ export const tableAPI = {
   get: (id: string) =>
     request.get(`/tables/${id}`),
 
+  update: (id: string, data: { name: string; description?: string }) =>
+    request.put(`/tables/${id}`, data),
+
   delete: (id: string) =>
     request.delete(`/tables/${id}`),
 
@@ -169,6 +193,28 @@ export const fieldAPI = {
 
   delete: (id: string) =>
     request.delete(`/fields/${id}`),
+
+  // 字段权限相关
+  getPermissions: (tableId: string) =>
+    request.get(`/tables/${tableId}/field-permissions`),
+
+  setPermission: (tableId: string, data: {
+    field_id: string
+    role: string
+    can_read: boolean
+    can_write: boolean
+    can_delete: boolean
+  }) =>
+    request.put(`/tables/${tableId}/field-permissions`, data),
+
+  batchSetPermissions: (tableId: string, permissions: Array<{
+    field_id: string
+    role: string
+    can_read: boolean
+    can_write: boolean
+    can_delete: boolean
+  }>) =>
+    request.put(`/tables/${tableId}/field-permissions/batch`, { permissions }),
 }
 
 // 记录相关 API
@@ -187,6 +233,9 @@ export const recordAPI = {
 
   delete: (id: string) =>
     request.delete(`/records/${id}`),
+
+  batchCreate: (data: { table_id: string; records: Record<string, any>[] }) =>
+    request.post('/records/batch', data),
 }
 
 export default api

@@ -3,7 +3,7 @@
     <div class="auth-card">
       <div class="auth-header">
         <h2>登录</h2>
-        <p class="subtitle">欢迎回到 Cornerstone 硬件工程数据平台</p>
+        <p class="subtitle">欢迎回到 Cornerstone 数据平台</p>
       </div>
 
       <el-form

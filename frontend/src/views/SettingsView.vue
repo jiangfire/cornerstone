@@ -18,7 +18,7 @@
                 v-model="systemForm.description"
                 type="textarea"
                 :rows="3"
-                placeholder="硬件工程数据管理平台"
+                placeholder="数据管理平台"
               />
             </el-form-item>
             <el-form-item label="允许用户注册">
@@ -84,7 +84,7 @@ const activeTab = ref('system')
 // 系统配置
 const systemForm = ref({
   name: 'Cornerstone',
-  description: '硬件工程数据管理平台',
+  description: '数据管理平台',
   allowRegistration: true,
   maxFileSize: 50,
 })

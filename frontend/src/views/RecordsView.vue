@@ -218,7 +218,7 @@ interface Field {
   created_at: string
 }
 
-interface Record {
+interface RecordData {
   id: string
   data: Record<string, any>
   version: number
@@ -235,7 +235,7 @@ const loading = ref(false)
 const submitting = ref(false)
 const dialogVisible = ref(false)
 const isEditMode = ref(false)
-const records = ref<Record[]>([])
+const records = ref<RecordData[]>([])
 const fields = ref<Field[]>([])
 
 const searchText = ref('')
@@ -313,7 +313,7 @@ const loadTableInfo = async () => {
   try {
     const response = await tableAPI.get(tableId)
     if (response.success && response.data) {
-      tableName.value = response.data.table.name
+      tableName.value = response.data.name || ''
     }
   } catch (error) {
     console.error('Failed to load table info:', error)
@@ -362,7 +362,7 @@ const handleCreate = () => {
   dialogVisible.value = true
 }
 
-const handleEdit = (row: Record) => {
+const handleEdit = (row: RecordData) => {
   isEditMode.value = true
   dialogTitle.value = '编辑记录'
   currentRecordId.value = row.id
@@ -370,7 +370,7 @@ const handleEdit = (row: Record) => {
   dialogVisible.value = true
 }
 
-const handleDelete = async (row: Record) => {
+const handleDelete = async (row: RecordData) => {
   try {
     await ElMessageBox.confirm(
       '确定要删除这条记录吗？',

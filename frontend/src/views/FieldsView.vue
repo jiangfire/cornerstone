@@ -10,15 +10,18 @@
             </el-button>
             <span class="table-name">{{ tableName }} - 字段管理</span>
           </div>
-          <el-button type="primary" @click="handleCreate">添加字段</el-button>
+          <div class="header-actions">
+            <el-button @click="goToPermissions">权限配置</el-button>
+            <el-button type="primary" @click="handleCreate">添加字段</el-button>
+          </div>
         </div>
       </template>
 
-      <el-empty v-if="fields.length === 0" description="暂无字段，请添加您的第一个字段">
-        <el-button type="primary" @click="handleCreate">添加字段</el-button>
+      <el-empty v-if="authorizedFields.length === 0" description="暂无字段，请添加您的第一个字段">
+        <el-button v-if="canCreateField" type="primary" @click="handleCreate">添加字段</el-button>
       </el-empty>
 
-      <el-table v-else :data="fields" style="width: 100%" v-loading="loading">
+      <el-table v-else :data="authorizedFields" style="width: 100%" v-loading="loading">
         <el-table-column prop="name" label="字段名称" min-width="180" />
         <el-table-column prop="type" label="字段类型" width="120">
           <template #default="{ row }">
@@ -40,8 +43,24 @@
         </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button
+              v-if="permissionStore.checkFieldPermission(row.id, 'write')"
+              size="small"
+              @click="handleEdit(row)"
+            >
+              编辑
+            </el-button>
+            <el-button
+              v-if="permissionStore.checkFieldPermission(row.id, 'delete')"
+              size="small"
+              type="danger"
+              @click="handleDelete(row)"
+            >
+              删除
+            </el-button>
+            <span v-if="!permissionStore.checkFieldPermission(row.id, 'write') && !permissionStore.checkFieldPermission(row.id, 'delete')" style="color: #909399; font-size: 12px">
+              无操作权限
+            </span>
           </template>
         </el-table-column>
       </el-table>
@@ -105,12 +124,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tableAPI, fieldAPI } from '@/services/api'
+import { usePermissionStore } from '@/stores/permissions'
 
 interface Field {
   id: string
@@ -125,6 +145,8 @@ const route = useRoute()
 const router = useRouter()
 const tableId = route.params.id as string
 const tableName = ref('')
+
+const permissionStore = usePermissionStore()
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -165,6 +187,20 @@ const rules: FormRules = {
 
 const dialogTitle = ref('添加字段')
 
+// 计算属性：根据权限过滤字段
+const authorizedFields = computed(() => {
+  return fields.value.filter(field =>
+    permissionStore.checkFieldPermission(field.id, 'read')
+  )
+})
+
+// 检查是否有创建字段的权限
+const canCreateField = computed(() => {
+  // 这里使用表级权限判断，因为字段还没有创建
+  // 在实际应用中，可以根据用户角色判断是否有创建字段的权限
+  return true
+})
+
 const formatDate = (dateStr: string) => {
   if (!dateStr) return '-'
   return new Date(dateStr).toLocaleString('zh-CN')
@@ -172,6 +208,10 @@ const formatDate = (dateStr: string) => {
 
 const goBack = () => {
   router.push(`/databases`)
+}
+
+const goToPermissions = () => {
+  router.push(`/tables/${tableId}/field-permissions`)
 }
 
 const getFieldTypeLabel = (type: string) => {
@@ -209,6 +249,8 @@ const loadFields = async () => {
     if (response.success && response.data) {
       fields.value = response.data.fields || []
     }
+    // 加载字段权限配置
+    await permissionStore.loadFieldPermissions(tableId)
   } catch (error) {
     ElMessage.error('加载字段列表失败')
   } finally {
@@ -220,7 +262,7 @@ const loadTableInfo = async () => {
   try {
     const response = await tableAPI.get(tableId)
     if (response.success && response.data) {
-      tableName.value = response.data.table.name
+      tableName.value = response.data.name || ''
     }
   } catch (error) {
     console.error('Failed to load table info:', error)
@@ -228,6 +270,10 @@ const loadTableInfo = async () => {
 }
 
 const handleCreate = () => {
+  if (!canCreateField.value) {
+    ElMessage.warning('您没有创建字段的权限')
+    return
+  }
   isEditMode.value = false
   dialogTitle.value = '添加字段'
   form.value = { name: '', type: 'string', required: false, options: '', id: '' }
@@ -235,6 +281,10 @@ const handleCreate = () => {
 }
 
 const handleEdit = (row: Field) => {
+  if (!permissionStore.checkFieldPermission(row.id, 'write')) {
+    ElMessage.warning('您没有编辑此字段的权限')
+    return
+  }
   isEditMode.value = true
   dialogTitle.value = '编辑字段'
   form.value = {
@@ -248,6 +298,11 @@ const handleEdit = (row: Field) => {
 }
 
 const handleDelete = async (row: Field) => {
+  if (!permissionStore.checkFieldPermission(row.id, 'delete')) {
+    ElMessage.warning('您没有删除此字段的权限')
+    return
+  }
+
   try {
     await ElMessageBox.confirm(
       `确定要删除字段 "${row.name}" 吗？`,
@@ -340,6 +395,11 @@ onMounted(() => {
         font-weight: 600;
         font-size: 16px;
       }
+    }
+
+    .header-actions {
+      display: flex;
+      gap: 10px;
     }
   }
 }

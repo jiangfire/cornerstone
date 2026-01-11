@@ -356,11 +356,11 @@ func (s *DatabaseService) ListDatabaseUsers(dbID, userID string) ([]interface{},
 
 	// 2. 查询数据库用户列表
 	var users []struct {
-		UserID    string `json:"user_id"`
-		Username  string `json:"username"`
-		Email     string `json:"email"`
-		Role      string `json:"role"`
-		JoinedAt  string `json:"joined_at"`
+		UserID   string `json:"user_id"`
+		Username string `json:"username"`
+		Email    string `json:"email"`
+		Role     string `json:"role"`
+		JoinedAt string `json:"joined_at"`
 	}
 
 	err = s.db.Raw(`

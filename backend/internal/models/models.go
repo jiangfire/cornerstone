@@ -267,6 +267,30 @@ func (TokenBlacklist) TableName() string {
 	return "token_blacklist"
 }
 
+// FieldPermission 字段级权限表 (flp_前缀)
+type FieldPermission struct {
+	ID        string    `gorm:"type:varchar(50);primaryKey" json:"id"`
+	TableID   string    `gorm:"type:varchar(50);not null" json:"table_id"`
+	FieldID   string    `gorm:"type:varchar(50);not null" json:"field_id"`
+	Role      string    `gorm:"type:varchar(50);not null" json:"role"` // owner, admin, editor, viewer
+	CanRead   bool      `gorm:"type:boolean;default:true" json:"can_read"`
+	CanWrite  bool      `gorm:"type:boolean;default:false" json:"can_write"`
+	CanDelete bool      `gorm:"type:boolean;default:false" json:"can_delete"`
+	CreatedAt time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+}
+
+func (FieldPermission) TableName() string {
+	return "field_permissions"
+}
+
+func (fp *FieldPermission) BeforeCreate(tx *gorm.DB) (err error) {
+	if fp.ID == "" {
+		fp.ID = GenerateID("flp")
+	}
+	return nil
+}
+
 // GenerateID 生成带前缀的唯一ID
 func GenerateID(prefix string) string {
 	// 使用时间戳 + 随机数生成简单ID

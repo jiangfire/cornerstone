@@ -50,6 +50,12 @@ const router = createRouter({
       meta: { requiresAuth: true, title: '字段管理' },
     },
     {
+      path: '/tables/:id/field-permissions',
+      name: 'field-permissions',
+      component: () => import('../views/FieldPermissionsView.vue'),
+      meta: { requiresAuth: true, title: '字段权限配置' },
+    },
+    {
       path: '/tables/:id/records',
       name: 'records',
       component: () => import('../views/RecordsView.vue'),

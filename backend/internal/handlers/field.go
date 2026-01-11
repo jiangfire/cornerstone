@@ -110,3 +110,66 @@ func DeleteField(c *gin.Context) {
 		"message": "字段已删除",
 	})
 }
+
+// GetFieldPermissions 获取表的字段权限配置
+func GetFieldPermissions(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	tableID := c.Param("id")
+
+	fieldService := services.NewFieldService(db.DB())
+	permissions, err := fieldService.GetFieldPermissions(tableID, userID)
+	if err != nil {
+		types.Error(c, 403, err.Error())
+		return
+	}
+
+	types.Success(c, gin.H{
+		"permissions": permissions,
+		"total":       len(permissions),
+	})
+}
+
+// SetFieldPermission 设置单个字段权限
+func SetFieldPermission(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	tableID := c.Param("id")
+
+	var req services.FieldPermissionRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		types.Error(c, 400, "参数错误: "+err.Error())
+		return
+	}
+
+	fieldService := services.NewFieldService(db.DB())
+	if err := fieldService.SetFieldPermission(tableID, req, userID); err != nil {
+		types.Error(c, 403, err.Error())
+		return
+	}
+
+	types.Success(c, gin.H{
+		"message": "权限设置成功",
+	})
+}
+
+// BatchSetFieldPermissions 批量设置字段权限
+func BatchSetFieldPermissions(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	tableID := c.Param("id")
+
+	var req services.BatchFieldPermissionsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		types.Error(c, 400, "参数错误: "+err.Error())
+		return
+	}
+
+	fieldService := services.NewFieldService(db.DB())
+	if err := fieldService.BatchSetFieldPermissions(tableID, req, userID); err != nil {
+		types.Error(c, 403, err.Error())
+		return
+	}
+
+	types.Success(c, gin.H{
+		"message": "批量权限设置成功",
+		"count":   len(req.Permissions),
+	})
+}

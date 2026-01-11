@@ -66,7 +66,25 @@
       "Bash(git add:*)",
       "Bash(git commit:*)",
       "Bash(git remote add:*)",
-      "Bash(git push:*)"
+      "Bash(git push:*)",
+      "Bash(xargs:*)",
+      "Bash(tail:*)",
+      "mcp__playwright__browser_evaluate",
+      "mcp__playwright__browser_console_messages",
+      "Bash(test:*)",
+      "mcp__playwright__browser_fill_form",
+      "Bash(Get-Content:*)",
+      "Bash(Select-Object -Last 10:*)",
+      "Bash(pnpm test:e2e:*)",
+      "Bash(node verify-tests.js:*)",
+      "Bash(move:*)",
+      "Bash(node frontend/e2e/verify-tests.cjs:*)",
+      "Bash(node:*)",
+      "Skill(kill-port)",
+      "Skill(kill-port:*)",
+      "Bash(pnpx kill-port:*)",
+      "Bash(npm run dev:*)",
+      "mcp__playwright__browser_select_option"
     ]
   }
 }

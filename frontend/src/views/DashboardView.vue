@@ -217,13 +217,13 @@ const pageTitle = computed(() => {
 const pageDescription = computed(() => {
   const path = router.currentRoute.value.path
   const descriptions: Record<string, string> = {
-    '/': '欢迎使用 Cornerstone 硬件工程数据平台',
+    '/': '欢迎使用 Cornerstone 数据平台',
     '/organizations': '管理您的团队和组织',
     '/databases': '管理您的数据库和数据表',
     '/plugins': '扩展平台功能的插件系统',
     '/settings': '平台配置和个人设置',
   }
-  return descriptions[path] || '欢迎使用 Cornerstone 硬件工程数据平台'
+  return descriptions[path] || '欢迎使用 Cornerstone 数据平台'
 })
 
 // 统计数据

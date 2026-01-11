@@ -49,14 +49,16 @@ func validateUsername(username string) error {
 		return errors.New("用户名长度必须在3-50个字符之间")
 	}
 
-	// 只允许字母、数字、下划线和连字符
-	matched, _ := regexp.MatchString(`^[a-zA-Z0-9_-]+$`, username)
+	// 支持字母（包括中文）、数字、下划线和连字符
+	// \p{L} 匹配所有语言的字母（包括中文）
+	// \p{N} 匹配所有语言的数字
+	matched, _ := regexp.MatchString(`^[\p{L}\p{N}_-]+$`, username)
 	if !matched {
 		return errors.New("用户名只能包含字母、数字、下划线和连字符")
 	}
 
 	// 不能以数字开头
-	if matched, _ := regexp.MatchString(`^[0-9]`, username); matched {
+	if matched, _ := regexp.MatchString(`^[\p{N}]`, username); matched {
 		return errors.New("用户名不能以数字开头")
 	}
 
