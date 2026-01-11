@@ -238,4 +238,53 @@ export const recordAPI = {
     request.post('/records/batch', data),
 }
 
+// 文件相关 API
+export const fileAPI = {
+  upload: (recordId: string, file: File) => {
+    const formData = new FormData()
+    formData.append('record_id', recordId)
+    formData.append('file', file)
+    return api.post('/files/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    })
+  },
+
+  get: (id: string) =>
+    request.get(`/files/${id}`),
+
+  download: (id: string) =>
+    `${API_CONFIG.baseURL}/files/${id}/download`,
+
+  delete: (id: string) =>
+    request.delete(`/files/${id}`),
+
+  listByRecord: (recordId: string) =>
+    request.get(`/records/${recordId}/files`),
+}
+
+// 插件相关 API
+export const pluginAPI = {
+  create: (data: { name: string; description: string; language: string; entry_file: string; timeout: number }) =>
+    request.post('/plugins', data),
+
+  list: () =>
+    request.get('/plugins'),
+
+  get: (id: string) =>
+    request.get(`/plugins/${id}`),
+
+  update: (id: string, data: { name: string; description: string; timeout: number }) =>
+    request.put(`/plugins/${id}`, data),
+
+  delete: (id: string) =>
+    request.delete(`/plugins/${id}`),
+
+  bind: (id: string, data: { table_id: string; trigger: string }) =>
+    request.post(`/plugins/${id}/bind`, data),
+
+  unbind: (id: string, data: { table_id: string }) =>
+    request.delete(`/plugins/${id}/unbind`, data),
+}
+
+
 export default api
