@@ -189,6 +189,38 @@
           </el-select>
         </el-form-item>
       </el-form>
+
+      <!-- 文件管理区域 -->
+      <el-divider v-if="isEdit">附件管理</el-divider>
+      <div v-if="isEdit" class="file-section">
+        <el-upload
+          :auto-upload="false"
+          :on-change="handleFileSelect"
+          :file-list="fileList"
+          :limit="5"
+        >
+          <el-button size="small" type="primary">选择文件</el-button>
+          <template #tip>
+            <div class="el-upload__tip">最多上传5个文件，单个文件不超过50MB</div>
+          </template>
+        </el-upload>
+
+        <el-table :data="attachedFiles" style="width: 100%; margin-top: 20px" v-if="attachedFiles.length > 0">
+          <el-table-column prop="file_name" label="文件名" />
+          <el-table-column prop="file_size" label="大小" width="120">
+            <template #default="{ row }">
+              {{ formatFileSize(row.file_size) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="150">
+            <template #default="{ row }">
+              <el-button size="small" @click="handleDownloadFile(row)">下载</el-button>
+              <el-button size="small" type="danger" @click="handleDeleteFile(row)">删除</el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
+
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
@@ -207,7 +239,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Refresh, Search } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { tableAPI, recordAPI, fieldAPI } from '@/services/api'
+import { tableAPI, recordAPI, fieldAPI, fileAPI } from '@/services/api'
 
 interface Field {
   id: string
@@ -248,6 +280,11 @@ const form = ref<Record<string, any>>({})
 const currentRecordId = ref('')
 
 const dialogTitle = ref('新建记录')
+
+// 文件管理相关变量
+const fileList = ref<any[]>([])
+const attachedFiles = ref<any[]>([])
+const isEdit = computed(() => isEditMode.value)
 
 // 动态生成表单验证规则
 const computedRules = computed(() => {
@@ -368,6 +405,7 @@ const handleEdit = (row: RecordData) => {
   currentRecordId.value = row.id
   form.value = { ...row.data }
   dialogVisible.value = true
+  loadAttachedFiles(row.id)
 }
 
 const handleDelete = async (row: RecordData) => {
@@ -433,6 +471,62 @@ const resetForm = () => {
   if (formRef.value) {
     formRef.value.resetFields()
   }
+  fileList.value = []
+  attachedFiles.value = []
+}
+
+// 加载记录的附件
+const loadAttachedFiles = async (recordId: string) => {
+  try {
+    const res: any = await fileAPI.listByRecord(recordId)
+    attachedFiles.value = res.data || []
+  } catch (error) {
+    console.error('加载附件失败', error)
+  }
+}
+
+// 处理文件选择
+const handleFileSelect = async (file: any) => {
+  if (!currentRecordId.value) {
+    ElMessage.warning('请先保存记录后再上传文件')
+    return
+  }
+
+  try {
+    await fileAPI.upload(currentRecordId.value, file.raw)
+    ElMessage.success('文件上传成功')
+    loadAttachedFiles(currentRecordId.value)
+    fileList.value = []
+  } catch (error: any) {
+    ElMessage.error(error.response?.data?.message || '文件上传失败')
+  }
+}
+
+// 下载文件
+const handleDownloadFile = (file: any) => {
+  const url = fileAPI.download(file.id)
+  window.open(url, '_blank')
+}
+
+// 删除文件
+const handleDeleteFile = async (file: any) => {
+  try {
+    await ElMessageBox.confirm('确定要删除该文件吗？', '提示', { type: 'warning' })
+    await fileAPI.delete(file.id)
+    ElMessage.success('删除成功')
+    loadAttachedFiles(currentRecordId.value)
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败')
+    }
+  }
+}
+
+// 格式化文件大小
+const formatFileSize = (bytes: number) => {
+  if (bytes < 1024) return bytes + ' B'
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
 }
 
 onMounted(() => {
