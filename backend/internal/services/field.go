@@ -138,20 +138,20 @@ type FieldConfig struct {
 
 // CreateFieldRequest 创建字段请求
 type CreateFieldRequest struct {
-	TableID   string      `json:"table_id" binding:"required"`
-	Name      string      `json:"name" binding:"required,min=1,max=255"`
-	Type      string      `json:"type" binding:"required,oneof=string number boolean date datetime select multiselect single_select multi_select"`
-	Required  bool        `json:"required"`
-	Options   string      `json:"options"` // 下拉选项，逗号分隔
-	Config    FieldConfig `json:"config"`
+	TableID  string      `json:"table_id" binding:"required"`
+	Name     string      `json:"name" binding:"required,min=1,max=255"`
+	Type     string      `json:"type" binding:"required,oneof=string number boolean date datetime select multiselect single_select multi_select"`
+	Required bool        `json:"required"`
+	Options  string      `json:"options"` // 下拉选项，逗号分隔
+	Config   FieldConfig `json:"config"`
 }
 
 // UpdateFieldRequest 更新字段请求
 type UpdateFieldRequest struct {
-	Name      string      `json:"name" binding:"required,min=1,max=255"`
-	Type      string      `json:"type" binding:"required,oneof=string number boolean date datetime single_select multi_select"`
-	Required  bool        `json:"required"`
-	Config    FieldConfig `json:"config"`
+	Name     string      `json:"name" binding:"required,min=1,max=255"`
+	Type     string      `json:"type" binding:"required,oneof=string number boolean date datetime single_select multi_select"`
+	Required bool        `json:"required"`
+	Config   FieldConfig `json:"config"`
 }
 
 // FieldResponse 字段响应
@@ -250,11 +250,11 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 
 	// 6. 创建字段
 	field := models.Field{
-		TableID:   req.TableID,
-		Name:      req.Name,
-		Type:      req.Type,
-		Required:  req.Required,
-		Options:   string(configJSON),
+		TableID:  req.TableID,
+		Name:     req.Name,
+		Type:     req.Type,
+		Required: req.Required,
+		Options:  string(configJSON),
 	}
 
 	if err := s.db.Create(&field).Error; err != nil {

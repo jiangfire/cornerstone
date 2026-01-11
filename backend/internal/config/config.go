@@ -25,9 +25,9 @@ type Config struct {
 
 // DatabaseConfig 数据库配置
 type DatabaseConfig struct {
-	URL     string
-	MaxOpen int
-	MaxIdle int
+	URL         string
+	MaxOpen     int
+	MaxIdle     int
 	MaxLifetime int
 }
 
@@ -61,10 +61,10 @@ func Load() (*Config, error) {
 	// 读取环境变量
 	config := &Config{
 		Database: DatabaseConfig{
-			URL:          getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/cornerstone?sslmode=disable"),
-			MaxOpen:      getEnvAsInt("DB_MAX_OPEN", 10),
-			MaxIdle:      getEnvAsInt("DB_MAX_IDLE", 5),
-			MaxLifetime:  getEnvAsInt("DB_MAX_LIFETIME", 3600),
+			URL:         getEnv("DATABASE_URL", "postgres://postgres:postgres@localhost:5432/cornerstone?sslmode=disable"),
+			MaxOpen:     getEnvAsInt("DB_MAX_OPEN", 10),
+			MaxIdle:     getEnvAsInt("DB_MAX_IDLE", 5),
+			MaxLifetime: getEnvAsInt("DB_MAX_LIFETIME", 3600),
 		},
 		Server: ServerConfig{
 			Mode: getEnv("SERVER_MODE", "debug"),

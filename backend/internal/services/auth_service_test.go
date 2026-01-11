@@ -178,4 +178,3 @@ func TestAuthService_Login(t *testing.T) {
 		assert.Error(t, err)
 	})
 }
-

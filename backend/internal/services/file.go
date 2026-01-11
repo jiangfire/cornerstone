@@ -160,4 +160,3 @@ func (s *FileService) ListRecordFiles(recordID string) ([]models.File, error) {
 	}
 	return files, nil
 }
-

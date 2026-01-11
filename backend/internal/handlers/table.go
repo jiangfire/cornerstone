@@ -26,11 +26,11 @@ func CreateTable(c *gin.Context) {
 	}
 
 	types.Success(c, gin.H{
-		"id":           table.ID,
-		"database_id":  table.DatabaseID,
-		"name":         table.Name,
-		"description":  table.Description,
-		"created_at":   table.CreatedAt,
+		"id":          table.ID,
+		"database_id": table.DatabaseID,
+		"name":        table.Name,
+		"description": table.Description,
+		"created_at":  table.CreatedAt,
 	})
 }
 

@@ -229,9 +229,9 @@ func TestValidateFieldValue_EmptyOptional(t *testing.T) {
 
 	// Optional field with validation
 	field := models.Field{
-		Type:    "string",
+		Type:     "string",
 		Required: false,
-		Options: `{"validation":"^[A-Z]+$","max_length":5}`,
+		Options:  `{"validation":"^[A-Z]+$","max_length":5}`,
 	}
 
 	// Empty value for optional field should pass
@@ -254,9 +254,9 @@ func TestValidateFieldValue_SpecialCharacters(t *testing.T) {
 
 	// Test with special characters that should be allowed in strings
 	testCases := []struct {
-		value    string
+		value      string
 		shouldPass bool
-		desc     string
+		desc       string
 	}{
 		{"Hello World", true, "spaces"},
 		{"test@example.com", true, "email chars"},
