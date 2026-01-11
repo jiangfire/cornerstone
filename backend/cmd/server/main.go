@@ -142,6 +142,15 @@ func main() {
 			protected.GET("/files/:id/download", handlers.DownloadFile)
 			protected.DELETE("/files/:id", handlers.DeleteFile)
 			protected.GET("/records/:id/files", handlers.ListRecordFiles)
+
+			// 插件相关
+			protected.POST("/plugins", handlers.CreatePlugin)
+			protected.GET("/plugins", handlers.ListPlugins)
+			protected.GET("/plugins/:id", handlers.GetPlugin)
+			protected.PUT("/plugins/:id", handlers.UpdatePlugin)
+			protected.DELETE("/plugins/:id", handlers.DeletePlugin)
+			protected.POST("/plugins/:id/bind", handlers.BindPlugin)
+			protected.DELETE("/plugins/:id/unbind", handlers.UnbindPlugin)
 		}
 	}
 
