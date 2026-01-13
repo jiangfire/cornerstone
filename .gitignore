@@ -143,3 +143,6 @@ script/
 
 # 个人配置
 *.code-snippets
+.playwright-mcp
+.claude
+CLAUDE.md

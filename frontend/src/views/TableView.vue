@@ -10,12 +10,12 @@
             </el-button>
             <span class="database-name">{{ databaseName }}</span>
           </div>
-          <el-button type="primary" @click="handleCreate">新建表</el-button>
+          <el-button v-if="canCreate" type="primary" @click="handleCreate">新建表</el-button>
         </div>
       </template>
 
       <el-empty v-if="tables.length === 0" description="暂无表，请创建您的第一个表">
-        <el-button type="primary" @click="handleCreate">创建表</el-button>
+        <el-button v-if="canCreate" type="primary" @click="handleCreate">创建表</el-button>
       </el-empty>
 
       <el-table v-else :data="tables" style="width: 100%" v-loading="loading">
@@ -30,7 +30,7 @@
           <template #default="{ row }">
             <el-button size="small" @click="handleFields(row)">字段管理</el-button>
             <el-button size="small" @click="handleRecords(row)">数据记录</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="canDelete" size="small" type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -75,7 +75,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -93,6 +93,7 @@ const route = useRoute()
 const router = useRouter()
 const databaseId = route.params.id as string
 const databaseName = ref('')
+const userRole = ref('')
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -122,6 +123,10 @@ const formatDate = (dateStr: string) => {
   return new Date(dateStr).toLocaleString('zh-CN')
 }
 
+// 权限判断
+const canCreate = computed(() => ['owner', 'admin', 'editor'].includes(userRole.value))
+const canDelete = computed(() => ['owner', 'admin'].includes(userRole.value))
+
 const goBack = () => {
   router.push('/databases')
 }
@@ -142,12 +147,10 @@ const loadTables = async () => {
 
 const loadDatabaseInfo = async () => {
   try {
-    const response = await databaseAPI.list()
+    const response = await databaseAPI.getDetail(databaseId)
     if (response.success && response.data) {
-      const db = response.data.databases?.find((d: any) => d.id === databaseId)
-      if (db) {
-        databaseName.value = db.name
-      }
+      databaseName.value = response.data.name || ''
+      userRole.value = response.data.role || 'viewer'
     }
   } catch (error) {
     console.error('Failed to load database info:', error)

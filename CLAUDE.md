@@ -1,1 +1,0 @@
-- only use bash command

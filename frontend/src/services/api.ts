@@ -223,7 +223,7 @@ export const recordAPI = {
     request.post('/records', data),
 
   list: (params: { table_id: string; limit?: number; offset?: number; filter?: string }) =>
-    request.get('/records', { table_id: params.table_id, limit: params.limit, offset: params.offset }),
+    request.get('/records', { table_id: params.table_id, limit: params.limit, offset: params.offset, filter: params.filter }),
 
   get: (id: string) =>
     request.get(`/records/${id}`),
@@ -264,7 +264,7 @@ export const fileAPI = {
 
 // 插件相关 API
 export const pluginAPI = {
-  create: (data: { name: string; description: string; language: string; entry_file: string; timeout: number }) =>
+  create: (data: { name: string; description: string; language: string; entry_file: string; timeout: number; config?: string; config_values?: string }) =>
     request.post('/plugins', data),
 
   list: () =>
@@ -273,7 +273,7 @@ export const pluginAPI = {
   get: (id: string) =>
     request.get(`/plugins/${id}`),
 
-  update: (id: string, data: { name: string; description: string; timeout: number }) =>
+  update: (id: string, data: { name: string; description: string; timeout: number; config?: string; config_values?: string }) =>
     request.put(`/plugins/${id}`, data),
 
   delete: (id: string) =>
@@ -284,6 +284,18 @@ export const pluginAPI = {
 
   unbind: (id: string, data: { table_id: string }) =>
     request.delete(`/plugins/${id}/unbind`, data),
+
+  getBindings: (id: string) =>
+    request.get(`/plugins/${id}/bindings`),
+}
+
+// 统计相关 API
+export const statsAPI = {
+  getSummary: () =>
+    request.get('/stats/summary'),
+
+  getActivities: (limit?: number) =>
+    request.get('/stats/activities', { limit }),
 }
 
 

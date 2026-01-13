@@ -15,7 +15,7 @@
               <el-icon><Refresh /></el-icon>
               刷新
             </el-button>
-            <el-button type="primary" @click="handleCreate">新建记录</el-button>
+            <el-button v-if="canCreate" type="primary" @click="handleCreate">新建记录</el-button>
           </div>
         </div>
       </template>
@@ -37,7 +37,7 @@
       </div>
 
       <el-empty v-if="records.length === 0" description="暂无数据记录">
-        <el-button type="primary" @click="handleCreate">创建记录</el-button>
+        <el-button v-if="canCreate" type="primary" @click="handleCreate">创建记录</el-button>
       </el-empty>
 
       <el-table v-else :data="records" style="width: 100%" v-loading="loading" border>
@@ -67,8 +67,8 @@
         </el-table-column>
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
-            <el-button size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="canEdit" size="small" @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="canDelete" size="small" type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -198,22 +198,51 @@
           :on-change="handleFileSelect"
           :file-list="fileList"
           :limit="5"
+          :on-exceed="handleExceed"
+          :before-upload="beforeUpload"
         >
-          <el-button size="small" type="primary">选择文件</el-button>
+          <el-button size="small" type="primary">
+            <el-icon><Upload /></el-icon> 选择文件
+          </el-button>
           <template #tip>
-            <div class="el-upload__tip">最多上传5个文件，单个文件不超过50MB</div>
+            <div class="el-upload__tip">
+              支持上传图片、文档、压缩包等文件，单文件不超过50MB
+            </div>
           </template>
         </el-upload>
 
-        <el-table :data="attachedFiles" style="width: 100%; margin-top: 20px" v-if="attachedFiles.length > 0">
-          <el-table-column prop="file_name" label="文件名" />
-          <el-table-column prop="file_size" label="大小" width="120">
+        <!-- 上传进度 -->
+        <div v-if="uploadProgress > 0 && uploadProgress < 100" class="upload-progress">
+          <el-progress :percentage="uploadProgress" />
+        </div>
+
+        <el-table
+          :data="attachedFiles"
+          style="width: 100%; margin-top: 20px"
+          v-if="attachedFiles.length > 0"
+          v-loading="loadingFiles"
+        >
+          <el-table-column label="文件" min-width="200">
+            <template #default="{ row }">
+              <div class="file-item">
+                <el-icon class="file-icon"><Document /></el-icon>
+                <span class="file-name">{{ row.file_name }}</span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="file_size" label="大小" width="100">
             <template #default="{ row }">
               {{ formatFileSize(row.file_size) }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="150">
+          <el-table-column prop="created_at" label="上传时间" width="180">
             <template #default="{ row }">
+              {{ formatDate(row.created_at) }}
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="180">
+            <template #default="{ row }">
+              <el-button size="small" @click="handlePreviewFile(row)">预览</el-button>
               <el-button size="small" @click="handleDownloadFile(row)">下载</el-button>
               <el-button size="small" type="danger" @click="handleDeleteFile(row)">删除</el-button>
             </template>
@@ -230,16 +259,33 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 文件预览对话框 -->
+    <el-dialog v-model="previewDialogVisible" title="文件预览" width="800px">
+      <div class="file-preview">
+        <img v-if="previewFile.isImage" :src="previewFile.url" style="max-width: 100%" />
+        <div v-else-if="previewFile.isPdf">
+          <iframe :src="previewFile.url" style="width: 100%; height: 600px"></iframe>
+        </div>
+        <div v-else>
+          <el-result icon="warning" title="无法预览" sub-title="此文件类型不支持预览，请下载后查看">
+            <template #extra>
+              <el-button type="primary" @click="handleDownloadFile(previewFile)">下载文件</el-button>
+            </template>
+          </el-result>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Refresh, Search } from '@element-plus/icons-vue'
+import { ArrowLeft, Refresh, Search, Upload, Document } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { tableAPI, recordAPI, fieldAPI, fileAPI } from '@/services/api'
+import { tableAPI, recordAPI, fieldAPI, fileAPI, databaseAPI } from '@/services/api'
 
 interface Field {
   id: string
@@ -262,6 +308,8 @@ const route = useRoute()
 const router = useRouter()
 const tableId = route.params.id as string
 const tableName = ref('')
+const databaseId = ref('')
+const userRole = ref('')
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -284,7 +332,16 @@ const dialogTitle = ref('新建记录')
 // 文件管理相关变量
 const fileList = ref<any[]>([])
 const attachedFiles = ref<any[]>([])
+const uploadProgress = ref(0)
+const loadingFiles = ref(false)
+const previewDialogVisible = ref(false)
+const previewFile = ref<any>({})
 const isEdit = computed(() => isEditMode.value)
+
+// 权限判断
+const canCreate = computed(() => ['owner', 'admin', 'editor'].includes(userRole.value))
+const canEdit = computed(() => ['owner', 'admin', 'editor'].includes(userRole.value))
+const canDelete = computed(() => ['owner', 'admin'].includes(userRole.value))
 
 // 动态生成表单验证规则
 const computedRules = computed(() => {
@@ -351,6 +408,15 @@ const loadTableInfo = async () => {
     const response = await tableAPI.get(tableId)
     if (response.success && response.data) {
       tableName.value = response.data.name || ''
+      databaseId.value = response.data.database_id || ''
+
+      // 获取数据库角色
+      if (databaseId.value) {
+        const dbResponse = await databaseAPI.getDetail(databaseId.value)
+        if (dbResponse.success && dbResponse.data) {
+          userRole.value = dbResponse.data.role || 'viewer'
+        }
+      }
     }
   } catch (error) {
     console.error('Failed to load table info:', error)
@@ -360,11 +426,18 @@ const loadTableInfo = async () => {
 const loadRecords = async () => {
   loading.value = true
   try {
-    const response = await recordAPI.list({
+    const params: any = {
       table_id: tableId,
       limit: pageSize.value,
       offset: (currentPage.value - 1) * pageSize.value,
-    })
+    }
+
+    // Add filter parameter if searching
+    if (searchText.value.trim()) {
+      params.filter = searchText.value.trim()
+    }
+
+    const response = await recordAPI.list(params)
     if (response.success && response.data) {
       records.value = response.data.records || []
       total.value = response.data.total || 0
@@ -382,10 +455,9 @@ const handleRefresh = () => {
   loadRecords()
 }
 
-const handleSearch = () => {
+const handleSearch = async () => {
   currentPage.value = 1
-  // TODO: Implement search with filter parameter
-  ElMessage.info('搜索功能开发中...')
+  await loadRecords()
 }
 
 const handleCreate = () => {
@@ -477,29 +549,78 @@ const resetForm = () => {
 
 // 加载记录的附件
 const loadAttachedFiles = async (recordId: string) => {
+  loadingFiles.value = true
   try {
     const res: any = await fileAPI.listByRecord(recordId)
     attachedFiles.value = res.data || []
   } catch (error) {
     console.error('加载附件失败', error)
+  } finally {
+    loadingFiles.value = false
   }
 }
 
-// 处理文件选择
+// 文件上传前校验
+const beforeUpload = (file: any) => {
+  const isLt50M = file.size / 1024 / 1024 < 50
+  if (!isLt50M) {
+    ElMessage.error('文件大小不能超过50MB')
+    return false
+  }
+  return true
+}
+
+// 处理文件超出限制
+const handleExceed = () => {
+  ElMessage.warning('最多只能上传5个文件')
+}
+
+// 处理文件选择（带进度）
 const handleFileSelect = async (file: any) => {
   if (!currentRecordId.value) {
     ElMessage.warning('请先保存记录后再上传文件')
     return
   }
 
+  uploadProgress.value = 0
   try {
-    await fileAPI.upload(currentRecordId.value, file.raw)
+    // Use axios directly to track upload progress
+    const formData = new FormData()
+    formData.append('record_id', currentRecordId.value)
+    formData.append('file', file.raw)
+
+    const api = (await import('@/services/api')).default
+    await api.post('/files/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      onUploadProgress: (progressEvent: any) => {
+        uploadProgress.value = Math.floor(
+          (progressEvent.loaded * 100) / (progressEvent.total || 1)
+        )
+      }
+    })
+
     ElMessage.success('文件上传成功')
     loadAttachedFiles(currentRecordId.value)
     fileList.value = []
+    uploadProgress.value = 0
   } catch (error: any) {
     ElMessage.error(error.response?.data?.message || '文件上传失败')
+    uploadProgress.value = 0
   }
+}
+
+// 预览文件
+const handlePreviewFile = (file: any) => {
+  const extension = file.file_name.split('.').pop()?.toLowerCase()
+  const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']
+
+  previewFile.value = {
+    ...file,
+    url: fileAPI.download(file.id),
+    isImage: imageExtensions.includes(extension),
+    isPdf: extension === 'pdf'
+  }
+  previewDialogVisible.value = true
 }
 
 // 下载文件
@@ -528,6 +649,21 @@ const formatFileSize = (bytes: number) => {
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(2) + ' KB'
   return (bytes / (1024 * 1024)).toFixed(2) + ' MB'
 }
+
+// 搜索防抖 - 当搜索文本改变时自动触发搜索
+let searchTimeout: ReturnType<typeof setTimeout> | null = null
+watch(searchText, () => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+  }
+  searchTimeout = setTimeout(() => {
+    if (searchText.value === '') {
+      loadRecords()
+    } else {
+      handleSearch()
+    }
+  }, 300)
+})
 
 onMounted(() => {
   loadTableInfo()

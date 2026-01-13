@@ -132,3 +132,17 @@ func UnbindPlugin(c *gin.Context) {
 
 	types.Success(c, "解绑成功")
 }
+
+// ListPluginBindings 列出插件的所有绑定
+func ListPluginBindings(c *gin.Context) {
+	pluginID := c.Param("id")
+
+	pluginService := services.NewPluginService(db.DB())
+	bindings, err := pluginService.ListBindings(pluginID)
+	if err != nil {
+		types.Error(c, 500, err.Error())
+		return
+	}
+
+	types.Success(c, bindings)
+}

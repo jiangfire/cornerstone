@@ -186,6 +186,8 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { statsAPI } from '@/services/api'
+import { ElMessage } from 'element-plus'
 import {
   UserFilled,
   ArrowDown,
@@ -237,42 +239,48 @@ const stats = ref({
 // 活动记录
 const activities = ref<Array<{ content: string; time: string; type: any }>>([])
 
-// 模拟统计数据
+// 加载统计数据
 const loadStats = async () => {
-  // TODO: 从后端获取真实数据
-  stats.value = {
-    users: 15,
-    organizations: 3,
-    databases: 8,
-    plugins: 5,
+  try {
+    const res: any = await statsAPI.getSummary()
+    stats.value = res.data || {
+      users: 0,
+      organizations: 0,
+      databases: 0,
+      plugins: 0,
+    }
+  } catch (error) {
+    console.error('Failed to load stats:', error)
+    ElMessage.error('加载统计数据失败')
   }
 }
 
-// 模拟活动数据
+// 加载活动数据
 const loadActivities = async () => {
-  // TODO: 从后端获取真实数据
-  activities.value = [
-    {
-      content: '创建了新的数据库 "项目A-电路设计"',
-      time: '2小时前',
-      type: 'primary',
-    },
-    {
-      content: '邀请 user2 加入组织 "研发团队"',
-      time: '5小时前',
-      type: 'success',
-    },
-    {
-      content: '安装了 "数据导出" 插件',
-      time: '1天前',
-      type: 'warning',
-    },
-    {
-      content: '更新了个人资料',
-      time: '2天前',
-      type: 'info',
-    },
-  ]
+  try {
+    const res: any = await statsAPI.getActivities(10)
+    activities.value = (res.data || []).map((item: any) => ({
+      content: item.content,
+      time: formatTimeAgo(item.time),
+      type: item.type || 'primary',
+    }))
+  } catch (error) {
+    console.error('Failed to load activities:', error)
+    activities.value = []
+  }
+}
+
+// 格式化相对时间
+const formatTimeAgo = (dateStr: string) => {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000)
+
+  if (seconds < 60) return '刚刚'
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}分钟前`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}小时前`
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}天前`
+  return date.toLocaleDateString('zh-CN')
 }
 
 // 处理用户菜单命令

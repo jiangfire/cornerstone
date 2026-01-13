@@ -28,8 +28,8 @@
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="handleTables(row)">表结构</el-button>
-            <el-button size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="canEdit(row)" size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
+            <el-button v-if="canDelete(row)" size="small" type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -90,6 +90,7 @@ interface Database {
   type: string
   table_count: number
   created_at: string
+  role?: string
 }
 
 const loading = ref(false)
@@ -123,6 +124,15 @@ const dialogTitle = ref('创建数据库')
 const formatDate = (dateStr: string) => {
   if (!dateStr) return '-'
   return new Date(dateStr).toLocaleString('zh-CN')
+}
+
+// 权限判断
+const canEdit = (row: Database) => {
+  return ['owner', 'admin'].includes(row.role || '')
+}
+
+const canDelete = (row: Database) => {
+  return row.role === 'owner'
 }
 
 const loadDatabases = async () => {

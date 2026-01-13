@@ -213,16 +213,18 @@ func (f *File) BeforeCreate(tx *gorm.DB) (err error) {
 
 // Plugin 插件定义 (plg_前缀)
 type Plugin struct {
-	ID          string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	Name        string     `gorm:"type:varchar(255);not null" json:"name"`
-	Description string     `gorm:"type:text" json:"description"`
-	Language    string     `gorm:"type:varchar(50);not null" json:"language"` // go, python, bash
-	EntryFile   string     `gorm:"type:varchar(255);not null" json:"entry_file"`
-	Timeout     int        `gorm:"type:integer;default:5" json:"timeout"` // 超时秒数
-	CreatedBy   string     `gorm:"type:varchar(50);not null" json:"created_by"`
-	CreatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt   *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	ID           string     `gorm:"type:varchar(50);primaryKey" json:"id"`
+	Name         string     `gorm:"type:varchar(255);not null" json:"name"`
+	Description  string     `gorm:"type:text" json:"description"`
+	Language     string     `gorm:"type:varchar(50);not null" json:"language"` // go, python, bash
+	EntryFile    string     `gorm:"type:varchar(255);not null" json:"entry_file"`
+	Timeout      int        `gorm:"type:integer;default:5" json:"timeout"` // 超时秒数
+	Config       string     `gorm:"type:text" json:"config"`                  // JSON config schema
+	ConfigValues string     `gorm:"type:text" json:"config_values"`          // JSON config values
+	CreatedBy    string     `gorm:"type:varchar(50);not null" json:"created_by"`
+	CreatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	DeletedAt    *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
 }
 
 func (Plugin) TableName() string {
@@ -287,6 +289,28 @@ func (FieldPermission) TableName() string {
 func (fp *FieldPermission) BeforeCreate(tx *gorm.DB) (err error) {
 	if fp.ID == "" {
 		fp.ID = GenerateID("flp")
+	}
+	return nil
+}
+
+// ActivityLog 活动日志表 (act_前缀)
+type ActivityLog struct {
+	ID           string    `gorm:"type:varchar(50);primaryKey" json:"id"`
+	UserID       string    `gorm:"type:varchar(50);not null" json:"user_id"`
+	Action       string    `gorm:"type:varchar(100);not null" json:"action"` // create, update, delete, etc.
+	ResourceType string    `gorm:"type:varchar(50)" json:"resource_type"` // database, table, record, plugin
+	ResourceID   string    `gorm:"type:varchar(50)" json:"resource_id"`
+	Description  string    `gorm:"type:text" json:"description"`
+	CreatedAt    time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+}
+
+func (ActivityLog) TableName() string {
+	return "activity_logs"
+}
+
+func (a *ActivityLog) BeforeCreate(tx *gorm.DB) (err error) {
+	if a.ID == "" {
+		a.ID = GenerateID("act")
 	}
 	return nil
 }

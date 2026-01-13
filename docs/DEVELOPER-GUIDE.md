@@ -412,6 +412,7 @@ curl -X GET http://localhost:8080/health
 ## 相关文档
 
 - [API 文档](./API.md) - 完整 API 接口文档
+- [权限系统](./PERMISSION-SYSTEM.md) - 三层权限模型详解
 - [测试报告](./E2E-TEST-REPORT.md) - E2E 测试报告
 - [项目状态](./PROJECT-STATUS.md) - 项目进度状态
 
@@ -429,4 +430,4 @@ curl -X GET http://localhost:8080/health
 
 ## 许可证
 
-本项目采用 MIT 许可证。
+本项目采用 GNU AGPL v3 许可证。

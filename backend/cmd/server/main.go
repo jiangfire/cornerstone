@@ -151,6 +151,11 @@ func main() {
 			protected.DELETE("/plugins/:id", handlers.DeletePlugin)
 			protected.POST("/plugins/:id/bind", handlers.BindPlugin)
 			protected.DELETE("/plugins/:id/unbind", handlers.UnbindPlugin)
+			protected.GET("/plugins/:id/bindings", handlers.ListPluginBindings)
+
+			// 统计相关
+			protected.GET("/stats/summary", handlers.GetStatsSummary)
+			protected.GET("/stats/activities", handlers.GetRecentActivities)
 		}
 	}
 

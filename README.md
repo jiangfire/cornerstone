@@ -7,9 +7,9 @@
 [![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![Vue Version](https://img.shields.io/badge/Vue-3.4+-4FC08D?style=flat&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1?style=flat&logo=postgresql)](https://www.postgresql.org/)
-[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 
-**版本**: v1.7 | **更新**: 2026-01-11 | **状态**: 字段级权限功能已完成 ✨
+**版本**: v1.8 | **更新**: 2026-01-11 | **状态**: 前端功能完善完成 ✅
 
 </div>
 
@@ -23,6 +23,8 @@
 - **动态字段支持** - JSONB 存储实现无迁移字段扩展
 - **三层权限模型** - 数据库/表/字段级细粒度权限控制
 - **插件扩展系统** - Go/Python 子进程执行
+- **活动日志** - 完整的用户操作审计
+- **文件管理** - 支持上传、预览、下载
 
 ---
 
@@ -93,11 +95,33 @@ pnpm dev
 - ✅ 批量创建
 - ✅ JSONB 动态字段查询
 - ✅ 乐观锁并发控制
+- ✅ 实时搜索（防抖优化）⭐ 新增
 
-**字段级权限** ⭐ 新增
+**字段级权限**
 - ✅ 字段级 R/W/D 权限控制
 - ✅ 权限矩阵配置界面
 - ✅ 批量权限设置
+- ✅ 前端权限UI控制（根据角色显示/隐藏按钮）
+- ✅ 后端权限验证（API级别权限检查）
+- ✅ 完整的权限系统测试（12/12 通过）
+
+**统计分析** ⭐ 新增
+- ✅ 统计 API（用户/组织/数据库/插件数量）
+- ✅ 活动日志系统
+- ✅ Dashboard 实时数据显示
+- ✅ 最近活动时间线
+
+**插件系统** ⭐ 增强
+- ✅ 插件 CRUD 操作
+- ✅ 插件绑定管理（查看/解绑）
+- ✅ 插件配置参数（动态编辑器）
+- ✅ 支持参数类型：string/number/boolean/select
+
+**文件管理** ⭐ 增强
+- ✅ 文件上传（带进度条）
+- ✅ 文件预览（图片/PDF）
+- ✅ 文件下载
+- ✅ 文件删除
 
 ---
 
@@ -129,9 +153,10 @@ L3: 字段级权限 (细化到 R/W/D 操作)
 - ✅ JWT 黑名单使用主键查询 <1ms
 - ✅ 物化视图自动刷新（每5分钟）
 - ✅ 无需 Redis 依赖
+- ✅ 活动日志表
 
 ### 数据库设计
-- **14张核心表**：users, organizations, databases, tables, fields, field_permissions, records 等
+- **15张核心表**：users, organizations, databases, tables, fields, field_permissions, records, activity_logs 等
 - **UUID主键**：`usr_001`, `db_001` (调试友好)
 - **JSONB存储**：动态字段 + GIN索引优化
 
@@ -144,6 +169,7 @@ L3: 字段级权限 (细化到 R/W/D 操作)
 | **API 文档** | 完整 API 接口文档 | [docs/API.md](./docs/API.md) |
 | **开发指南** | 开发环境搭建、项目结构 | [docs/DEVELOPER-GUIDE.md](./docs/DEVELOPER-GUIDE.md) |
 | **项目状态** | 项目进度、测试报告 | [docs/PROJECT-STATUS.md](./docs/PROJECT-STATUS.md) |
+| **权限系统** | 权限系统完整文档 | [docs/PERMISSION-SYSTEM.md](./docs/PERMISSION-SYSTEM.md) |
 | **E2E 测试** | 端到端测试报告 | [docs/E2E-TEST-REPORT.md](./docs/E2E-TEST-REPORT.md) |
 
 ---
@@ -154,15 +180,16 @@ L3: 字段级权限 (细化到 R/W/D 操作)
 |------|------|------|
 | **设计文档** | 100% | ✅ 完成 |
 | **后端基础设施** | 100% | ✅ 完成 |
-| **后端业务代码** | 90% | ✅ 完成 |
+| **后端业务代码** | 100% | ✅ 完成 |
 | **前端基础设施** | 100% | ✅ 完成 |
 | **前端页面组件** | 100% | ✅ 完成 |
 | **测试覆盖** | 100% | ✅ 完成 |
-| **整体进度** | **85%** | 🟢 优秀 |
+| **整体进度** | **95%** | 🟢 优秀 |
 
 ### 测试报告
 - ✅ 后端测试：33/33 通过
 - ✅ 前端 E2E：14/14 通过
+- ✅ 权限系统：12/12 通过
 - ✅ 通过率：100%
 
 ---
@@ -172,6 +199,7 @@ L3: 字段级权限 (细化到 R/W/D 操作)
 - [API 接口文档](./docs/API.md)
 - [开发指南](./docs/DEVELOPER-GUIDE.md)
 - [项目状态](./docs/PROJECT-STATUS.md)
+- [权限系统文档](./docs/PERMISSION-SYSTEM.md)
 - [E2E 测试报告](./docs/E2E-TEST-REPORT.md)
 
 ---
@@ -212,8 +240,8 @@ L3: 字段级权限 (细化到 R/W/D 操作)
 
 ## 📝 许可证
 
-本项目采用 MIT 许可证。
+本项目采用 GNU AGPL v3 许可证。
 
 ---
 
-**文档版本**: v1.7 | **最后更新**: 2026-01-11
+**文档版本**: v1.8 | **最后更新**: 2026-01-11

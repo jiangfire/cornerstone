@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
@@ -25,13 +26,17 @@ type CreatePluginRequest struct {
 	Language    string `json:"language" binding:"required,oneof=go python bash"`
 	EntryFile   string `json:"entry_file" binding:"required"`
 	Timeout     int    `json:"timeout" binding:"min=1,max=300"`
+	Config      string `json:"config" binding:"omitempty"`       // JSON config schema
+	ConfigValues string `json:"config_values" binding:"omitempty"` // JSON config values
 }
 
 // UpdatePluginRequest 更新插件请求
 type UpdatePluginRequest struct {
-	Name        string `json:"name" binding:"required,min=2,max=255"`
-	Description string `json:"description" binding:"max=500"`
-	Timeout     int    `json:"timeout" binding:"min=1,max=300"`
+	Name         string `json:"name" binding:"required,min=2,max=255"`
+	Description  string `json:"description" binding:"max=500"`
+	Timeout      int    `json:"timeout" binding:"min=1,max=300"`
+	Config       string `json:"config" binding:"omitempty"`
+	ConfigValues string `json:"config_values" binding:"omitempty"`
 }
 
 // CreatePlugin 创建插件
@@ -43,12 +48,14 @@ func (s *PluginService) CreatePlugin(req CreatePluginRequest, userID string) (*m
 	}
 
 	plugin := models.Plugin{
-		Name:        req.Name,
-		Description: req.Description,
-		Language:    req.Language,
-		EntryFile:   req.EntryFile,
-		Timeout:     req.Timeout,
-		CreatedBy:   userID,
+		Name:         req.Name,
+		Description:  req.Description,
+		Language:     req.Language,
+		EntryFile:    req.EntryFile,
+		Timeout:      req.Timeout,
+		Config:       req.Config,
+		ConfigValues: req.ConfigValues,
+		CreatedBy:    userID,
 	}
 
 	if err := s.db.Create(&plugin).Error; err != nil {
@@ -92,6 +99,8 @@ func (s *PluginService) UpdatePlugin(pluginID string, req UpdatePluginRequest) e
 	plugin.Name = req.Name
 	plugin.Description = req.Description
 	plugin.Timeout = req.Timeout
+	plugin.Config = req.Config
+	plugin.ConfigValues = req.ConfigValues
 
 	if err := s.db.Save(&plugin).Error; err != nil {
 		return fmt.Errorf("更新插件失败: %w", err)
@@ -150,4 +159,46 @@ func (s *PluginService) UnbindPlugin(pluginID, tableID string) error {
 		return errors.New("绑定关系不存在")
 	}
 	return nil
+}
+
+// BindingDetail 绑定详情
+type BindingDetail struct {
+	ID            string    `json:"id"`
+	TableID       string    `json:"table_id"`
+	TableName     string    `json:"table_name"`
+	DatabaseID    string    `json:"database_id"`
+	DatabaseName  string    `json:"database_name"`
+	Trigger       string    `json:"trigger"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+// ListBindings 列出插件的所有绑定
+func (s *PluginService) ListBindings(pluginID string) ([]BindingDetail, error) {
+	var bindings []models.PluginBinding
+	if err := s.db.Where("plugin_id = ?", pluginID).Find(&bindings).Error; err != nil {
+		return nil, fmt.Errorf("查询绑定失败: %w", err)
+	}
+
+	var details []BindingDetail
+	for _, binding := range bindings {
+		var table models.Table
+		if err := s.db.Where("id = ?", binding.TableID).First(&table).Error; err != nil {
+			continue
+		}
+
+		var database models.Database
+		s.db.Where("id = ?", table.DatabaseID).First(&database)
+
+		details = append(details, BindingDetail{
+			ID:           binding.ID,
+			TableID:      binding.TableID,
+			TableName:    table.Name,
+			DatabaseID:   table.DatabaseID,
+			DatabaseName: database.Name,
+			Trigger:      binding.Trigger,
+			CreatedAt:    binding.CreatedAt,
+		})
+	}
+
+	return details, nil
 }

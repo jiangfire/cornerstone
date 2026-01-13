@@ -47,6 +47,9 @@ func Migrate() error {
 		&models.Plugin{},
 		&models.PluginBinding{},
 
+		// 活动日志
+		&models.ActivityLog{},
+
 		// 安全相关
 		&models.TokenBlacklist{},
 	); err != nil {
