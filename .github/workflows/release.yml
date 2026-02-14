@@ -1,0 +1,128 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build:
+    name: Build Cross-Platform Binaries
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - goos: linux
+            goarch: amd64
+            suffix: linux-amd64
+          - goos: linux
+            goarch: arm64
+            suffix: linux-arm64
+          - goos: windows
+            goarch: amd64
+            suffix: windows-amd64.exe
+          - goos: darwin
+            goarch: amd64
+            suffix: darwin-amd64
+          - goos: darwin
+            goarch: arm64
+            suffix: darwin-arm64
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+
+      - name: Build binary
+        env:
+          GOOS: ${{ matrix.goos }}
+          GOARCH: ${{ matrix.goarch }}
+          CGO_ENABLED: 0
+        run: |
+          cd backend
+          go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" -trimpath -o cornerstone-${{ matrix.suffix }} ./cmd/server
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: cornerstone-${{ matrix.suffix }}
+          path: backend/cornerstone-${{ matrix.suffix }}
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          find artifacts -type f -exec mv {} release/ \;
+          cd release
+          for file in *; do
+            if [[ "$file" == *.exe ]]; then
+              zip "${file%.exe}.zip" "$file"
+            else
+              tar czf "$file.tar.gz" "$file"
+            fi
+          done
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          cat > RELEASE_NOTES.md << EOF
+          ## What's Changed
+
+          This release includes:
+          - Cross-platform binaries for Linux (amd64, arm64), Windows (amd64), and macOS (amd64, arm64)
+          - All latest features and bug fixes
+
+          ## Installation
+
+          Download the appropriate binary for your platform:
+          - **Linux AMD64**: cornerstone-linux-amd64.tar.gz
+          - **Linux ARM64**: cornerstone-linux-arm64.tar.gz
+          - **Windows AMD64**: cornerstone-windows-amd64.zip
+          - **macOS AMD64**: cornerstone-darwin-amd64.tar.gz
+          - **macOS ARM64 (Apple Silicon)**: cornerstone-darwin-arm64.tar.gz
+
+          ## Usage
+
+          1. Extract the archive
+          2. Set up your \`.env\` file (see backend/.env.example)
+          3. Run the binary: \`./cornerstone-*\`
+
+          ## Docker
+
+          Docker images are available at:
+          - Backend: \`ghcr.io/${{ github.repository }}/backend:${{ github.ref_name }}\`
+          - Frontend: \`ghcr.io/${{ github.repository }}/frontend:${{ github.ref_name }}\`
+
+          **Full Changelog**: https://github.com/${{ github.repository }}/compare/...
+          EOF
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release/*.tar.gz
+            release/*.zip
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

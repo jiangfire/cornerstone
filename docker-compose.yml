@@ -1,0 +1,108 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: cornerstone-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: cornerstone
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - cornerstone-network
+
+  # Backend API
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cornerstone-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      # Database configuration
+      DATABASE_URL: postgres://postgres:postgres@postgres:5432/cornerstone?sslmode=disable
+      DB_MAX_OPEN: 10
+      DB_MAX_IDLE: 5
+      DB_MAX_LIFETIME: 3600
+
+      # Server configuration
+      # WARNING: 生产环境请改为 release
+      SERVER_MODE: debug
+      PORT: 8080
+
+      # Logger configuration
+      LOG_LEVEL: info
+      LOG_OUTPUT: /app/logs/app.log
+      LOG_ERROR: /app/logs/error.log
+      LOG_MAX_SIZE: 100
+      LOG_MAX_AGE: 7
+      LOG_MAX_BACKUPS: 5
+
+      # JWT configuration
+      # WARNING: 生产环境必须替换为强随机密钥
+      JWT_SECRET: dev-secret-key-change-in-production
+      JWT_EXPIRATION: 24
+
+      # CORS configuration
+      CORS_ORIGIN: "*"
+      DEBUG: "true"
+    volumes:
+      - backend_logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    networks:
+      - cornerstone-network
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cornerstone-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    environment:
+      # API base URL for Docker Compose network
+      VITE_API_BASE_URL: http://localhost:8080/api
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - cornerstone-network
+
+volumes:
+  postgres_data:
+    driver: local
+  backend_logs:
+    driver: local
+
+networks:
+  cornerstone-network:
+    driver: bridge

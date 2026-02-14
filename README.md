@@ -4,12 +4,12 @@
 
 **一个现代化的、可扩展的数据管理平台**
 
-[![Go Version](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go)](https://golang.org/)
-[![Vue Version](https://img.shields.io/badge/Vue-3.4+-4FC08D?style=flat&logo=vue.js&logoColor=white)](https://vuejs.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://golang.org/)
+[![Vue Version](https://img.shields.io/badge/Vue-3.5+-4FC08D?style=flat&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1?style=flat&logo=postgresql)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 
-**版本**: v1.8 | **更新**: 2026-01-11 | **状态**: 前端功能完善完成 ✅
+**版本**: v1.0.0 | **更新**: 2026-02-14 | **状态**: 正式发布 ✅
 
 </div>
 
@@ -31,7 +31,7 @@
 ## 🚀 快速开始
 
 ### 环境要求
-- Go 1.21+
+- Go 1.25+
 - PostgreSQL 15+
 - Node.js 18+ (pnpm)
 
@@ -129,12 +129,12 @@ pnpm dev
 
 | 层级 | 技术 | 版本 |
 |------|------|------|
-| 后端 | Go + Gin + GORM | 1.21+ |
+| 后端 | Go + Gin + GORM | 1.25+ |
 | 数据库 | PostgreSQL | 15+ |
-| 前端 | Vue 3 + TypeScript | 3.4+ |
-| UI库 | Element Plus | 2.5+ |
-| 状态管理 | Pinia | 2.1+ |
-| 构建工具 | Vite | 5.0+ |
+| 前端 | Vue 3 + TypeScript | 3.5+ |
+| UI库 | Element Plus | 2.13+ |
+| 状态管理 | Pinia | 3.0+ |
+| 构建工具 | Rolldown-Vite | latest |
 
 ---
 
@@ -244,4 +244,4 @@ L3: 字段级权限 (细化到 R/W/D 操作)
 
 ---
 
-**文档版本**: v1.8 | **最后更新**: 2026-01-11
+**文档版本**: v1.0.0 | **最后更新**: 2026-02-14

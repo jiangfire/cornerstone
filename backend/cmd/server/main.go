@@ -1,5 +1,8 @@
 package main
 
+// Version is set at build time via -ldflags="-X main.Version=..."
+var Version = "dev"
+
 import (
 	"context"
 	"log"
@@ -59,6 +62,7 @@ func main() {
 		c.JSON(200, gin.H{
 			"status":  "healthy",
 			"service": "cornerstone-backend",
+			"version": Version,
 			"time":    time.Now().Format(time.RFC3339),
 		})
 	})
