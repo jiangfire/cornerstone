@@ -1,8 +1,5 @@
 package main
 
-// Version is set at build time via -ldflags="-X main.Version=..."
-var Version = "dev"
-
 import (
 	"context"
 	"log"
@@ -19,6 +16,9 @@ import (
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	applog "github.com/jiangfire/cornerstone/backend/pkg/log"
 )
+
+// Version is set at build time via -ldflags="-X main.Version=..."
+var Version = "dev"
 
 func main() {
 	// 1. 加载配置（从环境变量）

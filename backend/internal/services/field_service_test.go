@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -15,7 +15,7 @@ func setupFieldTestDB(t *testing.T) *gorm.DB {
 	os.Setenv("JWT_SECRET", "test-secret-key-for-testing-only")
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	err = db.AutoMigrate(
 		&models.User{},
@@ -23,7 +23,7 @@ func setupFieldTestDB(t *testing.T) *gorm.DB {
 		&models.Table{},
 		&models.Field{},
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 
 	return db
 }
@@ -34,16 +34,17 @@ func TestFieldService_CreateField(t *testing.T) {
 	service := NewFieldService(db)
 
 	// 创建测试数据
-	user := models.User{Username: "testuser", Email: "test@example.com"}
-	db.Create(&user)
+	user := models.User{Username: "testuser", Email: "test@example.com", Password: "hashed_password"}
+	require.NoError(t, db.Create(&user).Error)
+	require.NotEmpty(t, user.ID)
 
 	database := models.Database{Name: "Test DB", OwnerID: user.ID}
-	db.Create(&database)
+	require.NoError(t, db.Create(&database).Error)
+	require.NotEmpty(t, database.ID)
 
 	table := models.Table{Name: "Test Table", DatabaseID: database.ID}
-	result := db.Create(&table)
-	assert.NoError(t, result.Error)
-	assert.NotEmpty(t, table.ID, "Table ID should be generated")
+	require.NoError(t, db.Create(&table).Error)
+	require.NotEmpty(t, table.ID, "Table ID should be generated")
 
 	t.Run("Successful creation", func(t *testing.T) {
 		req := CreateFieldRequest{
@@ -52,9 +53,9 @@ func TestFieldService_CreateField(t *testing.T) {
 		}
 
 		field, err := service.CreateField(req, table.ID)
-		assert.NoError(t, err)
-		assert.NotNil(t, field)
-		assert.Equal(t, "Test Field", field.Name)
-		assert.Equal(t, "string", field.Type)
+		require.NoError(t, err)
+		require.NotNil(t, field)
+		require.Equal(t, "Test Field", field.Name)
+		require.Equal(t, "string", field.Type)
 	})
 }
