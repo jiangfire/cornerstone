@@ -20,6 +20,7 @@ func setupFieldTestDB(t *testing.T) *gorm.DB {
 	err = db.AutoMigrate(
 		&models.User{},
 		&models.Database{},
+		&models.DatabaseAccess{},
 		&models.Table{},
 		&models.Field{},
 	)
@@ -42,20 +43,29 @@ func TestFieldService_CreateField(t *testing.T) {
 	require.NoError(t, db.Create(&database).Error)
 	require.NotEmpty(t, database.ID)
 
-	table := models.Table{Name: "Test Table", DatabaseID: database.ID}
+	// 创建数据库访问权限
+	access := models.DatabaseAccess{UserID: user.ID, DatabaseID: database.ID, Role: "owner"}
+	require.NoError(t, db.Create(&access).Error)
+
+	table := models.Table{
+		ID:        models.GenerateID("tbl"), // Manually generate ID for test determinism
+		Name:       "Test Table",
+		DatabaseID: database.ID,
+	}
 	require.NoError(t, db.Create(&table).Error)
-	require.NotEmpty(t, table.ID, "Table ID should be generated")
+	require.NotEmpty(t, table.ID, "Table ID should be set")
 
 	t.Run("Successful creation", func(t *testing.T) {
 		req := CreateFieldRequest{
-			Name: "Test Field",
-			Type: "string",
+			TableID: table.ID,
+			Name:    "Test_Field",
+			Type:    "string",
 		}
 
-		field, err := service.CreateField(req, table.ID)
+		field, err := service.CreateField(req, user.ID)
 		require.NoError(t, err)
 		require.NotNil(t, field)
-		require.Equal(t, "Test Field", field.Name)
+		require.Equal(t, "Test_Field", field.Name)
 		require.Equal(t, "string", field.Type)
 	})
 }
