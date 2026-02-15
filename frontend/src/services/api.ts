@@ -1,4 +1,19 @@
 import axios, { type AxiosInstance, type AxiosResponse, type AxiosError } from 'axios'
+import type {
+  ApiResponse,
+  LoginResponse,
+  RegisterResponse,
+  UserProfile,
+  UserListResponse,
+  DatabaseListResponse,
+  TableListResponse,
+  FieldListResponse,
+  RecordListResponse,
+  OrganizationListResponse,
+  FileListResponse,
+  PluginListResponse,
+  StatsSummary,
+} from '@/types/api'
 
 // API 配置
 const API_CONFIG = {
@@ -15,7 +30,7 @@ api.interceptors.request.use(
     // 从 localStorage 获取 token
     const token = localStorage.getItem('auth_token')
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`
+      config.headers = { ...config.headers, Authorization: `Bearer ${token}` }
     }
 
     // 添加请求时间戳
@@ -38,7 +53,6 @@ api.interceptors.response.use(
   },
   (error: AxiosError) => {
     const { response } = error
-
     if (response?.status === 401) {
       // Token 过期或无效，清除本地存储并跳转到登录页
       localStorage.removeItem('auth_token')
@@ -52,116 +66,144 @@ api.interceptors.response.use(
 
 // 通用请求方法
 export const request = {
-  get<T = unknown>(url: string, params?: Record<string, unknown>): Promise<T> {
+  get<T = unknown>(url: string, params?: Record<string, unknown>): Promise<ApiResponse<T>> {
     return api.get(url, { params })
   },
 
-  post<T = unknown>(url: string, data?: Record<string, unknown>): Promise<T> {
+  post<T = unknown>(url: string, data?: Record<string, unknown>): Promise<ApiResponse<T>> {
     return api.post(url, data)
   },
 
-  put<T = unknown>(url: string, data?: Record<string, unknown>): Promise<T> {
+  put<T = unknown>(url: string, data?: Record<string, unknown>): Promise<ApiResponse<T>> {
     return api.put(url, data)
   },
 
-  delete<T = unknown>(url: string, data?: Record<string, unknown>): Promise<T> {
+  delete<T = unknown>(url: string, data?: Record<string, unknown>): Promise<ApiResponse<T>> {
     return data ? api.delete(url, { data }) : api.delete(url)
   },
 }
 
 // 认证相关 API
 export const authAPI = {
-  register: (data: { username: string; email: string; password: string }) =>
-    request.post('/auth/register', data),
-
-  login: (data: { username: string; password: string }) => request.post('/auth/login', data),
-
-  logout: () => request.post('/auth/logout'),
+  register: (data: { username: string; email: string; password: string }): Promise<ApiResponse<RegisterResponse>> =>
+    request.post<RegisterResponse>('/auth/register', data),
+  login: (data: { username: string; password: string }): Promise<ApiResponse<LoginResponse>> =>
+    request.post<LoginResponse>('/auth/login', data),
+  logout: (): Promise<ApiResponse<null>> => request.post<null>('/auth/logout'),
 }
 
 // 用户相关 API
 export const userAPI = {
-  getProfile: () => request.get('/users/me'),
-
-  updateProfile: (data: Record<string, unknown>) => request.put('/users/me', data),
-
-  // 获取用户列表（用于选择成员/共享用户）
-  list: (params?: { org_id?: string; db_id?: string }) => request.get('/users', params),
-
-  // 搜索用户
-  search: (query: string) => request.get('/users/search', { q: query }),
+  getProfile: (): Promise<ApiResponse<UserProfile>> => request.get<UserProfile>('/users/me'),
+  list: (params?: { org_id?: string; db_id?: string }): Promise<ApiResponse<UserListResponse>> =>
+    request.get<UserListResponse>('/users', params),
+  search: (query: string): Promise<ApiResponse<UserListResponse>> =>
+    request.get<UserListResponse>('/users/search', { q: query }),
 }
 
 // 组织相关 API
 export const organizationAPI = {
-  list: () => request.get('/organizations'),
+  list: (): Promise<ApiResponse<OrganizationListResponse>> =>
+    request.get<OrganizationListResponse>('/organizations'),
 
-  create: (data: { name: string; description?: string }) => request.post('/organizations', data),
+  create: (data: { name: string; description?: string }): Promise<ApiResponse<Organization>> =>
+    request.post<Organization>('/organizations', data),
 
-  getDetail: (id: string) => request.get(`/organizations/${id}`),
+  getDetail: (id: string): Promise<ApiResponse<Organization>> =>
+    request.get<Organization>(`/organizations/${id}`),
 
-  update: (id: string, data: Record<string, unknown>) => request.put(`/organizations/${id}`, data),
+  update: (
+    id: string,
+    data: { name: string; description?: string }
+  ): Promise<ApiResponse<Organization>> =>
+    request.put<Organization>(`/organizations/${id}`, data),
 
-  delete: (id: string) => request.delete(`/organizations/${id}`),
+  delete: (id: string): Promise<ApiResponse<null>> =>
+    request.delete<null>(`/organizations/${id}`),
 
   // 组织成员管理
-  getMembers: (id: string) => request.get(`/organizations/${id}/members`),
+  getMembers: (id: string): Promise<ApiResponse<Organization['members']>> =>
+    request.get<Organization['members']>(`/organizations/${id}/members`),
 
-  addMember: (id: string, data: { user_id: string; role: string }) =>
-    request.post(`/organizations/${id}/members`, data),
+  addMember: (
+    orgId: string,
+    data: { user_id: string; role: string }
+  ): Promise<ApiResponse<null>> =>
+    request.post<null>(`/organizations/${orgId}/members`, data),
 
-  removeMember: (orgId: string, memberId: string) =>
-    request.delete(`/organizations/${orgId}/members/${memberId}`),
+  removeMember: (orgId: string, memberId: string): Promise<ApiResponse<null>> =>
+    request.delete<null>(`/organizations/${orgId}/members/${memberId}`),
 
-  updateMemberRole: (orgId: string, memberId: string, role: string) =>
-    request.put(`/organizations/${orgId}/members/${memberId}/role`, { role }),
+  updateMemberRole: (
+    orgId: string,
+    memberId: string,
+    role: string
+  ): Promise<ApiResponse<null>> =>
+    request.put<null>(`/organizations/${orgId}/members/${memberId}/role`, { role }),
 }
 
 // 数据库相关 API
 export const databaseAPI = {
-  list: () => request.get('/databases'),
+  list: (): Promise<ApiResponse<DatabaseListResponse>> =>
+    request.get<DatabaseListResponse>('/databases'),
 
   create: (data: {
     name: string
     description?: string
     isPublic?: boolean
     isPersonal?: boolean
-  }) => request.post('/databases', data),
+  }): Promise<ApiResponse<Database>> =>
+    request.post<Database>('/databases', data),
 
-  getDetail: (id: string) => request.get(`/databases/${id}`),
+  getDetail: (id: string): Promise<ApiResponse<Database>> =>
+    request.get<Database>(`/databases/${id}`),
 
-  update: (id: string, data: { name: string; description?: string; isPublic?: boolean }) =>
-    request.put(`/databases/${id}`, data),
+  update: (
+    id: string,
+    data: { name?: string; description?: string }
+  ): Promise<ApiResponse<Database>> =>
+    request.put<Database>(`/databases/${id}`, data),
 
-  delete: (id: string) => request.delete(`/databases/${id}`),
+  delete: (id: string): Promise<ApiResponse<null>> =>
+    request.delete<null>(`/databases/${id}`),
 
-  getTables: (dbId: string) => request.get(`/databases/${dbId}/tables`),
+  // 数据库权限相关
+  share: (
+    id: string,
+    data: { user_id: string; role: string }
+  ): Promise<ApiResponse<null>> =>
+    request.post<null>(`/databases/${id}/share`, data),
 
-  share: (id: string, data: { user_id: string; role: string }) =>
-    request.post(`/databases/${id}/share`, data),
+  getUsers: (id: string): Promise<ApiResponse<Database['users']>> =>
+    request.get<Database['users']>(`/databases/${id}/users`),
 
-  getUsers: (id: string) => request.get(`/databases/${id}/users`),
+  removeUser: (dbId: string, userId: string): Promise<ApiResponse<null>> =>
+    request.delete<null>(`/databases/${dbId}/users/${userId}`),
 
-  removeUser: (dbId: string, userId: string) =>
-    request.delete(`/databases/${dbId}/users/${userId}`),
-
-  updateUserRole: (dbId: string, userId: string, role: string) =>
-    request.put(`/databases/${dbId}/users/${userId}/role`, { role }),
+  updateUserRole: (
+    dbId: string,
+    userId: string,
+    role: string
+  ): Promise<ApiResponse<null>> =>
+    request.put<null>(`/databases/${dbId}/users/${userId}/role`, { role }),
 }
 
 // 表相关 API
 export const tableAPI = {
-  create: (data: { database_id: string; name: string; description?: string }) =>
-    request.post('/tables', data),
+  create: (data: { database_id: string; name: string }): Promise<ApiResponse<Table>> =>
+    request.post<Table>('/tables', data),
 
-  get: (id: string) => request.get(`/tables/${id}`),
+  get: (id: string): Promise<ApiResponse<Table>> =>
+    request.get<Table>(`/tables/${id}`),
 
-  update: (id: string, data: { name: string; description?: string }) =>
-    request.put(`/tables/${id}`, data),
+  update: (
+    id: string,
+    data: { name: string }
+  ): Promise<ApiResponse<Table>> =>
+    request.put<Table>(`/tables/${id}`, data),
 
-  delete: (id: string) => request.delete(`/tables/${id}`),
-
-  getFields: (tableId: string) => request.get(`/tables/${tableId}/fields`),
+  delete: (id: string): Promise<ApiResponse<null>> =>
+    request.delete<null>(`/tables/${id}`),
 }
 
 // 字段相关 API
@@ -172,129 +214,154 @@ export const fieldAPI = {
     type: string
     required?: boolean
     options?: string
-  }) => request.post('/fields', data),
+  }): Promise<ApiResponse<Field>> =>
+    request.post<Field>('/fields', data),
 
-  get: (id: string) => request.get(`/fields/${id}`),
+  get: (id: string): Promise<ApiResponse<Field>> =>
+    request.get<Field>(`/fields/${id}`),
 
   update: (
     id: string,
-    data: { name: string; type: string; required?: boolean; options?: string },
-  ) => request.put(`/fields/${id}`, data),
+    data: { name?: string; type?: string; required?: boolean; options?: string }
+  ): Promise<ApiResponse<Field>> =>
+    request.put<Field>(`/fields/${id}`, data),
 
-  delete: (id: string) => request.delete(`/fields/${id}`),
+  delete: (id: string): Promise<ApiResponse<null>> =>
+    request.delete<null>(`/fields/${id}`),
 
   // 字段权限相关
-  getPermissions: (tableId: string) => request.get(`/tables/${tableId}/field-permissions`),
+  getPermissions: (tableId: string): Promise<ApiResponse<Field['permissions']>> =>
+    request.get<Field['permissions']>(`/tables/${tableId}/field-permissions`),
 
   setPermission: (
     tableId: string,
-    data: {
-      field_id: string
-      role: string
-      can_read: boolean
-      can_write: boolean
-      can_delete: boolean
-    },
-  ) => request.put(`/tables/${tableId}/field-permissions`, data),
+    data: { field_id: string; role: string; can_read: boolean; can_write: boolean; can_delete: boolean }
+  ): Promise<ApiResponse<null>> =>
+    request.put<null>(`/tables/${tableId}/field-permissions`, data),
 
   batchSetPermissions: (
     tableId: string,
-    permissions: Array<{
-      field_id: string
-      role: string
-      can_read: boolean
-      can_write: boolean
-      can_delete: boolean
-    }>,
-  ) => request.put(`/tables/${tableId}/field-permissions/batch`, { permissions }),
+    data: { permissions: Array<{ field_id: string; role: string; can_read: boolean; can_write: boolean; can_delete: boolean }> }
+  ): Promise<ApiResponse<null>> =>
+    request.put<null>(`/tables/${tableId}/field-permissions/batch`, { permissions }),
 }
 
 // 记录相关 API
 export const recordAPI = {
-  create: (data: { table_id: string; data: Record<string, unknown> }) =>
-    request.post('/records', data),
+  create: (data: {
+    table_id: string
+    data: Record<string, unknown>
+  }): Promise<ApiResponse<Record>> =>
+    request.post<Record>('/records', data),
 
-  list: (params: { table_id: string; limit?: number; offset?: number; filter?: string }) =>
-    request.get('/records', {
+  list: (params: {
+    table_id: string
+    limit?: number
+    offset?: number
+    filter?: string
+  }): Promise<ApiResponse<RecordListResponse>> =>
+    request.get<RecordListResponse>('/records', {
       table_id: params.table_id,
       limit: params.limit,
       offset: params.offset,
       filter: params.filter,
     }),
 
-  get: (id: string) => request.get(`/records/${id}`),
+  get: (id: string): Promise<ApiResponse<Record>> =>
+    request.get<Record>(`/records/${id}`),
 
-  update: (id: string, data: { data: Record<string, unknown>; version?: number }) =>
-    request.put(`/records/${id}`, data),
+  update: (
+    id: string,
+    data: Record<string, unknown>
+    version?: number
+  }): Promise<ApiResponse<Record>> =>
+    request.put<Record>(`/records/${id}`, { ...data, version }),
 
-  delete: (id: string) => request.delete(`/records/${id}`),
+  delete: (id: string): Promise<ApiResponse<null>> =>
+    request.delete<null>(`/records/${id}`),
 
-  batchCreate: (data: { table_id: string; records: Record<string, unknown>[] }) =>
-    request.post('/records/batch', data),
+  batchCreate: (data: {
+    table_id: string
+    data: Record<string, unknown>
+    count: number
+  }): Promise<ApiResponse<Record[]>> =>
+    request.post<Record[]>('/records/batch', { ...data, count }),
 }
 
 // 文件相关 API
 export const fileAPI = {
-  upload: (recordId: string, file: File) => {
+  upload: (recordId: string, file: File): Promise<ApiResponse<File>> => {
     const formData = new FormData()
     formData.append('record_id', recordId)
     formData.append('file', file)
-    return api.post('/files/upload', formData, {
+
+    return request.post<File>('/files/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
 
-  get: (id: string) => request.get(`/files/${id}`),
+  get: (id: string): Promise<ApiResponse<File>> =>
+    request.get<File>(`/files/${id}`),
 
-  download: (id: string) => `${API_CONFIG.baseURL}/files/${id}/download`,
+  delete: (id: string): Promise<ApiResponse<null>> =>
+    request.delete<null>(`/files/${id}`),
 
-  delete: (id: string) => request.delete(`/files/${id}`),
+  listByRecord: (recordId: string): Promise<ApiResponse<File['files']>> =>
+    request.get<File['files']>(`/records/${recordId}/files`),
 
-  listByRecord: (recordId: string) => request.get(`/records/${recordId}/files`),
+  download: (id: string): string =>
+    `${API_CONFIG.baseURL}/files/${id}/download`,
 }
 
 // 插件相关 API
 export const pluginAPI = {
   create: (data: {
     name: string
-    description: string
+    description?: string
     language: string
     entry_file: string
-    timeout: number
+    timeout?: number
     config?: string
-    config_values?: string
-  }) => request.post('/plugins', data),
+  }): Promise<ApiResponse<Plugin>> =>
+    request.post<Plugin>('/plugins', data),
 
-  list: () => request.get('/plugins'),
+  list: (): Promise<ApiResponse<PluginListResponse>> =>
+    request.get<PluginListResponse>('/plugins'),
 
-  get: (id: string) => request.get(`/plugins/${id}`),
+  get: (id: string): Promise<ApiResponse<Plugin>> =>
+    request.get<Plugin>(`/plugins/${id}`),
 
   update: (
     id: string,
     data: {
-      name: string
-      description: string
-      timeout: number
+      name?: string
+      description?: string
+      timeout?: number
       config?: string
-      config_values?: string
-    },
-  ) => request.put(`/plugins/${id}`, data),
+    }
+  ): Promise<ApiResponse<Plugin>> =>
+    request.put<Plugin>(`/plugins/${id}`, data),
 
-  delete: (id: string) => request.delete(`/plugins/${id}`),
+  delete: (id: string): Promise<ApiResponse<null>> =>
+    request.delete<null>(`/plugins/${id}`),
 
-  bind: (id: string, data: { table_id: string; trigger: string }) =>
-    request.post(`/plugins/${id}/bind`, data),
+  bind: (id: string, data: { table_id: string; trigger: string }): Promise<ApiResponse<null>> =>
+    request.post<null>(`/plugins/${id}/bind`, data),
 
-  unbind: (id: string, data: { table_id: string }) => request.delete(`/plugins/${id}/unbind`, data),
+  unbind: (id: string, data: { table_id: string }): Promise<ApiResponse<null>> =>
+    request.delete<null>(`/plugins/${id}/unbind`, { data }),
 
-  getBindings: (id: string) => request.get(`/plugins/${id}/bindings`),
+  getBindings: (id: string): Promise<ApiResponse<Plugin['bindings']>> =>
+    request.get<Plugin['bindings']>(`/plugins/${id}/bindings`),
 }
 
 // 统计相关 API
 export const statsAPI = {
-  getSummary: () => request.get('/stats/summary'),
+  getSummary: (): Promise<ApiResponse<StatsSummary>> =>
+    request.get<StatsSummary>('/stats/summary'),
 
-  getActivities: (limit?: number) => request.get('/stats/activities', { limit }),
+  getActivities: (limit?: number): Promise<ApiResponse<StatsSummary['activities']>> =>
+    request.get<StatsSummary['activities']>('/stats/activities', { limit }),
 }
 
 export default api
