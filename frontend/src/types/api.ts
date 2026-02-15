@@ -2,17 +2,35 @@
  * API 响应类型定义
  */
 
+// 通用API响应结构
+export interface ApiResponse<T = unknown> {
+  success: boolean
+  message: string
+  data: T
+}
+
 // 认证相关
+export interface AuthResponse {
+  success: boolean
+  message?: string
+  token?: string
+}
+
 export interface LoginResponse {
-  token: string
-  user: User
+  success: boolean
+  message?: string
+  token?: string
+  user?: User
 }
 
 export interface RegisterResponse {
-  token: string
-  user: User
+  success: boolean
+  message?: string
+  token?: string
+  user?: User
 }
 
+// 用户相关
 export interface UserProfile {
   id: string
   username: string
@@ -23,7 +41,6 @@ export interface UserProfile {
   avatar?: string
 }
 
-// 用户相关
 export interface User {
   id: string
   username: string
@@ -35,6 +52,8 @@ export interface User {
 }
 
 export interface UserListResponse {
+  success: boolean
+  message?: string
   users: User[]
   total: number
   page: number
@@ -52,6 +71,8 @@ export interface Database {
 }
 
 export interface DatabaseListResponse {
+  success: boolean
+  message?: string
   databases: Database[]
   total: number
   page: number
@@ -68,6 +89,8 @@ export interface Table {
 }
 
 export interface TableListResponse {
+  success: boolean
+  message?: string
   tables: Table[]
   total: number
   page: number
@@ -87,6 +110,8 @@ export interface Field {
 }
 
 export interface FieldListResponse {
+  success: boolean
+  message?: string
   fields: Field[]
   total: number
   page: number
@@ -106,6 +131,8 @@ export interface Record {
 }
 
 export interface RecordListResponse {
+  success: boolean
+  message?: string
   records: Record[]
   total: number
   has_more: boolean
@@ -122,10 +149,38 @@ export interface Organization {
 }
 
 export interface OrganizationListResponse {
+  success: boolean
+  message?: string
   organizations: Organization[]
   total: number
   page: number
   limit: number
+}
+
+export interface OrganizationMembers {
+  success: boolean
+  message?: string
+  members: OrganizationMember[]
+}
+
+export interface OrganizationMember {
+  id: string
+  user_id: string
+  organization_id: string
+  role: string
+  created_at: string
+  updated_at: string
+}
+
+export interface OrganizationAdded {
+  success: boolean
+  message?: string
+  member: OrganizationMember
+}
+
+export interface OrganizationRemoved {
+  success: boolean
+  message?: string
 }
 
 // 文件相关
@@ -138,9 +193,12 @@ export interface File {
   storage_url: string
   uploaded_by: string
   created_at: string
+  updated_at: string
 }
 
 export interface FileListResponse {
+  success: boolean
+  message?: string
   files: File[]
   total: number
   page: number
@@ -158,24 +216,63 @@ export interface Plugin {
 }
 
 export interface PluginListResponse {
+  success: boolean
+  message?: string
   plugins: Plugin[]
   total: number
   page: number
   limit: number
 }
 
+export interface PluginBinding {
+  table_id: string
+  plugin_id: string
+  created_at: string
+}
+
+export interface PluginBindings {
+  success: boolean
+  message?: string
+  bindings: PluginBinding[]
+}
+
 // 统计相关
 export interface StatsSummary {
+  success: boolean
+  message?: string
   total_databases: number
   total_tables: number
   total_fields: number
   total_records: number
 }
 
-export interface Activity {
+export interface ActivitiesResponse {
+  success: boolean
+  message?: string
+  activities: Activity[]
+}
+
+// 数据库用户相关
+export interface DatabaseUsers {
+  success: boolean
+  message?: string
+  users: DatabaseUser[]
+}
+
+export interface DatabaseUser {
   id: string
-  type: string
-  description: string
-  user_id: string
-  created_at: string
+  username: string
+  email: string
+  role: string
+}
+
+export interface DatabaseUserAdded {
+  success: boolean
+  message?: string
+  user: DatabaseUser
+}
+
+export interface DatabaseUserRemoved {
+  success: boolean
+  message?: string
 }
