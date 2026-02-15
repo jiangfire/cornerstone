@@ -272,9 +272,9 @@ export const recordAPI = {
 
   update: (
     id: string,
-    data: Record<string, unknown>
-    version?: number
-  }): Promise<ApiResponse<Record>> =>
+    data: Record<string, unknown>,
+    version?: number,
+  ): Promise<ApiResponse<Record>> =>
     request.put<Record>(`/records/${id}`, { ...data, version }),
 
   delete: (id: string): Promise<ApiResponse<null>> =>
