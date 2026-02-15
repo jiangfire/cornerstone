@@ -145,7 +145,7 @@ export const organizationAPI = {
 
 // 数据库相关 API
 export const databaseAPI = {
-  list: (): Promise<ApiResponse<DatabaseListResponse>> =>
+  list: (): Promise<DatabaseListResponse> =>
     request.get<DatabaseListResponse>('/databases'),
 
   create: (data: {
@@ -153,58 +153,58 @@ export const databaseAPI = {
     description?: string
     isPublic?: boolean
     isPersonal?: boolean
-  }): Promise<ApiResponse<Database>> =>
-    request.post<Database>('/databases', data),
+  }): Promise<DatabaseAdded> =>
+    request.post<DatabaseAdded>('/databases', data),
 
-  getDetail: (id: string): Promise<ApiResponse<Database>> =>
+  getDetail: (id: string): Promise<Database> =>
     request.get<Database>(`/databases/${id}`),
 
   update: (
     id: string,
     data: { name?: string; description?: string }
-  ): Promise<ApiResponse<Database>> =>
-    request.put<Database>(`/databases/${id}`, data),
+  ): Promise<DatabaseAdded> =>
+    request.put<DatabaseAdded>(`/databases/${id}`, data),
 
-  delete: (id: string): Promise<ApiResponse<null>> =>
-    request.delete<null>(`/databases/${id}`),
+  delete: (id: string): Promise<AuthResponse> =>
+    request.delete<AuthResponse>(`/databases/${id}`),
 
   // 数据库权限相关
   share: (
     id: string,
     data: { user_id: string; role: string }
-  ): Promise<ApiResponse<null>> =>
-    request.post<null>(`/databases/${id}/share`, data),
+  ): Promise<AuthResponse> =>
+    request.post<AuthResponse>(`/databases/${id}/share`, data),
 
-  getUsers: (id: string): Promise<ApiResponse<Database['users']>> =>
-    request.get<Database['users']>(`/databases/${id}/users`),
+  getUsers: (id: string): Promise<DatabaseUsers> =>
+    request.get<DatabaseUsers>(`/databases/${id}/users`),
 
-  removeUser: (dbId: string, userId: string): Promise<ApiResponse<null>> =>
-    request.delete<null>(`/databases/${dbId}/users/${userId}`),
+  removeUser: (dbId: string, userId: string): Promise<AuthResponse> =>
+    request.delete<AuthResponse>(`/databases/${dbId}/users/${userId}`),
 
   updateUserRole: (
     dbId: string,
     userId: string,
     role: string
-  ): Promise<ApiResponse<null>> =>
-    request.put<null>(`/databases/${dbId}/users/${userId}/role`, { role }),
+  ): Promise<AuthResponse> =>
+    request.put<AuthResponse>(`/databases/${dbId}/users/${userId}/role`, { role }),
 }
 
 // 表相关 API
 export const tableAPI = {
-  create: (data: { database_id: string; name: string }): Promise<ApiResponse<Table>> =>
-    request.post<Table>('/tables', data),
+  create: (data: { database_id: string; name: string }): Promise<TableAdded> =>
+    request.post<TableAdded>('/tables', data),
 
-  get: (id: string): Promise<ApiResponse<Table>> =>
+  get: (id: string): Promise<Table> =>
     request.get<Table>(`/tables/${id}`),
 
   update: (
     id: string,
     data: { name: string }
-  ): Promise<ApiResponse<Table>> =>
-    request.put<Table>(`/tables/${id}`, data),
+  ): Promise<TableAdded> =>
+    request.put<TableAdded>(`/tables/${id}`, data),
 
-  delete: (id: string): Promise<ApiResponse<null>> =>
-    request.delete<null>(`/tables/${id}`),
+  delete: (id: string): Promise<AuthResponse> =>
+    request.delete<AuthResponse>(`/tables/${id}`),
 }
 
 // 字段相关 API
@@ -215,36 +215,36 @@ export const fieldAPI = {
     type: string
     required?: boolean
     options?: string
-  }): Promise<ApiResponse<Field>> =>
-    request.post<Field>('/fields', data),
+  }): Promise<FieldAdded> =>
+    request.post<FieldAdded>('/fields', data),
 
-  get: (id: string): Promise<ApiResponse<Field>> =>
+  get: (id: string): Promise<Field> =>
     request.get<Field>(`/fields/${id}`),
 
   update: (
     id: string,
     data: { name?: string; type?: string; required?: boolean; options?: string }
-  ): Promise<ApiResponse<Field>> =>
-    request.put<Field>(`/fields/${id}`, data),
+  ): Promise<FieldAdded> =>
+    request.put<FieldAdded>(`/fields/${id}`, data),
 
-  delete: (id: string): Promise<ApiResponse<null>> =>
-    request.delete<null>(`/fields/${id}`),
+  delete: (id: string): Promise<AuthResponse> =>
+    request.delete<AuthResponse>(`/fields/${id}`),
 
   // 字段权限相关
-  getPermissions: (tableId: string): Promise<ApiResponse<Field['permissions']>> =>
-    request.get<Field['permissions']>(`/tables/${tableId}/field-permissions`),
+  getPermissions: (tableId: string): Promise<FieldPermissions> =>
+    request.get<FieldPermissions>(`/tables/${tableId}/field-permissions`),
 
   setPermission: (
     tableId: string,
     data: { field_id: string; role: string; can_read: boolean; can_write: boolean; can_delete: boolean }
-  ): Promise<ApiResponse<null>> =>
-    request.put<null>(`/tables/${tableId}/field-permissions`, data),
+  ): Promise<AuthResponse> =>
+    request.put<AuthResponse>(`/tables/${tableId}/field-permissions`, data),
 
   batchSetPermissions: (
     tableId: string,
     data: { permissions: Array<{ field_id: string; role: string; can_read: boolean; can_write: boolean; can_delete: boolean }> }
-  ): Promise<ApiResponse<null>> =>
-    request.put<null>(`/tables/${tableId}/field-permissions/batch`, { permissions }),
+  ): Promise<AuthResponse> =>
+    request.put<AuthResponse>(`/tables/${tableId}/field-permissions/batch`, { permissions }),
 }
 
 // 记录相关 API
@@ -291,24 +291,17 @@ export const recordAPI = {
 
 // 文件相关 API
 export const fileAPI = {
-  upload: (recordId: string, file: File): Promise<ApiResponse<File>> => {
-    const formData = new FormData()
-    formData.append('record_id', recordId)
-    formData.append('file', file)
+  upload: (recordId: string, file: File): Promise<FileAdded> =>
+    request.post<FileAdded>('/files/upload', { record_id: recordId, file }),
 
-    return request.post<File>('/files/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
-  },
-
-  get: (id: string): Promise<ApiResponse<File>> =>
+  get: (id: string): Promise<File> =>
     request.get<File>(`/files/${id}`),
 
-  delete: (id: string): Promise<ApiResponse<null>> =>
-    request.delete<null>(`/files/${id}`),
+  delete: (id: string): Promise<AuthResponse> =>
+    request.delete<AuthResponse>(`/files/${id}`),
 
-  listByRecord: (recordId: string): Promise<ApiResponse<File['files']>> =>
-    request.get<File['files']>(`/records/${recordId}/files`),
+  listByRecord: (recordId: string): Promise<FileListResponse> =>
+    request.get<FileListResponse>(`/records/${recordId}/files`),
 
   download: (id: string): string =>
     `${API_CONFIG.baseURL}/files/${id}/download`,
@@ -323,13 +316,13 @@ export const pluginAPI = {
     entry_file: string
     timeout?: number
     config?: string
-  }): Promise<ApiResponse<Plugin>> =>
-    request.post<Plugin>('/plugins', data),
+  }): Promise<PluginAdded> =>
+    request.post<PluginAdded>('/plugins', data),
 
-  list: (): Promise<ApiResponse<PluginListResponse>> =>
+  list: (): Promise<PluginListResponse> =>
     request.get<PluginListResponse>('/plugins'),
 
-  get: (id: string): Promise<ApiResponse<Plugin>> =>
+  get: (id: string): Promise<Plugin> =>
     request.get<Plugin>(`/plugins/${id}`),
 
   update: (
@@ -340,29 +333,29 @@ export const pluginAPI = {
       timeout?: number
       config?: string
     }
-  ): Promise<ApiResponse<Plugin>> =>
-    request.put<Plugin>(`/plugins/${id}`, data),
+  ): Promise<PluginAdded> =>
+    request.put<PluginAdded>(`/plugins/${id}`, data),
 
-  delete: (id: string): Promise<ApiResponse<null>> =>
-    request.delete<null>(`/plugins/${id}`),
+  delete: (id: string): Promise<AuthResponse> =>
+    request.delete<AuthResponse>(`/plugins/${id}`),
 
-  bind: (id: string, data: { table_id: string; trigger: string }): Promise<ApiResponse<null>> =>
-    request.post<null>(`/plugins/${id}/bind`, data),
+  bind: (id: string, data: { table_id: string; trigger: string }): Promise<AuthResponse> =>
+    request.post<AuthResponse>(`/plugins/${id}/bind`, data),
 
-  unbind: (id: string, data: { table_id: string }): Promise<ApiResponse<null>> =>
-    request.delete<null>(`/plugins/${id}/unbind`, { data }),
+  unbind: (id: string, data: { table_id: string }): Promise<AuthResponse> =>
+    request.delete<AuthResponse>(`/plugins/${id}/unbind`, { data }),
 
-  getBindings: (id: string): Promise<ApiResponse<Plugin['bindings']>> =>
-    request.get<Plugin['bindings']>(`/plugins/${id}/bindings`),
+  getBindings: (id: string): Promise<PluginBindings> =>
+    request.get<PluginBindings>(`/plugins/${id}/bindings`),
 }
 
 // 统计相关 API
 export const statsAPI = {
-  getSummary: (): Promise<ApiResponse<StatsSummary>> =>
+  getSummary: (): Promise<StatsSummary> =>
     request.get<StatsSummary>('/stats/summary'),
 
-  getActivities: (limit?: number): Promise<ApiResponse<StatsSummary['activities']>> =>
-    request.get<StatsSummary['activities']>('/stats/activities', { limit }),
+  getActivities: (limit?: number): Promise<ActivitiesResponse> =>
+    request.get<ActivitiesResponse>('/stats/activities', { limit }),
 }
 
 export default api
