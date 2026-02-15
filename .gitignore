@@ -78,6 +78,8 @@ node_modules/
 
 # 构建输出
 dist/
+# 但保留 backend/internal/frontend/dist 用于 Go embed
+!backend/internal/frontend/dist/
 # Embedded frontend build artifacts (keep .gitkeep)
 !backend/internal/frontend/dist/.gitkeep
 dist-ssr/
