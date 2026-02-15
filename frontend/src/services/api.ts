@@ -85,61 +85,62 @@ export const request = {
 
 // 认证相关 API
 export const authAPI = {
-  register: (data: { username: string; email: string; password: string }): Promise<ApiResponse<RegisterResponse>> =>
+  register: (data: { username: string; email: string; password: string }): Promise<RegisterResponse> =>
     request.post<RegisterResponse>('/auth/register', data),
-  login: (data: { username: string; password: string }): Promise<ApiResponse<LoginResponse>> =>
+  login: (data: { username: string; password: string }): Promise<LoginResponse> =>
     request.post<LoginResponse>('/auth/login', data),
-  logout: (): Promise<ApiResponse<null>> => request.post<null>('/auth/logout'),
+  logout: (): Promise<AuthResponse> =>
+    request.post<AuthResponse>('/auth/logout'),
 }
 
 // 用户相关 API
 export const userAPI = {
-  getProfile: (): Promise<ApiResponse<UserProfile>> => request.get<UserProfile>('/users/me'),
-  list: (params?: { org_id?: string; db_id?: string }): Promise<ApiResponse<UserListResponse>> =>
+  getProfile: (): Promise<UserProfile> => request.get<UserProfile>('/users/me'),
+  list: (params?: { org_id?: string; db_id?: string }): Promise<UserListResponse> =>
     request.get<UserListResponse>('/users', params),
-  search: (query: string): Promise<ApiResponse<UserListResponse>> =>
+  search: (query: string): Promise<UserListResponse> =>
     request.get<UserListResponse>('/users/search', { q: query }),
 }
 
 // 组织相关 API
 export const organizationAPI = {
-  list: (): Promise<ApiResponse<OrganizationListResponse>> =>
+  list: (): Promise<OrganizationListResponse> =>
     request.get<OrganizationListResponse>('/organizations'),
 
-  create: (data: { name: string; description?: string }): Promise<ApiResponse<Organization>> =>
-    request.post<Organization>('/organizations', data),
+  create: (data: { name: string; description?: string }): Promise<OrganizationAdded> =>
+    request.post<OrganizationAdded>('/organizations', data),
 
-  getDetail: (id: string): Promise<ApiResponse<Organization>> =>
+  getDetail: (id: string): Promise<Organization> =>
     request.get<Organization>(`/organizations/${id}`),
 
   update: (
     id: string,
     data: { name: string; description?: string }
-  ): Promise<ApiResponse<Organization>> =>
-    request.put<Organization>(`/organizations/${id}`, data),
+  ): Promise<OrganizationAdded> =>
+    request.put<OrganizationAdded>(`/organizations/${id}`, data),
 
-  delete: (id: string): Promise<ApiResponse<null>> =>
-    request.delete<null>(`/organizations/${id}`),
+  delete: (id: string): Promise<AuthResponse> =>
+    request.delete<AuthResponse>(`/organizations/${id}`),
 
   // 组织成员管理
-  getMembers: (id: string): Promise<ApiResponse<Organization['members']>> =>
-    request.get<Organization['members']>(`/organizations/${id}/members`),
+  getMembers: (id: string): Promise<OrganizationMembers> =>
+    request.get<OrganizationMembers>(`/organizations/${id}/members`),
 
   addMember: (
     orgId: string,
     data: { user_id: string; role: string }
-  ): Promise<ApiResponse<null>> =>
-    request.post<null>(`/organizations/${orgId}/members`, data),
+  ): Promise<OrganizationAdded> =>
+    request.post<OrganizationAdded>(`/organizations/${orgId}/members`, data),
 
-  removeMember: (orgId: string, memberId: string): Promise<ApiResponse<null>> =>
-    request.delete<null>(`/organizations/${orgId}/members/${memberId}`),
+  removeMember: (orgId: string, memberId: string): Promise<AuthResponse> =>
+    request.delete<AuthResponse>(`/organizations/${orgId}/members/${memberId}`),
 
   updateMemberRole: (
     orgId: string,
     memberId: string,
     role: string
-  ): Promise<ApiResponse<null>> =>
-    request.put<null>(`/organizations/${orgId}/members/${memberId}/role`, { role }),
+  ): Promise<AuthResponse> =>
+    request.put<AuthResponse>(`/organizations/${orgId}/members/${memberId}/role`, { role }),
 }
 
 // 数据库相关 API

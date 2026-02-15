@@ -2,13 +2,6 @@
  * API 响应类型定义
  */
 
-// 通用API响应结构
-export interface ApiResponse<T = unknown> {
-  success: boolean
-  message: string
-  data: T
-}
-
 // 认证相关
 export interface LoginResponse {
   token: string
