@@ -83,6 +83,3 @@ export const request = {
     return data ? api.delete(url, { data }) : api.delete(url)
   },
 }
-
-// @ts-nocheck - 暂时禁用类型检查以加快开发
-// TODO: 修复所有API返回类型后移除此注释
