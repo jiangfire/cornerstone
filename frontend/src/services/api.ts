@@ -2,7 +2,7 @@ import axios, { type AxiosInstance, type AxiosResponse, type AxiosError } from '
 
 // API 配置
 const API_CONFIG = {
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 10000,
 }
 
@@ -28,7 +28,7 @@ api.interceptors.request.use(
   },
   (error) => {
     return Promise.reject(error)
-  }
+  },
 )
 
 // 响应拦截器
@@ -47,25 +47,25 @@ api.interceptors.response.use(
     }
 
     return Promise.reject(error)
-  }
+  },
 )
 
 // 通用请求方法
 export const request = {
-  get<T = any>(url: string, params?: any): Promise<T> {
+  get<T = unknown>(url: string, params?: Record<string, unknown>): Promise<T> {
     return api.get(url, { params })
   },
 
-  post<T = any>(url: string, data?: any): Promise<T> {
+  post<T = unknown>(url: string, data?: Record<string, unknown>): Promise<T> {
     return api.post(url, data)
   },
 
-  put<T = any>(url: string, data?: any): Promise<T> {
+  put<T = unknown>(url: string, data?: Record<string, unknown>): Promise<T> {
     return api.put(url, data)
   },
 
-  delete<T = any>(url: string): Promise<T> {
-    return api.delete(url)
+  delete<T = unknown>(url: string, data?: Record<string, unknown>): Promise<T> {
+    return data ? api.delete(url, { data }) : api.delete(url)
   },
 }
 
@@ -74,50 +74,38 @@ export const authAPI = {
   register: (data: { username: string; email: string; password: string }) =>
     request.post('/auth/register', data),
 
-  login: (data: { username: string; password: string }) =>
-    request.post('/auth/login', data),
+  login: (data: { username: string; password: string }) => request.post('/auth/login', data),
 
-  logout: () =>
-    request.post('/auth/logout'),
+  logout: () => request.post('/auth/logout'),
 }
 
 // 用户相关 API
 export const userAPI = {
-  getProfile: () =>
-    request.get('/users/me'),
+  getProfile: () => request.get('/users/me'),
 
-  updateProfile: (data: any) =>
-    request.put('/users/me', data),
+  updateProfile: (data: Record<string, unknown>) => request.put('/users/me', data),
 
   // 获取用户列表（用于选择成员/共享用户）
-  list: (params?: { org_id?: string; db_id?: string }) =>
-    request.get('/users', params),
+  list: (params?: { org_id?: string; db_id?: string }) => request.get('/users', params),
 
   // 搜索用户
-  search: (query: string) =>
-    request.get('/users/search', { q: query }),
+  search: (query: string) => request.get('/users/search', { q: query }),
 }
 
 // 组织相关 API
 export const organizationAPI = {
-  list: () =>
-    request.get('/organizations'),
+  list: () => request.get('/organizations'),
 
-  create: (data: { name: string; description?: string }) =>
-    request.post('/organizations', data),
+  create: (data: { name: string; description?: string }) => request.post('/organizations', data),
 
-  getDetail: (id: string) =>
-    request.get(`/organizations/${id}`),
+  getDetail: (id: string) => request.get(`/organizations/${id}`),
 
-  update: (id: string, data: any) =>
-    request.put(`/organizations/${id}`, data),
+  update: (id: string, data: Record<string, unknown>) => request.put(`/organizations/${id}`, data),
 
-  delete: (id: string) =>
-    request.delete(`/organizations/${id}`),
+  delete: (id: string) => request.delete(`/organizations/${id}`),
 
   // 组织成员管理
-  getMembers: (id: string) =>
-    request.get(`/organizations/${id}/members`),
+  getMembers: (id: string) => request.get(`/organizations/${id}/members`),
 
   addMember: (id: string, data: { user_id: string; role: string }) =>
     request.post(`/organizations/${id}/members`, data),
@@ -131,29 +119,28 @@ export const organizationAPI = {
 
 // 数据库相关 API
 export const databaseAPI = {
-  list: () =>
-    request.get('/databases'),
+  list: () => request.get('/databases'),
 
-  create: (data: { name: string; description?: string; isPublic?: boolean; isPersonal?: boolean }) =>
-    request.post('/databases', data),
+  create: (data: {
+    name: string
+    description?: string
+    isPublic?: boolean
+    isPersonal?: boolean
+  }) => request.post('/databases', data),
 
-  getDetail: (id: string) =>
-    request.get(`/databases/${id}`),
+  getDetail: (id: string) => request.get(`/databases/${id}`),
 
   update: (id: string, data: { name: string; description?: string; isPublic?: boolean }) =>
     request.put(`/databases/${id}`, data),
 
-  delete: (id: string) =>
-    request.delete(`/databases/${id}`),
+  delete: (id: string) => request.delete(`/databases/${id}`),
 
-  getTables: (dbId: string) =>
-    request.get(`/databases/${dbId}/tables`),
+  getTables: (dbId: string) => request.get(`/databases/${dbId}/tables`),
 
   share: (id: string, data: { user_id: string; role: string }) =>
     request.post(`/databases/${id}/share`, data),
 
-  getUsers: (id: string) =>
-    request.get(`/databases/${id}/users`),
+  getUsers: (id: string) => request.get(`/databases/${id}/users`),
 
   removeUser: (dbId: string, userId: string) =>
     request.delete(`/databases/${dbId}/users/${userId}`),
@@ -167,74 +154,82 @@ export const tableAPI = {
   create: (data: { database_id: string; name: string; description?: string }) =>
     request.post('/tables', data),
 
-  get: (id: string) =>
-    request.get(`/tables/${id}`),
+  get: (id: string) => request.get(`/tables/${id}`),
 
   update: (id: string, data: { name: string; description?: string }) =>
     request.put(`/tables/${id}`, data),
 
-  delete: (id: string) =>
-    request.delete(`/tables/${id}`),
+  delete: (id: string) => request.delete(`/tables/${id}`),
 
-  getFields: (tableId: string) =>
-    request.get(`/tables/${tableId}/fields`),
+  getFields: (tableId: string) => request.get(`/tables/${tableId}/fields`),
 }
 
 // 字段相关 API
 export const fieldAPI = {
-  create: (data: { table_id: string; name: string; type: string; required?: boolean; options?: string }) =>
-    request.post('/fields', data),
+  create: (data: {
+    table_id: string
+    name: string
+    type: string
+    required?: boolean
+    options?: string
+  }) => request.post('/fields', data),
 
-  get: (id: string) =>
-    request.get(`/fields/${id}`),
+  get: (id: string) => request.get(`/fields/${id}`),
 
-  update: (id: string, data: { name: string; type: string; required?: boolean; options?: string }) =>
-    request.put(`/fields/${id}`, data),
+  update: (
+    id: string,
+    data: { name: string; type: string; required?: boolean; options?: string },
+  ) => request.put(`/fields/${id}`, data),
 
-  delete: (id: string) =>
-    request.delete(`/fields/${id}`),
+  delete: (id: string) => request.delete(`/fields/${id}`),
 
   // 字段权限相关
-  getPermissions: (tableId: string) =>
-    request.get(`/tables/${tableId}/field-permissions`),
+  getPermissions: (tableId: string) => request.get(`/tables/${tableId}/field-permissions`),
 
-  setPermission: (tableId: string, data: {
-    field_id: string
-    role: string
-    can_read: boolean
-    can_write: boolean
-    can_delete: boolean
-  }) =>
-    request.put(`/tables/${tableId}/field-permissions`, data),
+  setPermission: (
+    tableId: string,
+    data: {
+      field_id: string
+      role: string
+      can_read: boolean
+      can_write: boolean
+      can_delete: boolean
+    },
+  ) => request.put(`/tables/${tableId}/field-permissions`, data),
 
-  batchSetPermissions: (tableId: string, permissions: Array<{
-    field_id: string
-    role: string
-    can_read: boolean
-    can_write: boolean
-    can_delete: boolean
-  }>) =>
-    request.put(`/tables/${tableId}/field-permissions/batch`, { permissions }),
+  batchSetPermissions: (
+    tableId: string,
+    permissions: Array<{
+      field_id: string
+      role: string
+      can_read: boolean
+      can_write: boolean
+      can_delete: boolean
+    }>,
+  ) => request.put(`/tables/${tableId}/field-permissions/batch`, { permissions }),
 }
 
 // 记录相关 API
 export const recordAPI = {
-  create: (data: { table_id: string; data: Record<string, any> }) =>
+  create: (data: { table_id: string; data: Record<string, unknown> }) =>
     request.post('/records', data),
 
   list: (params: { table_id: string; limit?: number; offset?: number; filter?: string }) =>
-    request.get('/records', { table_id: params.table_id, limit: params.limit, offset: params.offset, filter: params.filter }),
+    request.get('/records', {
+      table_id: params.table_id,
+      limit: params.limit,
+      offset: params.offset,
+      filter: params.filter,
+    }),
 
-  get: (id: string) =>
-    request.get(`/records/${id}`),
+  get: (id: string) => request.get(`/records/${id}`),
 
-  update: (id: string, data: { data: Record<string, any>; version?: number }) =>
+  update: (id: string, data: { data: Record<string, unknown>; version?: number }) =>
     request.put(`/records/${id}`, data),
 
-  delete: (id: string) =>
-    request.delete(`/records/${id}`),
+  delete: (id: string) => request.delete(`/records/${id}`),
 
-  batchCreate: (data: { table_id: string; records: Record<string, any>[] }) =>
+  batchCreate: (data: { table_id: string; records: Record<string, unknown>[] }) =>
     request.post('/records/batch', data),
 }
 
@@ -245,58 +240,61 @@ export const fileAPI = {
     formData.append('record_id', recordId)
     formData.append('file', file)
     return api.post('/files/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' },
     })
   },
 
-  get: (id: string) =>
-    request.get(`/files/${id}`),
+  get: (id: string) => request.get(`/files/${id}`),
 
-  download: (id: string) =>
-    `${API_CONFIG.baseURL}/files/${id}/download`,
+  download: (id: string) => `${API_CONFIG.baseURL}/files/${id}/download`,
 
-  delete: (id: string) =>
-    request.delete(`/files/${id}`),
+  delete: (id: string) => request.delete(`/files/${id}`),
 
-  listByRecord: (recordId: string) =>
-    request.get(`/records/${recordId}/files`),
+  listByRecord: (recordId: string) => request.get(`/records/${recordId}/files`),
 }
 
 // 插件相关 API
 export const pluginAPI = {
-  create: (data: { name: string; description: string; language: string; entry_file: string; timeout: number; config?: string; config_values?: string }) =>
-    request.post('/plugins', data),
+  create: (data: {
+    name: string
+    description: string
+    language: string
+    entry_file: string
+    timeout: number
+    config?: string
+    config_values?: string
+  }) => request.post('/plugins', data),
 
-  list: () =>
-    request.get('/plugins'),
+  list: () => request.get('/plugins'),
 
-  get: (id: string) =>
-    request.get(`/plugins/${id}`),
+  get: (id: string) => request.get(`/plugins/${id}`),
 
-  update: (id: string, data: { name: string; description: string; timeout: number; config?: string; config_values?: string }) =>
-    request.put(`/plugins/${id}`, data),
+  update: (
+    id: string,
+    data: {
+      name: string
+      description: string
+      timeout: number
+      config?: string
+      config_values?: string
+    },
+  ) => request.put(`/plugins/${id}`, data),
 
-  delete: (id: string) =>
-    request.delete(`/plugins/${id}`),
+  delete: (id: string) => request.delete(`/plugins/${id}`),
 
   bind: (id: string, data: { table_id: string; trigger: string }) =>
     request.post(`/plugins/${id}/bind`, data),
 
-  unbind: (id: string, data: { table_id: string }) =>
-    request.delete(`/plugins/${id}/unbind`, data),
+  unbind: (id: string, data: { table_id: string }) => request.delete(`/plugins/${id}/unbind`, data),
 
-  getBindings: (id: string) =>
-    request.get(`/plugins/${id}/bindings`),
+  getBindings: (id: string) => request.get(`/plugins/${id}/bindings`),
 }
 
 // 统计相关 API
 export const statsAPI = {
-  getSummary: () =>
-    request.get('/stats/summary'),
+  getSummary: () => request.get('/stats/summary'),
 
-  getActivities: (limit?: number) =>
-    request.get('/stats/activities', { limit }),
+  getActivities: (limit?: number) => request.get('/stats/activities', { limit }),
 }
-
 
 export default api

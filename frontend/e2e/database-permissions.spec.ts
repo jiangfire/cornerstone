@@ -93,7 +93,7 @@ test.describe('Database Permission Management', () => {
 
     // Verify removal
     await page.click('button:has-text("管理用户")');
-    await expect(page.locator('text=' + editorUser.username)).not.toBeVisible();
+    await expect(page.locator('text=' + editorUser.username)).toBeHidden();
   });
 
   test('admin can share database with other users', async ({ page }) => {
@@ -137,7 +137,7 @@ test.describe('Database Permission Management', () => {
     const dbRow = await page.locator('table tbody tr').filter({ hasText: dbName });
 
     // Should not see share button
-    await expect(dbRow.locator('button:has-text("分享")')).not.toBeVisible();
+    await expect(dbRow.locator('button:has-text("分享")')).toBeHidden();
   });
 
   test('viewer cannot share database', async ({ page }) => {
@@ -157,6 +157,6 @@ test.describe('Database Permission Management', () => {
     const dbRow = await page.locator('table tbody tr').filter({ hasText: dbName });
 
     // Should not see share button
-    await expect(dbRow.locator('button:has-text("分享")')).not.toBeVisible();
+    await expect(dbRow.locator('button:has-text("分享")')).toBeHidden();
   });
 });

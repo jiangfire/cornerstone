@@ -28,11 +28,11 @@ func GetLogger() *zap.Logger {
 // InitLogger 初始化日志系统
 func InitLogger(cfg config.LoggerConfig) error {
 	// 创建日志目录
-	if err := os.MkdirAll(filepath.Dir(cfg.OutputPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cfg.OutputPath), 0750); err != nil {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(cfg.ErrorPath), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cfg.ErrorPath), 0750); err != nil {
 		return err
 	}
 

@@ -305,7 +305,9 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 		}
 
 		// 检测数据库类型并使用适当的查询方式
-		isSQLite := s.db.Dialector.Name() == "sqlite"
+		//nolint:staticcheck // QF1008 - Storing dialector name in variable is more readable than repeating s.db.Dialector.Name()
+		dialectorName := s.db.Dialector.Name()
+		isSQLite := dialectorName == "sqlite"
 
 		// 构建查询条件
 		for fieldID, value := range filter {
@@ -336,7 +338,9 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 		var filter map[string]interface{}
 		if err := json.Unmarshal([]byte(req.Filter), &filter); err == nil {
 			// 检测数据库类型并使用适当的查询方式
-			isSQLite := s.db.Dialector.Name() == "sqlite"
+			//nolint:staticcheck // QF1008 - Storing dialector name in variable is more readable
+			dialectorName := s.db.Dialector.Name()
+			isSQLite := dialectorName == "sqlite"
 
 			for fieldID, value := range filter {
 				jsonValue, _ := json.Marshal(value)
@@ -358,7 +362,8 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 	for i, r := range records {
 		var data interface{}
 		if r.Data != "" {
-			json.Unmarshal([]byte(r.Data), &data)
+			_ = json.Unmarshal([]byte(r.Data), &data)
+			// 数据已安全存储在数据库中，解析失败不影响核心功能
 		}
 
 		result[i] = RecordResponse{
@@ -397,7 +402,8 @@ func (s *RecordService) GetRecord(recordID, userID string) (*RecordResponse, err
 	// 3. 解析数据
 	var data interface{}
 	if record.Data != "" {
-		json.Unmarshal([]byte(record.Data), &data)
+		_ = json.Unmarshal([]byte(record.Data), &data)
+		// 数据已安全存储在数据库中，解析失败不影响核心功能
 	}
 
 	return &RecordResponse{

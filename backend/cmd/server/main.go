@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/config"
 	"github.com/jiangfire/cornerstone/backend/internal/db"
+	"github.com/jiangfire/cornerstone/backend/internal/frontend"
 	"github.com/jiangfire/cornerstone/backend/internal/handlers"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	applog "github.com/jiangfire/cornerstone/backend/pkg/log"
@@ -163,10 +164,14 @@ func main() {
 		}
 	}
 
-	// 10. 启动服务器
+	// 10. 注册前端静态文件服务
+	frontend.RegisterRoutes(r)
+
+	// 11. 启动服务器
 	srv := &http.Server{
-		Addr:    cfg.GetServerAddr(),
-		Handler: r,
+		Addr:              cfg.GetServerAddr(),
+		Handler:           r,
+		ReadHeaderTimeout:   10 * time.Second,
 	}
 
 	// 优雅关闭

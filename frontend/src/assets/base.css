@@ -1,86 +1,96 @@
-/* color palette from <https://github.com/vuejs/theme> */
+/* Frutiger Aero Design Tokens */
 :root {
-  --vt-c-white: #ffffff;
-  --vt-c-white-soft: #f8f8f8;
-  --vt-c-white-mute: #f2f2f2;
+  /* --- Primary gradient stops (sky blue) --- */
+  --fa-sky-50: #f0f9ff;
+  --fa-sky-100: #e0f2fe;
+  --fa-sky-200: #bae6fd;
+  --fa-sky-300: #7dd3fc;
+  --fa-sky-400: #38bdf8;
+  --fa-sky-500: #0ea5e9;
+  --fa-sky-600: #0284c7;
 
-  --vt-c-black: #181818;
-  --vt-c-black-soft: #222222;
-  --vt-c-black-mute: #282828;
+  /* --- Accent teal-green --- */
+  --fa-teal-300: #5eead4;
+  --fa-teal-400: #2dd4bf;
+  --fa-teal-500: #14b8a6;
 
-  --vt-c-indigo: #2c3e50;
+  /* --- Accent green --- */
+  --fa-green-300: #86efac;
+  --fa-green-400: #4ade80;
+  --fa-green-500: #22c55e;
 
-  --vt-c-divider-light-1: rgba(60, 60, 60, 0.29);
-  --vt-c-divider-light-2: rgba(60, 60, 60, 0.12);
-  --vt-c-divider-dark-1: rgba(84, 84, 84, 0.65);
-  --vt-c-divider-dark-2: rgba(84, 84, 84, 0.48);
+  /* --- Neutral (warm grays) --- */
+  --fa-gray-50: #fafaf9;
+  --fa-gray-100: #f5f5f4;
+  --fa-gray-200: #e7e5e4;
+  --fa-gray-300: #d6d3d1;
+  --fa-gray-400: #a8a29e;
+  --fa-gray-500: #78716c;
+  --fa-gray-600: #57534e;
+  --fa-gray-700: #44403c;
+  --fa-gray-800: #292524;
+  --fa-gray-900: #1c1917;
 
-  --vt-c-text-light-1: var(--vt-c-indigo);
-  --vt-c-text-light-2: rgba(60, 60, 60, 0.66);
-  --vt-c-text-dark-1: var(--vt-c-white);
-  --vt-c-text-dark-2: rgba(235, 235, 235, 0.64);
+  /* --- Semantic backgrounds --- */
+  --fa-bg-main: linear-gradient(135deg, #e0f2fe 0%, #f0fdfa 50%, #ecfdf5 100%);
+  --fa-bg-surface: rgba(255, 255, 255, 0.65);
+  --fa-bg-elevated: rgba(255, 255, 255, 0.8);
+  --fa-bg-header: rgba(255, 255, 255, 0.6);
+  --fa-bg-sidebar: rgba(255, 255, 255, 0.45);
+  --fa-bg-auth: linear-gradient(135deg, #7dd3fc 0%, #5eead4 50%, #86efac 100%);
+
+  /* --- Glass effects --- */
+  --fa-blur: blur(16px);
+  --fa-blur-heavy: blur(24px);
+  --fa-border: 1px solid rgba(255, 255, 255, 0.35);
+  --fa-border-subtle: 1px solid rgba(255, 255, 255, 0.18);
+
+  /* --- Shadows (soft, layered) --- */
+  --fa-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --fa-shadow-md: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --fa-shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.08);
+  --fa-shadow-glow: 0 0 24px rgba(56, 189, 248, 0.15);
+
+  /* --- Border radii --- */
+  --fa-radius-sm: 8px;
+  --fa-radius-md: 12px;
+  --fa-radius-lg: 16px;
+  --fa-radius-xl: 20px;
+  --fa-radius-full: 9999px;
+
+  /* --- Text --- */
+  --fa-text-primary: #1c1917;
+  --fa-text-secondary: #57534e;
+  --fa-text-muted: #a8a29e;
+  --fa-text-on-glass: #292524;
+
+  /* --- Accent (for primary buttons, active states) --- */
+  --fa-accent: linear-gradient(135deg, #38bdf8, #2dd4bf);
+  --fa-accent-hover: linear-gradient(135deg, #0ea5e9, #14b8a6);
+  --fa-accent-solid: #0ea5e9;
 }
 
-/* semantic color variables for this project */
-:root {
-  --color-background: var(--vt-c-white);
-  --color-background-soft: var(--vt-c-white-soft);
-  --color-background-mute: var(--vt-c-white-mute);
-
-  --color-border: var(--vt-c-divider-light-2);
-  --color-border-hover: var(--vt-c-divider-light-1);
-
-  --color-heading: var(--vt-c-text-light-1);
-  --color-text: var(--vt-c-text-light-1);
-
-  --section-gap: 160px;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-background: var(--vt-c-black);
-    --color-background-soft: var(--vt-c-black-soft);
-    --color-background-mute: var(--vt-c-black-mute);
-
-    --color-border: var(--vt-c-divider-dark-2);
-    --color-border-hover: var(--vt-c-divider-dark-1);
-
-    --color-heading: var(--vt-c-text-dark-1);
-    --color-text: var(--vt-c-text-dark-2);
-  }
-}
-
+/* Global reset */
 *,
 *::before,
 *::after {
   box-sizing: border-box;
   margin: 0;
-  font-weight: normal;
 }
 
 body {
   min-height: 100vh;
-  color: var(--color-text);
-  background: var(--color-background);
-  transition:
-    color 0.5s,
-    background-color 0.5s;
-  line-height: 1.6;
   font-family:
     Inter,
     -apple-system,
     BlinkMacSystemFont,
     'Segoe UI',
     Roboto,
-    Oxygen,
-    Ubuntu,
-    Cantarell,
-    'Fira Sans',
-    'Droid Sans',
-    'Helvetica Neue',
     sans-serif;
   font-size: 15px;
-  text-rendering: optimizeLegibility;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  color: var(--fa-text-primary);
+  background: var(--fa-bg-main);
 }

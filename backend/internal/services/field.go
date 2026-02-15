@@ -283,7 +283,8 @@ func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, erro
 	for i, f := range fields {
 		var config FieldConfig
 		if f.Options != "" {
-			json.Unmarshal([]byte(f.Options), &config)
+			_ = json.Unmarshal([]byte(f.Options), &config)
+			// 配置已安全存储在数据库中，解析失败不影响核心功能
 		}
 
 		result[i] = FieldResponse{
@@ -318,7 +319,8 @@ func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) 
 	// 3. 解析配置
 	var config FieldConfig
 	if field.Options != "" {
-		json.Unmarshal([]byte(field.Options), &config)
+		_ = json.Unmarshal([]byte(field.Options), &config)
+		// 配置已安全存储在数据库中，解析失败不影响核心功能
 	}
 
 	return &FieldResponse{

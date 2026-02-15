@@ -61,23 +61,15 @@
 
           <div class="security-section">
             <h4>安全设置</h4>
-            <el-button type="warning" @click="changePasswordDialog = true">
-              修改密码
-            </el-button>
-            <el-button type="danger" @click="confirmDeleteAccount">
-              删除账户
-            </el-button>
+            <el-button type="warning" @click="changePasswordDialog = true"> 修改密码 </el-button>
+            <el-button type="danger" @click="confirmDeleteAccount"> 删除账户 </el-button>
           </div>
         </el-col>
       </el-row>
     </el-card>
 
     <!-- 修改密码对话框 -->
-    <el-dialog
-      v-model="changePasswordDialog"
-      title="修改密码"
-      width="400px"
-    >
+    <el-dialog v-model="changePasswordDialog" title="修改密码" width="400px">
       <el-form :model="passwordForm" label-width="100px" ref="passwordFormRef">
         <el-form-item label="当前密码" prop="currentPassword">
           <el-input
@@ -156,7 +148,7 @@ const loadProfile = async () => {
         avatar: user.avatar || '',
       }
     }
-  } catch (error) {
+  } catch {
     ElMessage.error('加载个人资料失败')
   }
 }
@@ -165,10 +157,10 @@ const updateProfile = async () => {
   updating.value = true
   try {
     // 调用 API 更新个人资料
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     ElMessage.success('个人资料更新成功')
     await loadProfile()
-  } catch (error) {
+  } catch {
     ElMessage.error('更新失败')
   } finally {
     updating.value = false
@@ -203,7 +195,7 @@ const changePassword = async () => {
   changingPassword.value = true
   try {
     // 调用 API 修改密码
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     ElMessage.success('密码修改成功')
     changePasswordDialog.value = false
     passwordForm.value = {
@@ -211,7 +203,7 @@ const changePassword = async () => {
       newPassword: '',
       confirmPassword: '',
     }
-  } catch (error) {
+  } catch {
     ElMessage.error('密码修改失败')
   } finally {
     changingPassword.value = false
@@ -219,27 +211,25 @@ const changePassword = async () => {
 }
 
 const confirmDeleteAccount = () => {
-  ElMessageBox.confirm(
-    '确定要删除账户吗？此操作不可恢复，所有相关数据将被清空。',
-    '警告',
-    {
-      type: 'warning',
-      confirmButtonText: '确定删除',
-      cancelButtonText: '取消',
-    }
-  ).then(() => {
-    deleteAccount()
-  }).catch(() => {})
+  ElMessageBox.confirm('确定要删除账户吗？此操作不可恢复，所有相关数据将被清空。', '警告', {
+    type: 'warning',
+    confirmButtonText: '确定删除',
+    cancelButtonText: '取消',
+  })
+    .then(() => {
+      deleteAccount()
+    })
+    .catch(() => {})
 }
 
 const deleteAccount = async () => {
   try {
     // 调用 API 删除账户
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await new Promise((resolve) => setTimeout(resolve, 1000))
     ElMessage.success('账户已删除')
     // 退出登录
     await authStore.logout()
-  } catch (error) {
+  } catch {
     ElMessage.error('删除账户失败')
   }
 }

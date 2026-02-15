@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, logout, registerUser, TEST_USERS } from './utils/auth';
+import { login, TEST_USERS } from './utils/auth';
 import { createDatabase } from './utils/database';
 import { createTableWithFields, applyPermissionTemplate, batchSelectPermissions, setFieldPermission } from './utils/field-permission';
 
@@ -232,10 +232,6 @@ test.describe('Field-Level Permission Management', () => {
     await page.waitForURL(/\/tables\/.+\/field-permissions/);
 
     // Check that owner and admin checkboxes are disabled
-    const ownerCheckboxes = page.locator('table tbody tr').first().locator('input[type="checkbox"]').filter({ hasText: 'Owner' });
-    const adminCheckboxes = page.locator('table tbody tr').first().locator('input[type="checkbox"]').filter({ hasText: 'Admin' });
-
-    // These should be disabled or not interactable
     const ownerCheckbox = page.locator('table tbody tr').first().locator('input[type="checkbox"]').first();
     await expect(ownerCheckbox).toBeDisabled();
   });

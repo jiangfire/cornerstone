@@ -20,7 +20,9 @@
         <el-table-column label="操作" width="320" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button size="small" type="info" @click="handleViewBindings(row)">查看绑定</el-button>
+            <el-button size="small" type="info" @click="handleViewBindings(row)"
+              >查看绑定</el-button
+            >
             <el-button size="small" type="primary" @click="handleBind(row)">绑定</el-button>
             <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
@@ -29,11 +31,7 @@
     </el-card>
 
     <!-- 创建/编辑插件对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="isEdit ? '编辑插件' : '创建插件'"
-      width="500px"
-    >
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑插件' : '创建插件'" width="500px">
       <el-form :model="form" label-width="100px">
         <el-form-item label="插件名称">
           <el-input v-model="form.name" placeholder="请输入插件名称" />
@@ -169,7 +167,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { pluginAPI, tableAPI } from '@/services/api'
+import { pluginAPI } from '@/services/api'
+import { formatDate } from '@/utils/format'
 
 interface Plugin {
   id: string
@@ -201,9 +200,19 @@ const bindingsDialogVisible = ref(false)
 const configDialogVisible = ref(false)
 const isEdit = ref(false)
 const currentPlugin = ref<Plugin | null>(null)
-const bindingsList = ref<any[]>([])
+const bindingsList = ref<
+  Array<{
+    id: string
+    table_name: string
+    database_name: string
+    trigger: string
+    created_at: string
+  }>
+>([])
 const loadingBindings = ref(false)
-const configItems = ref<any[]>([])
+const configItems = ref<Array<{ name: string; type: string; default: string; required: boolean }>>(
+  [],
+)
 
 const form = ref({
   name: '',
@@ -212,22 +221,22 @@ const form = ref({
   entry_file: '',
   timeout: 30,
   config: '',
-  config_values: ''
+  config_values: '',
 })
 
 const bindForm = ref({
   table_id: '',
-  trigger: 'manual'
+  trigger: 'manual',
 })
 
 // 加载插件列表
 const loadPlugins = async () => {
   loading.value = true
   try {
-    const res: any = await pluginAPI.list()
-    plugins.value = res.data || []
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '加载插件列表失败')
+    const response = await pluginAPI.list()
+    plugins.value = response.data || []
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error ? (error as Error).message : '加载插件列表失败')
   } finally {
     loading.value = false
   }
@@ -243,7 +252,7 @@ const showCreateDialog = () => {
     entry_file: '',
     timeout: 30,
     config: '',
-    config_values: ''
+    config_values: '',
   }
   configItems.value = []
   dialogVisible.value = true
@@ -260,7 +269,7 @@ const handleEdit = (plugin: Plugin) => {
     entry_file: plugin.entry_file,
     timeout: plugin.timeout,
     config: plugin.config || '',
-    config_values: plugin.config_values || ''
+    config_values: plugin.config_values || '',
   }
   if (plugin.config) {
     configItems.value = parseConfig(plugin.config)
@@ -283,7 +292,7 @@ const handleSubmit = async () => {
         description: form.value.description,
         timeout: form.value.timeout,
         config: form.value.config,
-        config_values: form.value.config_values
+        config_values: form.value.config_values,
       })
       ElMessage.success('更新成功')
     } else {
@@ -294,14 +303,14 @@ const handleSubmit = async () => {
         entry_file: form.value.entry_file,
         timeout: form.value.timeout,
         config: form.value.config,
-        config_values: form.value.config_values
+        config_values: form.value.config_values,
       })
       ElMessage.success('创建成功')
     }
     dialogVisible.value = false
     loadPlugins()
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '操作失败')
+  } catch {
+    ElMessage.error('操作失败')
   } finally {
     submitting.value = false
   }
@@ -311,14 +320,14 @@ const handleSubmit = async () => {
 const handleDelete = async (plugin: Plugin) => {
   try {
     await ElMessageBox.confirm('确定要删除该插件吗？', '提示', {
-      type: 'warning'
+      type: 'warning',
     })
     await pluginAPI.delete(plugin.id)
     ElMessage.success('删除成功')
     loadPlugins()
-  } catch (error: any) {
+  } catch (error: unknown) {
     if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '删除失败')
+      ElMessage.error('删除失败')
     }
   }
 }
@@ -328,7 +337,7 @@ const handleBind = async (plugin: Plugin) => {
   currentPlugin.value = plugin
   bindForm.value = {
     table_id: '',
-    trigger: 'manual'
+    trigger: 'manual',
   }
   bindDialogVisible.value = true
 }
@@ -341,8 +350,8 @@ const handleConfirmBind = async () => {
     await pluginAPI.bind(currentPlugin.value.id, bindForm.value)
     ElMessage.success('绑定成功')
     bindDialogVisible.value = false
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '绑定失败')
+  } catch {
+    ElMessage.error('绑定失败')
   } finally {
     binding.value = false
   }
@@ -353,7 +362,7 @@ const getLanguageType = (language: string) => {
   const types: Record<string, string> = {
     go: 'success',
     python: 'warning',
-    bash: 'info'
+    bash: 'info',
   }
   return types[language] || ''
 }
@@ -369,28 +378,28 @@ const handleViewBindings = async (plugin: Plugin) => {
 const loadBindings = async (pluginId: string) => {
   loadingBindings.value = true
   try {
-    const res: any = await pluginAPI.getBindings(pluginId)
-    bindingsList.value = res.data || []
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '加载绑定列表失败')
+    const response = await pluginAPI.getBindings(pluginId)
+    bindingsList.value = response.data || []
+  } catch {
+    ElMessage.error('加载绑定列表失败')
   } finally {
     loadingBindings.value = false
   }
 }
 
 // 解绑插件
-const handleUnbind = async (binding: any) => {
+const handleUnbind = async (binding: { id: string; table_name: string; table_id: string }) => {
   if (!currentPlugin.value) return
   try {
     await ElMessageBox.confirm(`确定要解绑表"${binding.table_name}"吗？`, '提示', {
-      type: 'warning'
+      type: 'warning',
     })
     await pluginAPI.unbind(currentPlugin.value.id, { table_id: binding.table_id })
     ElMessage.success('解绑成功')
     await loadBindings(currentPlugin.value.id)
-  } catch (error: any) {
-    if (error !== 'cancel') {
-      ElMessage.error(error.response?.data?.message || '解绑失败')
+  } catch (err) {
+    if (err !== 'cancel') {
+      ElMessage.error('解绑失败')
     }
   }
 }
@@ -417,11 +426,6 @@ const getTriggerType = (trigger: string) => {
   return types[trigger] || ''
 }
 
-// 格式化日期
-const formatDate = (dateStr: string) => {
-  return new Date(dateStr).toLocaleString('zh-CN')
-}
-
 // 解析配置 JSON
 const parseConfig = (configStr: string) => {
   try {
@@ -442,7 +446,7 @@ const addConfigItem = () => {
     name: '',
     type: 'string',
     default: '',
-    required: false
+    required: false,
   })
 }
 

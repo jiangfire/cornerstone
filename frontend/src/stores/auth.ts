@@ -81,8 +81,8 @@ export const useAuthStore = defineStore('auth', () => {
 
       ElMessage.error(response.message || '登录失败')
       return false
-    } catch (error: any) {
-      ElMessage.error(error?.response?.data?.message || '登录失败，请检查网络连接')
+    } catch (error: unknown) {
+      ElMessage.error(error instanceof Error ? error.message : '登录失败，请检查网络连接')
       return false
     } finally {
       loading.value = false
@@ -102,8 +102,8 @@ export const useAuthStore = defineStore('auth', () => {
 
       ElMessage.error(response.message || '注册失败')
       return false
-    } catch (error: any) {
-      ElMessage.error(error?.response?.data?.message || '注册失败，请检查网络连接')
+    } catch (error: unknown) {
+      ElMessage.error(error instanceof Error ? error.message : '注册失败，请检查网络连接')
       return false
     } finally {
       loading.value = false
@@ -134,7 +134,7 @@ export const useAuthStore = defineStore('auth', () => {
       if (response.success && response.data) {
         setUser(response.data)
       }
-    } catch (error) {
+    } catch {
       // 如果获取失败，可能是token过期，清除认证信息
       clearAuth()
     }

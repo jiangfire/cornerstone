@@ -19,12 +19,7 @@
         </div>
       </template>
 
-      <el-alert
-        title="权限说明"
-        type="info"
-        :closable="false"
-        style="margin-bottom: 20px"
-      >
+      <el-alert title="权限说明" type="info" :closable="false" style="margin-bottom: 20px">
         <ul style="margin: 5px 0 0 20px; padding: 0">
           <li><strong>R (Read)</strong>: 读取权限 - 允许查看字段内容</li>
           <li><strong>W (Write)</strong>: 写入权限 - 允许编辑字段内容</li>
@@ -113,11 +108,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { tableAPI, fieldAPI } from '@/services/api'
+import { tableAPI } from '@/services/api'
 import { usePermissionStore, type FieldPermission } from '@/stores/permissions'
 
 interface Field {
@@ -164,9 +159,9 @@ const permissionMatrix = ref<PermissionRow[]>([])
 
 // 初始化权限矩阵
 const initPermissionMatrix = () => {
-  permissionMatrix.value = fields.value.map(field => {
+  permissionMatrix.value = fields.value.map((field) => {
     const permissions: Record<string, PermissionCell> = {}
-    roles.forEach(role => {
+    roles.forEach((role) => {
       permissions[role.value] = {
         canRead: true,
         canWrite: role.value === 'owner' || role.value === 'admin' || role.value === 'editor',
@@ -199,7 +194,7 @@ const loadFields = async () => {
       // 加载现有权限配置
       await loadExistingPermissions()
     }
-  } catch (error) {
+  } catch {
     ElMessage.error('加载字段列表失败')
   } finally {
     loading.value = false
@@ -225,13 +220,12 @@ const loadExistingPermissions = async () => {
     if (permissions && permissions.length > 0) {
       // 将权限配置应用到矩阵中
       permissions.forEach((perm: FieldPermission) => {
-        const row = permissionMatrix.value.find(r => r.fieldId === perm.field_id)
-        if (row && row.permissions[perm.role]) {
-          row.permissions[perm.role] = {
-            canRead: perm.can_read,
-            canWrite: perm.can_write,
-            canDelete: perm.can_delete,
-          }
+        const row = permissionMatrix.value.find((r) => r.fieldId === perm.field_id)
+        const permissionCell = row?.permissions[perm.role]
+        if (permissionCell) {
+          permissionCell.canRead = perm.can_read
+          permissionCell.canWrite = perm.can_write
+          permissionCell.canDelete = perm.can_delete
         }
       })
     }
@@ -252,16 +246,17 @@ const savePermissions = async () => {
     // 构建批量权限配置
     const permissions: FieldPermission[] = []
 
-    permissionMatrix.value.forEach(row => {
-      roles.forEach(role => {
+    permissionMatrix.value.forEach((row) => {
+      roles.forEach((role) => {
         // 只保存非 owner/admin 的权限，因为它们的权限是固定的
         if (canEditRole(role.value)) {
+          const permissionCell = row.permissions[role.value]
           permissions.push({
             field_id: row.fieldId,
             role: role.value,
-            can_read: row.permissions[role.value].canRead,
-            can_write: row.permissions[role.value].canWrite,
-            can_delete: row.permissions[role.value].canDelete,
+            can_read: permissionCell?.canRead ?? false,
+            can_write: permissionCell?.canWrite ?? false,
+            can_delete: permissionCell?.canDelete ?? false,
           })
         }
       })
@@ -271,7 +266,7 @@ const savePermissions = async () => {
     if (success) {
       ElMessage.success('权限配置保存成功')
     }
-  } catch (error) {
+  } catch {
     ElMessage.error('保存失败')
   } finally {
     saving.value = false
@@ -287,21 +282,26 @@ const resetToDefault = () => {
       type: 'warning',
       confirmButtonText: '确定',
       cancelButtonText: '取消',
-    }
-  ).then(() => {
-    initPermissionMatrix()
-    ElMessage.success('已重置为默认权限，请点击保存按钮保存更改')
-  }).catch(() => {
-    // 用户取消
-  })
+    },
+  )
+    .then(() => {
+      initPermissionMatrix()
+      ElMessage.success('已重置为默认权限，请点击保存按钮保存更改')
+    })
+    .catch(() => {
+      // 用户取消
+    })
 }
 
 // 全选指定权限
 const selectAll = (permissionKey: keyof PermissionCell) => {
-  permissionMatrix.value.forEach(row => {
-    roles.forEach(role => {
+  permissionMatrix.value.forEach((row) => {
+    roles.forEach((role) => {
       if (canEditRole(role.value)) {
-        row.permissions[role.value][permissionKey] = true
+        const permissionCell = row.permissions[role.value]
+        if (permissionCell) {
+          permissionCell[permissionKey] = true
+        }
       }
     })
   })
@@ -310,8 +310,8 @@ const selectAll = (permissionKey: keyof PermissionCell) => {
 
 // 清空全部权限
 const clearAll = () => {
-  permissionMatrix.value.forEach(row => {
-    roles.forEach(role => {
+  permissionMatrix.value.forEach((row) => {
+    roles.forEach((role) => {
       if (canEditRole(role.value)) {
         row.permissions[role.value] = {
           canRead: false,
@@ -326,8 +326,8 @@ const clearAll = () => {
 
 // 应用权限模板
 const applyTemplate = (template: string) => {
-  permissionMatrix.value.forEach(row => {
-    roles.forEach(role => {
+  permissionMatrix.value.forEach((row) => {
+    roles.forEach((role) => {
       if (canEditRole(role.value)) {
         switch (template) {
           case 'default':
@@ -450,8 +450,9 @@ onMounted(() => {
     .batch-actions {
       margin-top: 20px;
       padding: 16px;
-      background-color: #f5f7fa;
-      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: var(--fa-radius-md);
+      border: var(--fa-border-subtle);
 
       .batch-actions-title {
         font-weight: 600;

@@ -101,7 +101,7 @@ test.describe('Organization Role Management', () => {
 
     // Verify member removed
     await page.click('text=成员管理');
-    await expect(page.locator('text=' + editorUser.username)).not.toBeVisible();
+    await expect(page.locator('text=' + editorUser.username)).toBeHidden();
   });
 
   test('admin can add members to organization', async ({ page }) => {
@@ -147,7 +147,7 @@ test.describe('Organization Role Management', () => {
     await orgRow.click('button:has-text("查看")');
 
     // Should not see member management or add member options
-    await expect(page.locator('text=成员管理')).not.toBeVisible();
-    await expect(page.locator('button:has-text("添加成员")')).not.toBeVisible();
+    await expect(page.locator('text=成员管理')).toBeHidden();
+    await expect(page.locator('button:has-text("添加成员")')).toBeHidden();
   });
 });

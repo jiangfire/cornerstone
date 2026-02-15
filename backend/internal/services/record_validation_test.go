@@ -19,7 +19,7 @@ func setupTestDB() *gorm.DB {
 	dbFile := fmt.Sprintf("test_validation_%d.db", time.Now().UnixNano())
 
 	// Clean up any existing test database
-	os.Remove(dbFile)
+	_ = os.Remove(dbFile)
 
 	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
 	if err != nil {
@@ -47,7 +47,7 @@ func cleanupTestDB() {
 	// Remove any test database files
 	files, _ := filepath.Glob("test_validation_*.db")
 	for _, file := range files {
-		os.Remove(file)
+		_ = os.Remove(file)
 	}
 }
 

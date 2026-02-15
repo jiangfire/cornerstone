@@ -13,8 +13,8 @@ func TestSQLiteConnection(t *testing.T) {
 	dbFile := "test_simple.db"
 
 	// Clean up any existing test database
-	os.Remove(dbFile)
-	defer os.Remove(dbFile)
+	_ = os.Remove(dbFile)
+	defer func() { _ = os.Remove(dbFile) }()
 
 	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
 	if err != nil {

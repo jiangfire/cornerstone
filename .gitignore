@@ -78,6 +78,8 @@ node_modules/
 
 # 构建输出
 dist/
+# Embedded frontend build artifacts (keep .gitkeep)
+!backend/internal/frontend/dist/.gitkeep
 dist-ssr/
 build/
 *.local

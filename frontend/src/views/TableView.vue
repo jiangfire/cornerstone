@@ -30,26 +30,17 @@
           <template #default="{ row }">
             <el-button size="small" @click="handleFields(row)">字段管理</el-button>
             <el-button size="small" @click="handleRecords(row)">数据记录</el-button>
-            <el-button v-if="canDelete" size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="canDelete" size="small" type="danger" @click="handleDelete(row)"
+              >删除</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
     <!-- 创建/编辑对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="dialogTitle"
-      width="600px"
-      @close="resetForm"
-    >
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="100px"
-        :loading="submitting"
-      >
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="600px" @close="resetForm">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" :loading="submitting">
         <el-form-item label="表名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入表名称" />
         </el-form-item>
@@ -65,9 +56,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit" :loading="submitting">
-            确定
-          </el-button>
+          <el-button type="primary" @click="handleSubmit" :loading="submitting"> 确定 </el-button>
         </span>
       </template>
     </el-dialog>
@@ -81,6 +70,7 @@ import { ArrowLeft } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tableAPI, databaseAPI } from '@/services/api'
+import { formatDate } from '@/utils/format'
 
 interface Table {
   id: string
@@ -111,17 +101,10 @@ const rules: FormRules = {
     { required: true, message: '请输入表名称', trigger: 'blur' },
     { min: 2, max: 100, message: '长度在 2-100 个字符之间', trigger: 'blur' },
   ],
-  description: [
-    { max: 500, message: '描述不能超过500个字符', trigger: 'blur' },
-  ],
+  description: [{ max: 500, message: '描述不能超过500个字符', trigger: 'blur' }],
 }
 
 const dialogTitle = ref('创建表')
-
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN')
-}
 
 // 权限判断
 const canCreate = computed(() => ['owner', 'admin', 'editor'].includes(userRole.value))
@@ -138,7 +121,7 @@ const loadTables = async () => {
     if (response.success && response.data) {
       tables.value = response.data.tables || []
     }
-  } catch (error) {
+  } catch {
     ElMessage.error('加载表列表失败')
   } finally {
     loading.value = false
@@ -152,8 +135,8 @@ const loadDatabaseInfo = async () => {
       databaseName.value = response.data.name || ''
       userRole.value = response.data.role || 'viewer'
     }
-  } catch (error) {
-    console.error('Failed to load database info:', error)
+  } catch (err) {
+    console.error('Failed to load database info:', err)
   }
 }
 
@@ -173,22 +156,18 @@ const handleRecords = (row: Table) => {
 
 const handleDelete = async (row: Table) => {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除表 "${row.name}" 吗？相关数据将被清空。`,
-      '警告',
-      {
-        type: 'warning',
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-      }
-    )
+    await ElMessageBox.confirm(`确定要删除表 "${row.name}" 吗？相关数据将被清空。`, '警告', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+    })
     const response = await tableAPI.delete(row.id)
     if (response.success) {
       ElMessage.success('删除成功')
       await loadTables()
     }
-  } catch (error) {
-    if (error !== 'cancel') {
+  } catch (err) {
+    if (err !== 'cancel') {
       ElMessage.error('删除失败')
     }
   }
@@ -214,7 +193,7 @@ const handleSubmit = async () => {
       dialogVisible.value = false
       await loadTables()
     }
-  } catch (error) {
+  } catch {
     ElMessage.error('创建失败')
   } finally {
     submitting.value = false

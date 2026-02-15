@@ -7,8 +7,11 @@
  * with proper setup and teardown.
  */
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { spawn } = require('child_process');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require('path');
 
 // Test configuration
@@ -100,6 +103,7 @@ function checkTestFiles() {
 function checkPlaywright() {
   info('Checking Playwright installation...');
 
+   
   const packageJsonPath = path.join(TEST_CONFIG.frontendDir, 'package.json');
   if (!fs.existsSync(packageJsonPath)) {
     error('package.json not found in frontend directory');
@@ -129,6 +133,7 @@ async function checkBackendServer() {
   info('Checking backend server...');
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const http = require('http');
     return new Promise((resolve) => {
       const req = http.get('http://localhost:8080/api/health', (res) => {
@@ -154,7 +159,7 @@ async function checkBackendServer() {
         resolve(false);
       });
     });
-  } catch (e) {
+  } catch {
     warn('Could not check backend server');
     return false;
   }

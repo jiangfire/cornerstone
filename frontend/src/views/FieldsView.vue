@@ -58,7 +58,13 @@
             >
               删除
             </el-button>
-            <span v-if="!permissionStore.checkFieldPermission(row.id, 'write') && !permissionStore.checkFieldPermission(row.id, 'delete')" style="color: #909399; font-size: 12px">
+            <span
+              v-if="
+                !permissionStore.checkFieldPermission(row.id, 'write') &&
+                !permissionStore.checkFieldPermission(row.id, 'delete')
+              "
+              style="color: #909399; font-size: 12px"
+            >
               无操作权限
             </span>
           </template>
@@ -67,19 +73,8 @@
     </el-card>
 
     <!-- 创建/编辑对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="dialogTitle"
-      width="600px"
-      @close="resetForm"
-    >
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="120px"
-        :loading="submitting"
-      >
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="600px" @close="resetForm">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" :loading="submitting">
         <el-form-item label="字段名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入字段名称" />
         </el-form-item>
@@ -114,9 +109,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit" :loading="submitting">
-            确定
-          </el-button>
+          <el-button type="primary" @click="handleSubmit" :loading="submitting"> 确定 </el-button>
         </span>
       </template>
     </el-dialog>
@@ -130,6 +123,7 @@ import { ArrowLeft } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tableAPI, fieldAPI } from '@/services/api'
+import { formatDate } from '@/utils/format'
 import { usePermissionStore } from '@/stores/permissions'
 
 interface Field {
@@ -168,12 +162,10 @@ const rules: FormRules = {
     { required: true, message: '请输入字段名称', trigger: 'blur' },
     { min: 2, max: 100, message: '长度在 2-100 个字符之间', trigger: 'blur' },
   ],
-  type: [
-    { required: true, message: '请选择字段类型', trigger: 'change' },
-  ],
+  type: [{ required: true, message: '请选择字段类型', trigger: 'change' }],
   options: [
     {
-      validator: (rule: any, value: string, callback: any) => {
+      validator: (_rule: unknown, value: string, callback: (error?: Error) => void) => {
         if ((form.value.type === 'select' || form.value.type === 'multiselect') && !value) {
           callback(new Error('下拉/多选字段必须配置选项'))
         } else {
@@ -189,9 +181,7 @@ const dialogTitle = ref('添加字段')
 
 // 计算属性：根据权限过滤字段
 const authorizedFields = computed(() => {
-  return fields.value.filter(field =>
-    permissionStore.checkFieldPermission(field.id, 'read')
-  )
+  return fields.value.filter((field) => permissionStore.checkFieldPermission(field.id, 'read'))
 })
 
 // 检查是否有创建字段的权限
@@ -200,11 +190,6 @@ const canCreateField = computed(() => {
   // 在实际应用中，可以根据用户角色判断是否有创建字段的权限
   return true
 })
-
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN')
-}
 
 const goBack = () => {
   router.push(`/databases`)
@@ -251,7 +236,7 @@ const loadFields = async () => {
     }
     // 加载字段权限配置
     await permissionStore.loadFieldPermissions(tableId)
-  } catch (error) {
+  } catch {
     ElMessage.error('加载字段列表失败')
   } finally {
     loading.value = false
@@ -304,15 +289,11 @@ const handleDelete = async (row: Field) => {
   }
 
   try {
-    await ElMessageBox.confirm(
-      `确定要删除字段 "${row.name}" 吗？`,
-      '警告',
-      {
-        type: 'warning',
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-      }
-    )
+    await ElMessageBox.confirm(`确定要删除字段 "${row.name}" 吗？`, '警告', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+    })
     const response = await fieldAPI.delete(row.id)
     if (response.success) {
       ElMessage.success('删除成功')
@@ -360,7 +341,7 @@ const handleSubmit = async () => {
         await loadFields()
       }
     }
-  } catch (error) {
+  } catch {
     ElMessage.error(isEditMode.value ? '更新失败' : '添加失败')
   } finally {
     submitting.value = false

@@ -76,3 +76,29 @@ jobs:
         with:
           name: frontend-dist
           path: frontend/dist
+
+  embedded-build:
+    name: Embedded Build Verification
+    needs: [frontend-build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: backend/internal/frontend/dist
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.25.4'
+          cache-dependency-path: backend/go.sum
+
+      - name: Verify embedded build compiles
+        run: |
+          cd backend
+          go build -o /dev/null ./cmd/server

@@ -52,7 +52,7 @@ export async function logout(page: Page) {
   try {
     await page.click('[class*="user-dropdown"] or .user-menu or [data-testid="user-menu"]');
     await page.click('text=退出登录');
-  } catch (e) {
+  } catch {
     // Fallback: clear localStorage and navigate to login
     await page.evaluate(() => localStorage.clear());
     await page.goto('/login');

@@ -22,7 +22,7 @@ func Auth() gin.HandlerFunc {
 
 		// 检查Bearer格式
 		parts := strings.SplitN(authHeader, " ", 2)
-		if !(len(parts) == 2 && parts[0] == "Bearer") {
+		if len(parts) != 2 || parts[0] != "Bearer" {
 			types.Unauthorized(c, "认证令牌格式错误")
 			c.Abort()
 			return

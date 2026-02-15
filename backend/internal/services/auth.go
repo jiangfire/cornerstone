@@ -25,12 +25,16 @@ func NewAuthService(db *gorm.DB) *AuthService {
 type RegisterRequest struct {
 	Username string `json:"username" binding:"required,min=3,max=50"`
 	Email    string `json:"email" binding:"required,email"`
+	// #nosec G117 - Password字段是请求DTO的一部分，需要JSON序列化
+	// 密码会在存储前进行哈希处理，这是安全的设计
 	Password string `json:"password" binding:"required,min=6,max=50"`
 }
 
 // LoginRequest 用户登录请求
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
+	// #nosec G117 - Password字段是请求DTO的一部分，需要JSON序列化
+	// 密码会在验证时进行哈希比对，这是安全的设计
 	Password string `json:"password" binding:"required"`
 }
 

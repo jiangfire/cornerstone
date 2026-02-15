@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { RouterView, useRoute } from 'vue-router'
 import { computed } from 'vue'
+import AppLayout from '@/components/AppLayout.vue'
 
 const route = useRoute()
 
-// 判断当前是否是认证相关页面
 const isAuthPage = computed(() => {
   return route.path === '/login' || route.path === '/register'
 })
@@ -12,212 +12,223 @@ const isAuthPage = computed(() => {
 
 <template>
   <div id="app">
-    <!-- 认证页面使用简单布局 -->
     <div v-if="isAuthPage" class="auth-layout">
       <RouterView />
     </div>
-
-    <!-- 主应用使用 Dashboard 布局 -->
-    <div v-else class="main-layout">
+    <AppLayout v-else>
       <RouterView />
-    </div>
+    </AppLayout>
   </div>
 </template>
 
 <style>
-/* 全局样式重置和基础样式 */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-  background-color: #f5f5f5;
-}
-
-#app {
-  width: 100%;
-  height: 100vh;
-}
-
+/* === Auth layout === */
 .auth-layout {
   display: flex;
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: var(--fa-bg-auth);
+  padding: 20px;
 }
 
-.main-layout {
+#app {
   width: 100%;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100vh;
 }
 
-/* Element Plus 主题覆盖 */
-.el-button--primary {
-  background-color: #409eff;
-  border-color: #409eff;
-}
+/* === Element Plus: Glassmorphism Overrides === */
 
-.el-button--primary:hover {
-  background-color: #337ecc;
-  border-color: #337ecc;
-}
-
-/* 滚动条样式 */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-  background: #c0c0c0;
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: #a0a0a0;
-}
-
-/* 表单样式 */
-.el-form {
-  background: white;
-  padding: 24px;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-}
-
-/* 卡片样式 */
+/* Cards */
 .el-card {
-  border-radius: 8px;
-  border: none;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  background: var(--fa-bg-surface);
+  -webkit-backdrop-filter: var(--fa-blur);
+  backdrop-filter: var(--fa-blur);
+  border: var(--fa-border);
+  border-radius: var(--fa-radius-lg);
+  box-shadow: var(--fa-shadow-md);
 }
 
 .el-card__header {
-  background: #f8f9fa;
-  border-bottom: 1px solid #ebeef5;
+  background: rgba(255, 255, 255, 0.3);
+  border-bottom: var(--fa-border-subtle);
   font-weight: 600;
-  color: #303133;
+  color: var(--fa-text-primary);
 }
 
-/* 表格样式 */
-.el-table {
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.el-table th {
-  background: #f5f7fa;
-  color: #606266;
-  font-weight: 600;
-}
-
-/* 标签样式优化 */
-.el-tag {
-  font-weight: 500;
-}
-
-/* 空状态样式 */
-.el-empty__description {
-  color: #909399;
-}
-
-/* 对话框样式 */
+/* Dialogs */
 .el-dialog {
-  border-radius: 8px;
+  background: var(--fa-bg-elevated);
+  -webkit-backdrop-filter: var(--fa-blur-heavy);
+  backdrop-filter: var(--fa-blur-heavy);
+  border: var(--fa-border);
+  border-radius: var(--fa-radius-lg);
+  box-shadow: var(--fa-shadow-lg);
 }
 
 .el-dialog__header {
-  background: #f8f9fa;
-  border-bottom: 1px solid #ebeef5;
-  border-radius: 8px 8px 0 0;
+  background: rgba(255, 255, 255, 0.35);
+  border-bottom: var(--fa-border-subtle);
+  border-radius: var(--fa-radius-lg) var(--fa-radius-lg) 0 0;
 }
 
 .el-dialog__body {
   padding: 20px 24px;
 }
 
-/* 按钮组间距 */
-.el-button + .el-button {
-  margin-left: 8px;
+/* Forms */
+.el-form {
+  background: transparent;
 }
 
-/* 表单项样式 */
 .el-form-item__label {
   font-weight: 500;
-  color: #606266;
+  color: var(--fa-text-secondary);
 }
 
-/* 输入框样式 */
+/* Inputs */
 .el-input__wrapper {
-  border-radius: 4px;
+  border-radius: var(--fa-radius-sm);
+  background: rgba(255, 255, 255, 0.5);
+  transition:
+    box-shadow 0.2s,
+    background 0.2s;
 }
 
 .el-input__wrapper:hover {
-  box-shadow: 0 0 0 1px #c0c4cc inset;
+  box-shadow: 0 0 0 1px rgba(14, 165, 233, 0.3) inset;
 }
 
 .el-input__wrapper.is-focus {
-  box-shadow: 0 0 0 1px #409eff inset;
+  box-shadow: 0 0 0 1px var(--fa-accent-solid) inset;
+  background: rgba(255, 255, 255, 0.7);
 }
 
-/* 上传组件样式 */
-.el-upload {
-  border: 1px dashed #d9d9d9;
-  border-radius: 6px;
-  cursor: pointer;
-  position: relative;
+/* Primary buttons */
+.el-button--primary {
+  background: var(--fa-accent);
+  border: none;
+  color: #fff;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.el-button--primary:hover,
+.el-button--primary:focus {
+  background: var(--fa-accent-hover);
+  border: none;
+}
+
+/* Tables */
+.el-table {
+  border-radius: var(--fa-radius-md);
   overflow: hidden;
+  --el-table-bg-color: transparent;
+  --el-table-tr-bg-color: transparent;
 }
 
-.el-upload:hover {
-  border-color: #409eff;
+.el-table th {
+  background: rgba(255, 255, 255, 0.4) !important;
+  color: var(--fa-text-secondary);
+  font-weight: 600;
 }
 
-/* 页码组件样式 */
+.el-table td {
+  border-bottom-color: rgba(255, 255, 255, 0.2);
+}
+
+.el-table--enable-row-hover .el-table__body tr:hover > td {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* Tags */
+.el-tag {
+  font-weight: 500;
+  border-radius: var(--fa-radius-sm);
+}
+
+/* Empty */
+.el-empty__description {
+  color: var(--fa-text-muted);
+}
+
+/* Pagination */
 .el-pagination {
   margin-top: 16px;
   text-align: right;
 }
 
-/* 标签页样式 */
+/* Tabs */
 .el-tabs__item {
   font-weight: 500;
 }
 
 .el-tabs__active-bar {
-  background-color: #409eff;
+  background: var(--fa-accent-solid);
 }
 
-/* 下拉菜单样式 */
+/* Dropdown */
+.el-dropdown-menu {
+  background: var(--fa-bg-elevated);
+  -webkit-backdrop-filter: var(--fa-blur);
+  backdrop-filter: var(--fa-blur);
+  border: var(--fa-border);
+  border-radius: var(--fa-radius-md);
+}
+
 .el-dropdown-menu__item {
   font-weight: 500;
 }
 
 .el-dropdown-menu__item:hover {
-  background-color: #f5f7fa;
-  color: #409eff;
+  background: rgba(14, 165, 233, 0.08);
+  color: var(--fa-accent-solid);
 }
 
-/* 时间线样式 */
+/* Timeline */
 .el-timeline-item__content {
   font-weight: 500;
 }
 
 .el-timeline-item__timestamp {
-  color: #909399;
+  color: var(--fa-text-muted);
   font-size: 12px;
 }
 
-/* 统计卡片样式 */
+/* Upload */
+.el-upload {
+  border: 1px dashed var(--fa-gray-300);
+  border-radius: var(--fa-radius-sm);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+
+.el-upload:hover {
+  border-color: var(--fa-accent-solid);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(14, 165, 233, 0.25);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(14, 165, 233, 0.4);
+}
+
+/* Stat/action cards */
 .stat-card .el-card__body {
   padding: 16px;
 }
@@ -227,37 +238,7 @@ body {
   cursor: pointer;
 }
 
-/* 响应式工具类 */
-@media (max-width: 768px) {
-  .el-col-xs-24 {
-    width: 100%;
-  }
-
-  .el-dialog {
-    width: 90% !important;
-    margin: 10vh auto !important;
-  }
-
-  .el-form {
-    padding: 16px;
-  }
-}
-
-/* 加载状态 */
-.loading-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 9999;
-}
-
-/* 页面过渡动画 */
+/* Page transitions */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.3s ease;
@@ -268,43 +249,42 @@ body {
   opacity: 0;
 }
 
-/* 工具类 */
+/* Responsive */
+@media (max-width: 768px) {
+  .el-dialog {
+    width: 90% !important;
+    margin: 10vh auto !important;
+  }
+}
+
+/* Utility classes */
 .text-center {
   text-align: center;
 }
-
 .mt-2 {
   margin-top: 8px;
 }
-
 .mt-4 {
   margin-top: 16px;
 }
-
 .mb-2 {
   margin-bottom: 8px;
 }
-
 .mb-4 {
   margin-bottom: 16px;
 }
-
 .w-full {
   width: 100%;
 }
-
 .flex {
   display: flex;
 }
-
 .items-center {
   align-items: center;
 }
-
 .justify-between {
   justify-content: space-between;
 }
-
 .gap-2 {
   gap: 8px;
 }

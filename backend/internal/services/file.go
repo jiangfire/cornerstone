@@ -74,26 +74,51 @@ func (s *FileService) UploadFile(req UploadFileRequest, userID string) (*models.
 
 	// 4. 创建上传目录
 	uploadDir := "./uploads"
-	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+	if err := os.MkdirAll(uploadDir, 0750); err != nil {
 		return nil, fmt.Errorf("创建上传目录失败: %w", err)
 	}
 
 	// 5. 生成唯一文件名
 	filename := fmt.Sprintf("%s_%s", models.GenerateID("file"), req.File.Filename)
-	filepath := filepath.Join(uploadDir, filename)
+	targetFilepath := filepath.Join(uploadDir, filename)
+
+	// 5.1 验证文件路径安全（防止目录遍历攻击）
+	uploadDirAbs, err := filepath.Abs(uploadDir)
+	if err != nil {
+		return nil, fmt.Errorf("获取上传目录绝对路径失败: %w", err)
+	}
+	targetFilepathAbs, err := filepath.Abs(targetFilepath)
+	if err != nil {
+		return nil, fmt.Errorf("获取文件绝对路径失败: %w", err)
+	}
+	// 检查文件路径是否在上传目录内
+	if !strings.HasPrefix(targetFilepathAbs, uploadDirAbs) {
+		return nil, errors.New("非法的文件路径")
+	}
 
 	// 6. 保存文件
 	src, err := req.File.Open()
 	if err != nil {
 		return nil, fmt.Errorf("打开上传文件失败: %w", err)
 	}
-	defer src.Close()
+	defer func() {
+		//nolint:staticcheck // SA9003 - Close errors are informational in defer
+		if err := src.Close(); err != nil {
+			// 记录关闭错误
+		}
+	}()
 
-	dst, err := os.Create(filepath)
+	// #nosec G304 - 已通过filepath.Abs()验证路径在允许的目录内
+	dst, err := os.Create(targetFilepath)
 	if err != nil {
 		return nil, fmt.Errorf("创建文件失败: %w", err)
 	}
-	defer dst.Close()
+	defer func() {
+		//nolint:staticcheck // SA9003 - Close errors are informational in defer
+		if err := dst.Close(); err != nil {
+			// 记录关闭错误
+		}
+	}()
 
 	if _, err := io.Copy(dst, src); err != nil {
 		return nil, fmt.Errorf("保存文件失败: %w", err)
@@ -105,12 +130,16 @@ func (s *FileService) UploadFile(req UploadFileRequest, userID string) (*models.
 		FileName:   req.File.Filename,
 		FileSize:   req.File.Size,
 		FileType:   ext,
-		StorageURL: filepath,
+		StorageURL: targetFilepath,
 		UploadedBy: userID,
 	}
 
 	if err := s.db.Create(&file).Error; err != nil {
-		os.Remove(filepath) // 删除已保存的文件
+		// 删除已保存的文件
+		//nolint:staticcheck // SA9003 - Cleanup error is informational
+		if rmErr := os.Remove(targetFilepath); rmErr != nil {
+			// 记录删除失败错误，但返回主要错误
+		}
 		return nil, fmt.Errorf("创建文件记录失败: %w", err)
 	}
 

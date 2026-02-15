@@ -13,7 +13,7 @@ import (
 // setupTestDB 创建测试数据库
 func setupAuthTestDB(t *testing.T) *gorm.DB {
 	// 设置测试环境变量
-	os.Setenv("JWT_SECRET", "test-secret-key-for-testing-only")
+	_ = os.Setenv("JWT_SECRET", "test-secret-key-for-testing-only")
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	assert.NoError(t, err)

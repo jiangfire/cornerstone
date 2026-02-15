@@ -7,7 +7,9 @@
  * without requiring the full backend to be running.
  */
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require('path');
 
 // Colors for console output
@@ -36,10 +38,6 @@ function error(message) {
 
 function info(message) {
   log(`ℹ️  ${message}`, 'blue');
-}
-
-function warn(message) {
-  log(`⚠️  ${message}`, 'yellow');
 }
 
 /**

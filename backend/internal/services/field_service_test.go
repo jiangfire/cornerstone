@@ -12,7 +12,7 @@ import (
 
 // setupFieldTestDB 创建字段测试环境
 func setupFieldTestDB(t *testing.T) *gorm.DB {
-	os.Setenv("JWT_SECRET", "test-secret-key-for-testing-only")
+	_ = os.Setenv("JWT_SECRET", "test-secret-key-for-testing-only")
 
 	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
 	require.NoError(t, err)

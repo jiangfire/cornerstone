@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { login, logout, registerUser, TEST_USERS } from './utils/auth';
+import { login, registerUser, TEST_USERS } from './utils/auth';
 import { createDatabase } from './utils/database';
 import { createTableWithFields, setFieldPermission } from './utils/field-permission';
 
@@ -34,7 +34,7 @@ test.describe('Permission Enforcement Tests', () => {
   });
 
   test('editor can read and write field1', async ({ page }) => {
-    const editorUser = await registerUser(page, 'editor');
+    await registerUser(page, 'editor');
     await logout(page);
     await login(page, TEST_USERS.editor);
 
@@ -63,11 +63,11 @@ test.describe('Permission Enforcement Tests', () => {
 
     // field3 should not be visible (no permission)
     const field3Input = page.locator('input[placeholder*="field3"]');
-    await expect(field3Input).not.toBeVisible();
+    await expect(field3Input).toBeHidden();
   });
 
   test('editor cannot write to read-only field2', async ({ page }) => {
-    const editorUser = await registerUser(page, 'editor');
+    await registerUser(page, 'editor');
     await logout(page);
     await login(page, TEST_USERS.editor);
 
@@ -93,7 +93,7 @@ test.describe('Permission Enforcement Tests', () => {
   });
 
   test('viewer can only read field1', async ({ page }) => {
-    const viewerUser = await registerUser(page, 'viewer');
+    await registerUser(page, 'viewer');
     await logout(page);
     await login(page, TEST_USERS.viewer);
 
@@ -117,11 +117,11 @@ test.describe('Permission Enforcement Tests', () => {
 
     // field2 should not be visible (no permission)
     const field2Input = page.locator('input[placeholder*="field2"]');
-    await expect(field2Input).not.toBeVisible();
+    await expect(field2Input).toBeHidden();
 
     // field3 should not be visible (no permission)
     const field3Input = page.locator('input[placeholder*="field3"]');
-    await expect(field3Input).not.toBeVisible();
+    await expect(field3Input).toBeHidden();
   });
 
   test('owner has full access to all fields', async ({ page }) => {
@@ -155,7 +155,7 @@ test.describe('Permission Enforcement Tests', () => {
   });
 
   test('admin has full access to all fields', async ({ page }) => {
-    const adminUser = await registerUser(page, 'admin');
+    await registerUser(page, 'admin');
     await logout(page);
     await login(page, TEST_USERS.admin);
 
@@ -204,7 +204,7 @@ test.describe('Permission Enforcement Tests', () => {
     await page.goto('/databases');
 
     // The test database should not be visible to this user
-    await expect(page.locator('text=' + dbName)).not.toBeVisible();
+    await expect(page.locator('text=' + dbName)).toBeHidden();
   });
 
   test('user with no field permissions sees empty field list', async ({ page }) => {
@@ -224,7 +224,7 @@ test.describe('Permission Enforcement Tests', () => {
     });
 
     // Login as viewer
-    const viewerUser = await registerUser(page, 'viewer');
+    await registerUser(page, 'viewer');
     await logout(page);
     await login(page, TEST_USERS.viewer);
 
@@ -242,7 +242,7 @@ test.describe('Permission Enforcement Tests', () => {
 
     // Should not see the restricted field
     const restrictedInput = page.locator('input[placeholder*="restricted"]');
-    await expect(restrictedInput).not.toBeVisible();
+    await expect(restrictedInput).toBeHidden();
 
     // Or the form might be empty
     const formContent = await page.locator('.el-dialog__body').textContent();

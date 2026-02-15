@@ -28,27 +28,20 @@
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button size="small" @click="handleTables(row)">表结构</el-button>
-            <el-button v-if="canEdit(row)" size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button v-if="canDelete(row)" size="small" type="danger" @click="handleDelete(row)">删除</el-button>
+            <el-button v-if="canEdit(row)" size="small" type="primary" @click="handleEdit(row)"
+              >编辑</el-button
+            >
+            <el-button v-if="canDelete(row)" size="small" type="danger" @click="handleDelete(row)"
+              >删除</el-button
+            >
           </template>
         </el-table-column>
       </el-table>
     </el-card>
 
     <!-- 创建/编辑对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="dialogTitle"
-      width="500px"
-      @close="resetForm"
-    >
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="100px"
-        :loading="submitting"
-      >
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px" @close="resetForm">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" :loading="submitting">
         <el-form-item label="数据库名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入数据库名称" />
         </el-form-item>
@@ -67,9 +60,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit" :loading="submitting">
-            确定
-          </el-button>
+          <el-button type="primary" @click="handleSubmit" :loading="submitting"> 确定 </el-button>
         </span>
       </template>
     </el-dialog>
@@ -82,6 +73,7 @@ import { useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { databaseAPI } from '@/services/api'
+import { formatDate } from '@/utils/format'
 
 interface Database {
   id: string
@@ -114,17 +106,10 @@ const rules: FormRules = {
     { required: true, message: '请输入数据库名称', trigger: 'blur' },
     { min: 2, max: 50, message: '长度在 2-50 个字符之间', trigger: 'blur' },
   ],
-  description: [
-    { max: 200, message: '描述不能超过200个字符', trigger: 'blur' },
-  ],
+  description: [{ max: 200, message: '描述不能超过200个字符', trigger: 'blur' }],
 }
 
 const dialogTitle = ref('创建数据库')
-
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN')
-}
 
 // 权限判断
 const canEdit = (row: Database) => {
@@ -142,7 +127,7 @@ const loadDatabases = async () => {
     if (response.success && response.data) {
       databases.value = response.data.databases || []
     }
-  } catch (error) {
+  } catch {
     ElMessage.error('加载数据库列表失败')
   } finally {
     loading.value = false
@@ -174,19 +159,15 @@ const handleTables = (row: Database) => {
 
 const handleDelete = async (row: Database) => {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除数据库 "${row.name}" 吗？相关数据将被清空。`,
-      '警告',
-      {
-        type: 'warning',
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-      }
-    )
+    await ElMessageBox.confirm(`确定要删除数据库 "${row.name}" 吗？相关数据将被清空。`, '警告', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+    })
     ElMessage.success('删除成功')
     await loadDatabases()
-  } catch (error) {
-    if (error !== 'cancel') {
+  } catch (err) {
+    if (err !== 'cancel') {
       ElMessage.error('删除失败')
     }
   }
@@ -216,7 +197,7 @@ const handleSubmit = async () => {
 
     dialogVisible.value = false
     await loadDatabases()
-  } catch (error) {
+  } catch {
     ElMessage.error(isEditMode.value ? '更新失败' : '创建失败')
   } finally {
     submitting.value = false

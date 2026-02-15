@@ -28,7 +28,9 @@
           <template #default="{ row }">
             <el-button size="small" @click="handleView(row)">查看</el-button>
             <el-button size="small" type="primary" @click="handleEdit(row)">编辑</el-button>
-            <el-button size="small" type="info" @click="handleManageMembers(row)">成员管理</el-button>
+            <el-button size="small" type="info" @click="handleManageMembers(row)"
+              >成员管理</el-button
+            >
             <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
         </el-table-column>
@@ -36,7 +38,7 @@
     </el-card>
 
     <!-- 成员管理面板 -->
-    <el-card v-if="selectedOrg" class="box-card member-card" style="margin-top: 16px;">
+    <el-card v-if="selectedOrg" class="box-card member-card" style="margin-top: 16px">
       <template #header>
         <div class="card-header">
           <span>成员管理 - {{ selectedOrg.name }}</span>
@@ -58,7 +60,7 @@
               v-model="row.role"
               size="small"
               :disabled="!canManageMembers || row.role === 'owner'"
-              @change="(val) => handleRoleChange(row, val)"
+              @change="(val: string) => handleRoleChange(row, val)"
               style="width: 100%"
             >
               <el-option label="Owner" value="owner" />
@@ -88,19 +90,8 @@
     </el-card>
 
     <!-- 创建/编辑组织对话框 -->
-    <el-dialog
-      v-model="dialogVisible"
-      :title="dialogTitle"
-      width="500px"
-      @close="resetForm"
-    >
-      <el-form
-        ref="formRef"
-        :model="form"
-        :rules="rules"
-        label-width="100px"
-        :loading="submitting"
-      >
+    <el-dialog v-model="dialogVisible" :title="dialogTitle" width="500px" @close="resetForm">
+      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" :loading="submitting">
         <el-form-item label="组织名称" prop="name">
           <el-input v-model="form.name" placeholder="请输入组织名称" />
         </el-form-item>
@@ -116,9 +107,7 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSubmit" :loading="submitting">
-            确定
-          </el-button>
+          <el-button type="primary" @click="handleSubmit" :loading="submitting"> 确定 </el-button>
         </span>
       </template>
     </el-dialog>
@@ -179,6 +168,7 @@ import { ref, onMounted, computed } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { organizationAPI, userAPI } from '@/services/api'
+import { formatDate } from '@/utils/format'
 
 interface Organization {
   id: string
@@ -222,9 +212,7 @@ const rules: FormRules = {
     { required: true, message: '请输入组织名称', trigger: 'blur' },
     { min: 2, max: 50, message: '长度在 2-50 个字符之间', trigger: 'blur' },
   ],
-  description: [
-    { max: 200, message: '描述不能超过200个字符', trigger: 'blur' },
-  ],
+  description: [{ max: 200, message: '描述不能超过200个字符', trigger: 'blur' }],
 }
 
 const dialogTitle = ref('创建组织')
@@ -264,12 +252,6 @@ const getRoleType = (role: string) => {
   return roleMap[role] || 'info'
 }
 
-// 格式化日期
-const formatDate = (dateStr: string) => {
-  if (!dateStr) return '-'
-  return new Date(dateStr).toLocaleString('zh-CN')
-}
-
 // 加载组织列表
 const loadOrganizations = async () => {
   loading.value = true
@@ -278,7 +260,7 @@ const loadOrganizations = async () => {
     if (response.success && response.data) {
       organizations.value = response.data.organizations || []
     }
-  } catch (error) {
+  } catch {
     ElMessage.error('加载组织列表失败')
   } finally {
     loading.value = false
@@ -308,32 +290,22 @@ const handleEdit = (row: Organization) => {
 // 处理查看
 const handleView = (row: Organization) => {
   ElMessageBox.alert(
-    `
-    <strong>组织名称:</strong> ${row.name}<br/>
-    <strong>角色:</strong> ${row.role}<br/>
-    <strong>创建时间:</strong> ${formatDate(row.created_at)}<br/>
-    <strong>描述:</strong> ${row.description || '无'}
-    `,
+    `组织名称: ${row.name}\n角色: ${row.role}\n创建时间: ${formatDate(row.created_at)}\n描述: ${row.description || '无'}`,
     '组织详情',
     {
-      dangerouslyUseHTMLString: true,
       confirmButtonText: '确定',
-    }
+    },
   )
 }
 
 // 处理删除
 const handleDelete = async (row: Organization) => {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除组织 "${row.name}" 吗？此操作不可恢复。`,
-      '警告',
-      {
-        type: 'warning',
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-      }
-    )
+    await ElMessageBox.confirm(`确定要删除组织 "${row.name}" 吗？此操作不可恢复。`, '警告', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+    })
 
     const response = await organizationAPI.delete(row.id)
     if (response.success) {
@@ -344,8 +316,8 @@ const handleDelete = async (row: Organization) => {
         closeMemberPanel()
       }
     }
-  } catch (error) {
-    if (error !== 'cancel') {
+  } catch (err: unknown) {
+    if (err !== 'cancel') {
       ElMessage.error('删除失败')
     }
   }
@@ -379,7 +351,7 @@ const handleSubmit = async () => {
       dialogVisible.value = false
       await loadOrganizations()
     }
-  } catch (error) {
+  } catch {
     ElMessage.error(isEditMode.value ? '更新失败' : '创建失败')
   } finally {
     submitting.value = false
@@ -410,7 +382,7 @@ const loadMembers = async () => {
     if (response.success) {
       members.value = response.data.members || []
     }
-  } catch (error) {
+  } catch {
     ElMessage.error('加载成员列表失败')
   } finally {
     membersLoading.value = false
@@ -432,7 +404,7 @@ const loadAvailableUsers = async () => {
     if (response.success) {
       availableUsers.value = response.data.users || []
     }
-  } catch (error) {
+  } catch {
     ElMessage.error('加载用户列表失败')
     availableUsers.value = []
   } finally {
@@ -464,18 +436,15 @@ const submitAddMember = async () => {
     if (!valid) return
 
     submitting.value = true
-    const response = await organizationAPI.addMember(
-      selectedOrg.value.id,
-      addMemberForm.value
-    )
+    const response = await organizationAPI.addMember(selectedOrg.value.id, addMemberForm.value)
 
     if (response.success) {
       ElMessage.success('添加成员成功')
       addMemberDialogVisible.value = false
       await loadMembers()
     }
-  } catch (error: any) {
-    ElMessage.error(error.response?.data?.message || '添加成员失败')
+  } catch (err: unknown) {
+    ElMessage.error(err instanceof Error ? err.response?.data?.message : '添加成员失败')
   } finally {
     submitting.value = false
   }
@@ -486,17 +455,11 @@ const handleRoleChange = async (member: Member, newRole: string) => {
   if (!selectedOrg.value) return
 
   try {
-    await ElMessageBox.confirm(
-      `确定要将 ${member.username} 的角色改为 ${newRole} 吗？`,
-      '确认',
-      { type: 'warning' }
-    )
+    await ElMessageBox.confirm(`确定要将 ${member.username} 的角色改为 ${newRole} 吗？`, '确认', {
+      type: 'warning',
+    })
 
-    await organizationAPI.updateMemberRole(
-      selectedOrg.value.id,
-      member.id,
-      newRole
-    )
+    await organizationAPI.updateMemberRole(selectedOrg.value.id, member.id, newRole)
 
     ElMessage.success('角色更新成功')
     await loadMembers()
@@ -514,11 +477,9 @@ const handleRemoveMember = async (member: Member) => {
   if (!selectedOrg.value) return
 
   try {
-    await ElMessageBox.confirm(
-      `确定要移除成员 ${member.username} 吗？`,
-      '警告',
-      { type: 'warning' }
-    )
+    await ElMessageBox.confirm(`确定要移除成员 ${member.username} 吗？`, '警告', {
+      type: 'warning',
+    })
 
     await organizationAPI.removeMember(selectedOrg.value.id, member.id)
     ElMessage.success('移除成员成功')

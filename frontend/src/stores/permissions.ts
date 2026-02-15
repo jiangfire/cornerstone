@@ -57,8 +57,8 @@ export const usePermissionStore = defineStore('permissions', () => {
         return response.data.permissions
       }
       return []
-    } catch (error: any) {
-      ElMessage.error(error?.response?.data?.message || '加载字段权限失败')
+    } catch (error: unknown) {
+      ElMessage.error(error instanceof Error ? error.message : '加载字段权限失败')
       return []
     } finally {
       loading.value = false
@@ -67,7 +67,7 @@ export const usePermissionStore = defineStore('permissions', () => {
 
   // 更新用户权限缓存
   const updateUserPermissionCache = (permissions: FieldPermission[]) => {
-    permissions.forEach(perm => {
+    permissions.forEach((perm) => {
       const key = `${perm.field_id}_${perm.role}`
       userPermissions.value.set(key, {
         fieldId: perm.field_id,
@@ -79,7 +79,11 @@ export const usePermissionStore = defineStore('permissions', () => {
   }
 
   // 检查字段权限
-  const checkFieldPermission = (fieldId: string, action: 'read' | 'write' | 'delete', role?: string): boolean => {
+  const checkFieldPermission = (
+    fieldId: string,
+    action: 'read' | 'write' | 'delete',
+    role?: string,
+  ): boolean => {
     const effectiveRole = role || currentRole.value
     const key = `${fieldId}_${effectiveRole}`
     const perm = userPermissions.value.get(key)
@@ -124,8 +128,8 @@ export const usePermissionStore = defineStore('permissions', () => {
         return true
       }
       return false
-    } catch (error: any) {
-      ElMessage.error(error?.response?.data?.message || '权限设置失败')
+    } catch (error: unknown) {
+      ElMessage.error(error instanceof Error ? error.message : '权限设置失败')
       return false
     } finally {
       loading.value = false
@@ -144,8 +148,8 @@ export const usePermissionStore = defineStore('permissions', () => {
         return true
       }
       return false
-    } catch (error: any) {
-      ElMessage.error(error?.response?.data?.message || '批量权限设置失败')
+    } catch (error: unknown) {
+      ElMessage.error(error instanceof Error ? error.message : '批量权限设置失败')
       return false
     } finally {
       loading.value = false
@@ -171,8 +175,11 @@ export const usePermissionStore = defineStore('permissions', () => {
   }
 
   // 过滤有权限的字段
-  const filterAuthorizedFields = (fields: Array<{ id: string }>, action: 'read' | 'write' | 'delete' = 'read') => {
-    return fields.filter(field => checkFieldPermission(field.id, action))
+  const filterAuthorizedFields = (
+    fields: Array<{ id: string }>,
+    action: 'read' | 'write' | 'delete' = 'read',
+  ) => {
+    return fields.filter((field) => checkFieldPermission(field.id, action))
   }
 
   return {
