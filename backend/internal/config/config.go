@@ -50,7 +50,7 @@ type LoggerConfig struct {
 // JWTConfig JWT配置
 type JWTConfig struct {
 	Secret     string `json:"-"` // 防止序列化敏感信息
-	Expiration int // 单位：小时
+	Expiration int    // 单位：小时
 }
 
 // Load 加载配置从环境变量

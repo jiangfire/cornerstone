@@ -246,6 +246,14 @@ export interface StatsSummary {
   total_records: number
 }
 
+export interface Activity {
+  id: string
+  type?: string
+  content: string
+  time: string
+  created_at?: string
+}
+
 export interface ActivitiesResponse {
   success: boolean
   message?: string

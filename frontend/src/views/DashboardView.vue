@@ -156,7 +156,7 @@ const loadActivities = async () => {
       (item: { type?: string; content: string; time: string }) => ({
         content: item.content,
         time: formatTimeAgo(item.time),
-        type: item.type || 'primary',
+        type: (item.type || 'primary') as 'primary' | 'success' | 'warning' | 'danger' | 'info',
       }),
     )
   } catch (error) {

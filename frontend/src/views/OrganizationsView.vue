@@ -444,7 +444,8 @@ const submitAddMember = async () => {
       await loadMembers()
     }
   } catch (err: unknown) {
-    ElMessage.error(err instanceof Error ? err.response?.data?.message : '添加成员失败')
+    const message = err instanceof Error ? err.message : '添加成员失败'
+    ElMessage.error(message)
   } finally {
     submitting.value = false
   }

@@ -252,7 +252,7 @@
 
     <!-- 文件预览对话框 -->
     <el-dialog v-model="previewDialogVisible" title="文件预览" width="800px">
-      <div class="file-preview">
+      <div v-if="previewFile" class="file-preview">
         <img v-if="previewFile.isImage" :src="previewFile.url" style="max-width: 100%" />
         <div v-else-if="previewFile.isPdf">
           <iframe :src="previewFile.url" style="width: 100%; height: 600px"></iframe>
@@ -277,7 +277,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Refresh, Search, Upload, Document } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { tableAPI, recordAPI, fileAPI } from '@/services/api'
+import { tableAPI, recordAPI, fileAPI, databaseAPI } from '@/services/api'
 import { formatDate, formatFileSize } from '@/utils/format'
 
 interface Field {
@@ -332,7 +332,7 @@ const attachedFiles = ref<
 const uploadProgress = ref(0)
 const loadingFiles = ref(false)
 const previewDialogVisible = ref(false)
-const previewFile = ref<{ url: string; isImage: boolean; isPdf: boolean } | null>(null)
+const previewFile = ref<{ id: string; url: string; isImage: boolean; isPdf: boolean } | null>(null)
 const isEdit = computed(() => isEditMode.value)
 
 // 权限判断
@@ -575,8 +575,8 @@ const handleFileSelect = async (file: { raw: File }) => {
     formData.append('record_id', currentRecordId.value)
     formData.append('file', file.raw)
 
-    const api = (await import('@/services/api')).default
-    await api.post('/files/upload', formData, {
+    const apiInstance = (await import('@/services/api')).default
+    await apiInstance.post('/files/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       onUploadProgress: (progressEvent: { loaded: number; total?: number }) => {
         uploadProgress.value = Math.floor((progressEvent.loaded * 100) / (progressEvent.total || 1))
@@ -599,6 +599,7 @@ const handlePreviewFile = (file: { id: string; file_name: string }) => {
   const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']
 
   previewFile.value = {
+    id: file.id,
     url: fileAPI.download(file.id),
     isImage: imageExtensions.includes(extension || ''),
     isPdf: extension === 'pdf',

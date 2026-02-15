@@ -171,7 +171,7 @@ func main() {
 	srv := &http.Server{
 		Addr:              cfg.GetServerAddr(),
 		Handler:           r,
-		ReadHeaderTimeout:   10 * time.Second,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	// 优雅关闭

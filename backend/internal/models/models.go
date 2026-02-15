@@ -219,8 +219,8 @@ type Plugin struct {
 	Language     string     `gorm:"type:varchar(50);not null" json:"language"` // go, python, bash
 	EntryFile    string     `gorm:"type:varchar(255);not null" json:"entry_file"`
 	Timeout      int        `gorm:"type:integer;default:5" json:"timeout"` // 超时秒数
-	Config       string     `gorm:"type:text" json:"config"`                  // JSON config schema
-	ConfigValues string     `gorm:"type:text" json:"config_values"`          // JSON config values
+	Config       string     `gorm:"type:text" json:"config"`               // JSON config schema
+	ConfigValues string     `gorm:"type:text" json:"config_values"`        // JSON config values
 	CreatedBy    string     `gorm:"type:varchar(50);not null" json:"created_by"`
 	CreatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
@@ -298,7 +298,7 @@ type ActivityLog struct {
 	ID           string    `gorm:"type:varchar(50);primaryKey" json:"id"`
 	UserID       string    `gorm:"type:varchar(50);not null" json:"user_id"`
 	Action       string    `gorm:"type:varchar(100);not null" json:"action"` // create, update, delete, etc.
-	ResourceType string    `gorm:"type:varchar(50)" json:"resource_type"` // database, table, record, plugin
+	ResourceType string    `gorm:"type:varchar(50)" json:"resource_type"`    // database, table, record, plugin
 	ResourceID   string    `gorm:"type:varchar(50)" json:"resource_id"`
 	Description  string    `gorm:"type:text" json:"description"`
 	CreatedAt    time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`

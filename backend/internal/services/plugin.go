@@ -21,12 +21,12 @@ func NewPluginService(db *gorm.DB) *PluginService {
 
 // CreatePluginRequest 创建插件请求
 type CreatePluginRequest struct {
-	Name        string `json:"name" binding:"required,min=2,max=255"`
-	Description string `json:"description" binding:"max=500"`
-	Language    string `json:"language" binding:"required,oneof=go python bash"`
-	EntryFile   string `json:"entry_file" binding:"required"`
-	Timeout     int    `json:"timeout" binding:"min=1,max=300"`
-	Config      string `json:"config" binding:"omitempty"`       // JSON config schema
+	Name         string `json:"name" binding:"required,min=2,max=255"`
+	Description  string `json:"description" binding:"max=500"`
+	Language     string `json:"language" binding:"required,oneof=go python bash"`
+	EntryFile    string `json:"entry_file" binding:"required"`
+	Timeout      int    `json:"timeout" binding:"min=1,max=300"`
+	Config       string `json:"config" binding:"omitempty"`        // JSON config schema
 	ConfigValues string `json:"config_values" binding:"omitempty"` // JSON config values
 }
 
@@ -163,13 +163,13 @@ func (s *PluginService) UnbindPlugin(pluginID, tableID string) error {
 
 // BindingDetail 绑定详情
 type BindingDetail struct {
-	ID            string    `json:"id"`
-	TableID       string    `json:"table_id"`
-	TableName     string    `json:"table_name"`
-	DatabaseID    string    `json:"database_id"`
-	DatabaseName  string    `json:"database_name"`
-	Trigger       string    `json:"trigger"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID           string    `json:"id"`
+	TableID      string    `json:"table_id"`
+	TableName    string    `json:"table_name"`
+	DatabaseID   string    `json:"database_id"`
+	DatabaseName string    `json:"database_name"`
+	Trigger      string    `json:"trigger"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // ListBindings 列出插件的所有绑定

@@ -48,7 +48,7 @@ func TestFieldService_CreateField(t *testing.T) {
 	require.NoError(t, db.Create(&access).Error)
 
 	table := models.Table{
-		ID:        models.GenerateID("tbl"), // Manually generate ID for test determinism
+		ID:         models.GenerateID("tbl"), // Manually generate ID for test determinism
 		Name:       "Test Table",
 		DatabaseID: database.ID,
 	}
