@@ -9,6 +9,7 @@ import (
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"github.com/jiangfire/cornerstone/backend/pkg/utils"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // AuthService 认证服务
@@ -42,6 +43,26 @@ type LoginRequest struct {
 type AuthResponse struct {
 	Token string      `json:"token"`
 	User  models.User `json:"user"`
+}
+
+// UpdateProfileRequest 更新个人资料请求
+type UpdateProfileRequest struct {
+	Username string `json:"username" binding:"required,min=3,max=50"`
+	Email    string `json:"email" binding:"required,email"`
+	Phone    string `json:"phone" binding:"max=50"`
+	Bio      string `json:"bio" binding:"max=2000"`
+	Avatar   string `json:"avatar" binding:"max=262144"` // 支持 Data URL
+}
+
+// ChangePasswordRequest 修改密码请求
+type ChangePasswordRequest struct {
+	CurrentPassword string `json:"current_password" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=6,max=50"`
+}
+
+// DeleteAccountRequest 删除账户请求
+type DeleteAccountRequest struct {
+	Password string `json:"password" binding:"required"`
 }
 
 // validateUsername 验证用户名格式
@@ -249,6 +270,163 @@ func (s *AuthService) GetUserByID(userID string) (*models.User, error) {
 	return &user, nil
 }
 
+// UpdateProfile 更新个人资料
+func (s *AuthService) UpdateProfile(userID string, req UpdateProfileRequest) (*models.User, error) {
+	req.Username = sanitizeInput(req.Username)
+	req.Email = sanitizeInput(req.Email)
+	req.Phone = strings.TrimSpace(req.Phone)
+	req.Bio = strings.TrimSpace(req.Bio)
+
+	if err := validateUsername(req.Username); err != nil {
+		return nil, fmt.Errorf("用户名验证失败: %w", err)
+	}
+	if err := validateEmail(req.Email); err != nil {
+		return nil, fmt.Errorf("邮箱验证失败: %w", err)
+	}
+
+	var user models.User
+	if err := s.db.Where("id = ?", userID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("用户不存在")
+		}
+		return nil, fmt.Errorf("查询用户失败: %w", err)
+	}
+
+	var existing models.User
+	if err := s.db.Where("username = ? AND id <> ?", req.Username, userID).First(&existing).Error; err == nil {
+		return nil, errors.New("用户名已存在")
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("校验用户名失败: %w", err)
+	}
+
+	if err := s.db.Where("email = ? AND id <> ?", req.Email, userID).First(&existing).Error; err == nil {
+		return nil, errors.New("邮箱已被注册")
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("校验邮箱失败: %w", err)
+	}
+
+	user.Username = req.Username
+	user.Email = req.Email
+	user.Phone = req.Phone
+	user.Bio = req.Bio
+	user.Avatar = req.Avatar
+
+	if err := s.db.Save(&user).Error; err != nil {
+		return nil, fmt.Errorf("更新个人资料失败: %w", err)
+	}
+
+	user.Password = ""
+	return &user, nil
+}
+
+// ChangePassword 修改密码
+func (s *AuthService) ChangePassword(userID string, req ChangePasswordRequest) error {
+	if err := validatePassword(req.NewPassword); err != nil {
+		return fmt.Errorf("新密码验证失败: %w", err)
+	}
+
+	var user models.User
+	if err := s.db.Where("id = ?", userID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return errors.New("用户不存在")
+		}
+		return fmt.Errorf("查询用户失败: %w", err)
+	}
+
+	if err := utils.CheckPassword(req.CurrentPassword, user.Password); err != nil {
+		return errors.New("当前密码错误")
+	}
+
+	if req.CurrentPassword == req.NewPassword {
+		return errors.New("新密码不能与当前密码相同")
+	}
+
+	hashedPassword, err := utils.HashPassword(req.NewPassword)
+	if err != nil {
+		return fmt.Errorf("密码加密失败: %w", err)
+	}
+
+	if err := s.db.Model(&models.User{}).
+		Where("id = ?", userID).
+		Update("password", hashedPassword).Error; err != nil {
+		return fmt.Errorf("更新密码失败: %w", err)
+	}
+
+	return nil
+}
+
+// DeleteAccount 删除账户
+func (s *AuthService) DeleteAccount(userID string, req DeleteAccountRequest) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		var user models.User
+		if err := tx.Where("id = ?", userID).First(&user).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New("用户不存在")
+			}
+			return fmt.Errorf("查询用户失败: %w", err)
+		}
+
+		if err := utils.CheckPassword(req.Password, user.Password); err != nil {
+			return errors.New("密码错误，无法删除账户")
+		}
+
+		var orgCount int64
+		if err := tx.Model(&models.Organization{}).
+			Where("owner_id = ? AND deleted_at IS NULL", userID).
+			Count(&orgCount).Error; err != nil {
+			return fmt.Errorf("检查组织所有权失败: %w", err)
+		}
+		if orgCount > 0 {
+			return errors.New("当前账户仍拥有组织，请先转移或删除组织后再删除账户")
+		}
+
+		var dbCount int64
+		if err := tx.Model(&models.Database{}).
+			Where("owner_id = ? AND deleted_at IS NULL", userID).
+			Count(&dbCount).Error; err != nil {
+			return fmt.Errorf("检查数据库所有权失败: %w", err)
+		}
+		if dbCount > 0 {
+			return errors.New("当前账户仍拥有数据库，请先转移或删除数据库后再删除账户")
+		}
+
+		if err := tx.Where("user_id = ?", userID).Delete(&models.OrganizationMember{}).Error; err != nil {
+			return fmt.Errorf("清理组织成员关系失败: %w", err)
+		}
+
+		if err := tx.Where("user_id = ?", userID).Delete(&models.DatabaseAccess{}).Error; err != nil {
+			return fmt.Errorf("清理数据库权限失败: %w", err)
+		}
+
+		if err := tx.Where("created_by = ?", userID).Delete(&models.PluginExecution{}).Error; err != nil {
+			return fmt.Errorf("清理插件执行记录失败: %w", err)
+		}
+
+		// 删除用户创建的插件及其绑定，避免遗留脏数据
+		var pluginIDs []string
+		if err := tx.Model(&models.Plugin{}).Where("created_by = ?", userID).Pluck("id", &pluginIDs).Error; err != nil {
+			return fmt.Errorf("查询用户插件失败: %w", err)
+		}
+		if len(pluginIDs) > 0 {
+			if err := tx.Where("plugin_id IN ?", pluginIDs).Delete(&models.PluginBinding{}).Error; err != nil {
+				return fmt.Errorf("清理插件绑定失败: %w", err)
+			}
+			if err := tx.Where("plugin_id IN ?", pluginIDs).Delete(&models.PluginExecution{}).Error; err != nil {
+				return fmt.Errorf("清理插件执行结果失败: %w", err)
+			}
+			if err := tx.Where("id IN ?", pluginIDs).Delete(&models.Plugin{}).Error; err != nil {
+				return fmt.Errorf("删除用户插件失败: %w", err)
+			}
+		}
+
+		if err := tx.Unscoped().Delete(&user).Error; err != nil {
+			return fmt.Errorf("删除用户失败: %w", err)
+		}
+
+		return nil
+	})
+}
+
 // Logout 用户登出（将Token加入黑名单）
 func (s *AuthService) Logout(token string) error {
 	// 1. 解析Token获取过期时间
@@ -265,7 +443,10 @@ func (s *AuthService) Logout(token string) error {
 		ExpiredAt: claims.ExpiresAt.Time,
 	}
 
-	if err := s.db.Create(&blacklist).Error; err != nil {
+	if err := s.db.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "token_hash"}},
+		DoNothing: true,
+	}).Create(&blacklist).Error; err != nil {
 		return fmt.Errorf("添加黑名单失败: %w", err)
 	}
 

@@ -15,6 +15,18 @@
               <el-icon><Refresh /></el-icon>
               刷新
             </el-button>
+            <el-dropdown @command="handleExport" :disabled="exporting">
+              <el-button :loading="exporting">
+                <el-icon><Download /></el-icon>
+                导出
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="csv">导出 CSV</el-dropdown-item>
+                  <el-dropdown-item command="json">导出 JSON</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
             <el-button v-if="canCreate" type="primary" @click="handleCreate">新建记录</el-button>
           </div>
         </div>
@@ -274,10 +286,10 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Refresh, Search, Upload, Document } from '@element-plus/icons-vue'
+import { ArrowLeft, Refresh, Search, Upload, Document, Download } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { tableAPI, recordAPI, fileAPI, databaseAPI } from '@/services/api'
+import { tableAPI, recordAPI, fileAPI, databaseAPI, exportAPI } from '@/services/api'
 import { formatDate, formatFileSize } from '@/utils/format'
 
 interface Field {
@@ -315,6 +327,7 @@ const searchText = ref('')
 const currentPage = ref(1)
 const pageSize = ref(20)
 const total = ref(0)
+const exporting = ref(false)
 
 const formRef = ref<FormInstance>()
 const form = ref<Record<string, unknown>>({})
@@ -448,6 +461,33 @@ const handleRefresh = () => {
 const handleSearch = async () => {
   currentPage.value = 1
   await loadRecords()
+}
+
+const handleExport = async (format: 'csv' | 'json') => {
+  exporting.value = true
+  try {
+    const blobData = await exportAPI.downloadRecords(tableId, format, searchText.value)
+    const blob =
+      blobData instanceof Blob
+        ? blobData
+        : new Blob([blobData], { type: format === 'csv' ? 'text/csv' : 'application/json' })
+
+    const link = document.createElement('a')
+    const url = window.URL.createObjectURL(blob)
+    link.href = url
+    const safeTableName = (tableName.value || tableId).replace(/[\\/:*?"<>|]/g, '_')
+    link.download = `${safeTableName}_${new Date().toISOString().replace(/[:.]/g, '-')}.${format}`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+
+    ElMessage.success('导出成功')
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error ? error.message : '导出失败')
+  } finally {
+    exporting.value = false
+  }
 }
 
 const handleCreate = () => {

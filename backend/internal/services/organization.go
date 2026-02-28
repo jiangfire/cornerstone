@@ -6,6 +6,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // OrganizationService 组织服务
@@ -64,41 +65,28 @@ func (s *OrganizationService) CreateOrganization(req CreateOrgRequest, ownerID s
 		return nil, fmt.Errorf("数据库查询失败: %w", err)
 	}
 
-	// 2. 开始事务
-	tx := s.db.Begin()
-	defer func() {
-		if r := recover(); r != nil {
-			tx.Rollback()
-		}
-	}()
-
-	// 3. 创建组织
+	// 2. 事务内创建组织与所有者成员关系
 	org := models.Organization{
 		Name:        req.Name,
 		Description: req.Description,
 		OwnerID:     ownerID,
 	}
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&org).Error; err != nil {
+			return fmt.Errorf("创建组织失败: %w", err)
+		}
 
-	if err := tx.Create(&org).Error; err != nil {
-		tx.Rollback()
-		return nil, fmt.Errorf("创建组织失败: %w", err)
-	}
-
-	// 4. 自动将创建者添加为组织所有者
-	member := models.OrganizationMember{
-		OrganizationID: org.ID,
-		UserID:         ownerID,
-		Role:           "owner",
-	}
-
-	if err := tx.Create(&member).Error; err != nil {
-		tx.Rollback()
-		return nil, fmt.Errorf("添加组织所有者失败: %w", err)
-	}
-
-	// 5. 提交事务
-	if err := tx.Commit().Error; err != nil {
-		return nil, fmt.Errorf("提交事务失败: %w", err)
+		member := models.OrganizationMember{
+			OrganizationID: org.ID,
+			UserID:         ownerID,
+			Role:           "owner",
+		}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&member).Error; err != nil {
+			return fmt.Errorf("添加组织所有者失败: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	return &org, nil
@@ -250,22 +238,18 @@ func (s *OrganizationService) AddMember(orgID string, req AddMemberRequest, oper
 		return errors.New("用户不存在")
 	}
 
-	// 3. 检查用户是否已是成员
-	var existingMember models.OrganizationMember
-	err = s.db.Where("organization_id = ? AND user_id = ?", orgID, req.UserID).First(&existingMember).Error
-	if err == nil {
-		return errors.New("该用户已是组织成员")
-	}
-
-	// 4. 添加成员
+	// 3. 添加成员（幂等并发安全）
 	member := models.OrganizationMember{
 		OrganizationID: orgID,
 		UserID:         req.UserID,
 		Role:           req.Role,
 	}
-
-	if err := s.db.Create(&member).Error; err != nil {
-		return fmt.Errorf("添加成员失败: %w", err)
+	result := s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&member)
+	if result.Error != nil {
+		return fmt.Errorf("添加成员失败: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("该用户已是组织成员")
 	}
 
 	return nil

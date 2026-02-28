@@ -8,6 +8,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // DatabaseService 数据库管理服务
@@ -124,7 +125,7 @@ func (s *DatabaseService) CreateDatabase(req CreateDBRequest, ownerID string) (*
 		return nil, fmt.Errorf("数据库查询失败: %w", err)
 	}
 
-	// 3. 创建数据库
+	// 3. 在事务中创建数据库和所有者权限
 	database := models.Database{
 		Name:        req.Name,
 		Description: req.Description,
@@ -132,20 +133,22 @@ func (s *DatabaseService) CreateDatabase(req CreateDBRequest, ownerID string) (*
 		IsPublic:    req.IsPublic,
 		IsPersonal:  req.IsPersonal,
 	}
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&database).Error; err != nil {
+			return fmt.Errorf("创建数据库失败: %w", err)
+		}
 
-	if err := s.db.Create(&database).Error; err != nil {
-		return nil, fmt.Errorf("创建数据库失败: %w", err)
-	}
-
-	// 4. 自动为所有者添加权限
-	access := models.DatabaseAccess{
-		UserID:     ownerID,
-		DatabaseID: database.ID,
-		Role:       "owner",
-	}
-
-	if err := s.db.Create(&access).Error; err != nil {
-		return nil, fmt.Errorf("添加所有者权限失败: %w", err)
+		access := models.DatabaseAccess{
+			UserID:     ownerID,
+			DatabaseID: database.ID,
+			Role:       "owner",
+		}
+		if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&access).Error; err != nil {
+			return fmt.Errorf("添加所有者权限失败: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	return &database, nil
@@ -319,27 +322,23 @@ func (s *DatabaseService) ShareDatabase(dbID string, req ShareDBRequest, operato
 		return errors.New("用户不存在")
 	}
 
-	// 4. 检查是否已分享
-	var existingAccess models.DatabaseAccess
-	err = s.db.Where("database_id = ? AND user_id = ?", dbID, req.UserID).First(&existingAccess).Error
-	if err == nil {
-		return errors.New("该用户已有访问权限")
-	}
-
-	// 5. 权限验证：owner只能分享给owner，admin可以分享给admin/editor/viewer
+	// 4. 权限验证：owner只能分享给owner，admin可以分享给admin/editor/viewer
 	if operatorAccess.Role == "owner" && req.Role != "owner" {
 		return errors.New("所有者只能将数据库分享给其他所有者")
 	}
 
-	// 6. 添加权限
+	// 5. 添加权限（幂等并发安全）
 	access := models.DatabaseAccess{
 		UserID:     req.UserID,
 		DatabaseID: dbID,
 		Role:       req.Role,
 	}
-
-	if err := s.db.Create(&access).Error; err != nil {
-		return fmt.Errorf("分享数据库失败: %w", err)
+	result := s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&access)
+	if result.Error != nil {
+		return fmt.Errorf("分享数据库失败: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("该用户已有访问权限")
 	}
 
 	return nil

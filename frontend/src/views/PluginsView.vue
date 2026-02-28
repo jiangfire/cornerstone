@@ -69,7 +69,12 @@
     <el-dialog v-model="bindDialogVisible" title="绑定插件到表" width="500px">
       <el-form :model="bindForm" label-width="100px">
         <el-form-item label="选择表">
-          <el-select v-model="bindForm.table_id" placeholder="请选择表">
+          <el-select
+            v-model="bindForm.table_id"
+            placeholder="请选择表"
+            filterable
+            :loading="loadingTables"
+          >
             <el-option
               v-for="table in tables"
               :key="table.id"
@@ -167,7 +172,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { pluginAPI } from '@/services/api'
+import { pluginAPI, databaseAPI } from '@/services/api'
 import { formatDate } from '@/utils/format'
 
 interface Plugin {
@@ -191,6 +196,7 @@ interface Table {
 const loading = ref(false)
 const submitting = ref(false)
 const binding = ref(false)
+const loadingTables = ref(false)
 const plugins = ref<Plugin[]>([])
 const tables = ref<Table[]>([])
 
@@ -228,6 +234,30 @@ const bindForm = ref({
   table_id: '',
   trigger: 'manual',
 })
+
+const loadTables = async () => {
+  loadingTables.value = true
+  try {
+    const dbResp = await databaseAPI.list()
+    const databases = dbResp.data?.databases || []
+    const tableResult = await Promise.all(
+      databases.map(async (database: { id: string }) => {
+        const tableResp = await databaseAPI.getTables(database.id)
+        return tableResp.data?.tables || []
+      }),
+    )
+
+    tables.value = tableResult.flat().map((table: { id: string; name: string }) => ({
+      id: table.id,
+      name: table.name,
+    }))
+  } catch {
+    ElMessage.error('加载可绑定表失败')
+    tables.value = []
+  } finally {
+    loadingTables.value = false
+  }
+}
 
 // 加载插件列表
 const loadPlugins = async () => {
@@ -335,6 +365,7 @@ const handleDelete = async (plugin: Plugin) => {
 // 显示绑定对话框
 const handleBind = async (plugin: Plugin) => {
   currentPlugin.value = plugin
+  await loadTables()
   bindForm.value = {
     table_id: '',
     trigger: 'manual',

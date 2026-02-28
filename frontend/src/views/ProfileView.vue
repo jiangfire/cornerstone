@@ -110,12 +110,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UserFilled } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
+import { userAPI } from '@/services/api'
 
 const authStore = useAuthStore()
+const router = useRouter()
 
 const updating = ref(false)
 const changingPassword = ref(false)
@@ -137,9 +140,9 @@ const passwordForm = ref({
 
 const loadProfile = async () => {
   try {
-    // 从 auth store 获取用户信息
-    const user = authStore.user
-    if (user) {
+    const response = await userAPI.getProfile()
+    if (response.success && response.data) {
+      const user = response.data
       profileForm.value = {
         username: user.username || '',
         email: user.email || '',
@@ -156,12 +159,21 @@ const loadProfile = async () => {
 const updateProfile = async () => {
   updating.value = true
   try {
-    // 调用 API 更新个人资料
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    const response = await userAPI.updateProfile({
+      username: profileForm.value.username,
+      email: profileForm.value.email,
+      phone: profileForm.value.phone,
+      bio: profileForm.value.bio,
+      avatar: profileForm.value.avatar,
+    })
+    if (!response.success) {
+      throw new Error(response.message || '更新失败')
+    }
     ElMessage.success('个人资料更新成功')
+    await authStore.fetchProfile()
     await loadProfile()
-  } catch {
-    ElMessage.error('更新失败')
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error ? error.message : '更新失败')
   } finally {
     updating.value = false
   }
@@ -194,8 +206,13 @@ const changePassword = async () => {
 
   changingPassword.value = true
   try {
-    // 调用 API 修改密码
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    const response = await userAPI.changePassword({
+      current_password: passwordForm.value.currentPassword,
+      new_password: passwordForm.value.newPassword,
+    })
+    if (!response.success) {
+      throw new Error(response.message || '密码修改失败')
+    }
     ElMessage.success('密码修改成功')
     changePasswordDialog.value = false
     passwordForm.value = {
@@ -203,8 +220,8 @@ const changePassword = async () => {
       newPassword: '',
       confirmPassword: '',
     }
-  } catch {
-    ElMessage.error('密码修改失败')
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error ? error.message : '密码修改失败')
   } finally {
     changingPassword.value = false
   }
@@ -224,13 +241,26 @@ const confirmDeleteAccount = () => {
 
 const deleteAccount = async () => {
   try {
-    // 调用 API 删除账户
-    await new Promise((resolve) => setTimeout(resolve, 1000))
+    const { value } = await ElMessageBox.prompt('请输入当前密码以确认删除账户', '二次确认', {
+      inputType: 'password',
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      inputPlaceholder: '当前密码',
+      closeOnClickModal: false,
+    })
+
+    const response = await userAPI.deleteAccount({ password: value })
+    if (!response.success) {
+      throw new Error(response.message || '删除账户失败')
+    }
+
     ElMessage.success('账户已删除')
-    // 退出登录
-    await authStore.logout()
-  } catch {
-    ElMessage.error('删除账户失败')
+    authStore.clearAuth()
+    await router.replace('/login')
+  } catch (error: unknown) {
+    if (error !== 'cancel') {
+      ElMessage.error(error instanceof Error ? error.message : '删除账户失败')
+    }
   }
 }
 

@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -37,17 +38,20 @@ func main() {
 	logger.Info("Starting Cornerstone server...")
 
 	// 3. 初始化数据库
-	if err := db.InitDB(cfg.Database); err != nil {
+	if err := retryOperation(func() error {
+		return db.InitDB(cfg.Database)
+	}, 3, time.Second); err != nil {
 		applog.Fatalf("Failed to init database: %v", err)
 	}
 
 	// 4. 执行数据库迁移
-	if err := db.Migrate(); err != nil {
+	if err := retryOperation(db.Migrate, 3, time.Second); err != nil {
 		applog.Fatalf("Failed to migrate database: %v", err)
 	}
 
 	// 5. 设置定时任务（物化视图刷新和token清理）
-	db.SetupPeriodicTasks()
+	taskCtx, cancelTasks := context.WithCancel(context.Background())
+	periodicTaskWG := db.SetupPeriodicTasks(taskCtx)
 
 	// 6. 创建Gin引擎
 	gin.SetMode(cfg.Server.Mode)
@@ -56,6 +60,7 @@ func main() {
 	// 7. 注册中间件
 	r.Use(gin.Recovery())
 	r.Use(middleware.CORS())
+	r.Use(middleware.RequestID())
 	r.Use(middleware.RequestLogger())
 
 	// 8. 健康检查路由
@@ -84,6 +89,9 @@ func main() {
 		{
 			// 用户相关
 			protected.GET("/users/me", handlers.GetUserInfo)
+			protected.PUT("/users/me", handlers.UpdateUserInfo)
+			protected.PUT("/users/me/password", handlers.ChangeUserPassword)
+			protected.DELETE("/users/me", handlers.DeleteUserAccount)
 			protected.GET("/users", handlers.ListUsers)
 			protected.GET("/users/search", handlers.SearchUsers)
 			protected.POST("/auth/logout", handlers.Logout)
@@ -136,6 +144,7 @@ func main() {
 			// 记录相关
 			protected.POST("/records", handlers.CreateRecord)
 			protected.GET("/records", handlers.ListRecords)
+			protected.GET("/records/export", handlers.ExportRecords)
 			protected.GET("/records/:id", handlers.GetRecord)
 			protected.PUT("/records/:id", handlers.UpdateRecord)
 			protected.DELETE("/records/:id", handlers.DeleteRecord)
@@ -157,12 +166,24 @@ func main() {
 			protected.POST("/plugins/:id/bind", handlers.BindPlugin)
 			protected.DELETE("/plugins/:id/unbind", handlers.UnbindPlugin)
 			protected.GET("/plugins/:id/bindings", handlers.ListPluginBindings)
+			protected.POST("/plugins/:id/execute", handlers.ExecutePlugin)
+			protected.GET("/plugins/:id/executions", handlers.ListPluginExecutions)
 
 			// 统计相关
 			protected.GET("/stats/summary", handlers.GetStatsSummary)
 			protected.GET("/stats/activities", handlers.GetRecentActivities)
+
+			// 系统设置
+			protected.GET("/settings", handlers.GetSettings)
+			protected.PUT("/settings", handlers.UpdateSettings)
 		}
 	}
+
+	// API 版本兼容路由：将 /api/v1/* 复用到 /api/*
+	r.Any("/api/v1/*path", func(c *gin.Context) {
+		c.Request.URL.Path = "/api" + c.Param("path")
+		r.HandleContext(c)
+	})
 
 	// 10. 注册前端静态文件服务
 	frontend.RegisterRoutes(r)
@@ -172,6 +193,9 @@ func main() {
 		Addr:              cfg.GetServerAddr(),
 		Handler:           r,
 		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	// 优雅关闭
@@ -193,9 +217,51 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
+	// 先停止后台任务，避免关库后继续访问DB
+	cancelTasks()
+	waitPeriodicTasks(periodicTaskWG, 3*time.Second)
+
 	if err := srv.Shutdown(ctx); err != nil {
 		applog.Fatalf("Server forced to shutdown: %v", err)
 	}
 
+	if err := db.CloseDB(); err != nil {
+		applog.Errorf("Failed to close database: %v", err)
+	}
+
+	applog.Sync()
 	applog.Info("Server exited")
+}
+
+func waitPeriodicTasks(wg *sync.WaitGroup, timeout time.Duration) {
+	if wg == nil {
+		return
+	}
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		wg.Wait()
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(timeout):
+		applog.Warn("Periodic tasks shutdown timeout")
+	}
+}
+
+func retryOperation(op func() error, maxAttempts int, baseDelay time.Duration) error {
+	var lastErr error
+	for i := 0; i < maxAttempts; i++ {
+		if err := op(); err != nil {
+			lastErr = err
+			if i < maxAttempts-1 {
+				time.Sleep(baseDelay * time.Duration(i+1))
+			}
+			continue
+		}
+		return nil
+	}
+	return lastErr
 }

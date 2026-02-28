@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	"github.com/jiangfire/cornerstone/backend/internal/services"
@@ -145,4 +147,41 @@ func ListPluginBindings(c *gin.Context) {
 	}
 
 	types.Success(c, bindings)
+}
+
+// ExecutePlugin 手动执行插件
+func ExecutePlugin(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	pluginID := c.Param("id")
+
+	var req services.ExecutePluginRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		types.Error(c, 400, "参数错误: "+err.Error())
+		return
+	}
+
+	pluginService := services.NewPluginService(db.DB())
+	execution, err := pluginService.ExecutePlugin(pluginID, userID, req)
+	if err != nil {
+		types.Error(c, 400, err.Error())
+		return
+	}
+
+	types.Success(c, execution)
+}
+
+// ListPluginExecutions 查询插件执行记录
+func ListPluginExecutions(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	pluginID := c.Param("id")
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "50"))
+
+	pluginService := services.NewPluginService(db.DB())
+	executions, err := pluginService.ListExecutions(pluginID, userID, limit)
+	if err != nil {
+		types.Error(c, 400, err.Error())
+		return
+	}
+
+	types.Success(c, executions)
 }

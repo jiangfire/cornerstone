@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -11,6 +13,7 @@ import (
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"github.com/jiangfire/cornerstone/backend/pkg/db"
 	"golang.org/x/crypto/bcrypt"
+	"gorm.io/gorm/clause"
 )
 
 // JWTClaims JWT声明结构
@@ -19,6 +22,41 @@ type JWTClaims struct {
 	Username string `json:"username"`
 	Role     string `json:"role"`
 	jwt.RegisteredClaims
+}
+
+var (
+	jwtConfigMu   sync.RWMutex
+	jwtCfgLoaded  bool
+	jwtSecret     string
+	jwtExpiration int
+)
+
+func loadJWTConfig() (string, int, error) {
+	jwtConfigMu.RLock()
+	if jwtCfgLoaded {
+		secret := jwtSecret
+		expiration := jwtExpiration
+		jwtConfigMu.RUnlock()
+		return secret, expiration, nil
+	}
+	jwtConfigMu.RUnlock()
+
+	jwtConfigMu.Lock()
+	defer jwtConfigMu.Unlock()
+	if jwtCfgLoaded {
+		return jwtSecret, jwtExpiration, nil
+	}
+
+	cfg, err := config.Load()
+	if err != nil {
+		return "", 0, fmt.Errorf("加载JWT配置失败: %w", err)
+	}
+
+	jwtSecret = cfg.JWT.Secret
+	jwtExpiration = cfg.JWT.Expiration
+	jwtCfgLoaded = true
+
+	return jwtSecret, jwtExpiration, nil
 }
 
 // HashPassword 使用bcrypt哈希密码
@@ -35,7 +73,7 @@ func CheckPasswordHash(password, hash string) bool {
 
 // GenerateJWT 生成JWT令牌
 func GenerateJWT(userID, username, role string) (string, error) {
-	cfg, err := config.Load()
+	secret, expiration, err := loadJWTConfig()
 	if err != nil {
 		return "", err
 	}
@@ -45,7 +83,7 @@ func GenerateJWT(userID, username, role string) (string, error) {
 		Username: username,
 		Role:     role,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * time.Duration(cfg.JWT.Expiration))),
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * time.Duration(expiration))),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 			NotBefore: jwt.NewNumericDate(time.Now()),
 			Issuer:    "cornerstone",
@@ -53,12 +91,12 @@ func GenerateJWT(userID, username, role string) (string, error) {
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	return token.SignedString([]byte(cfg.JWT.Secret))
+	return token.SignedString([]byte(secret))
 }
 
 // ValidateJWT 验证JWT令牌
 func ValidateJWT(tokenString string) (*JWTClaims, error) {
-	cfg, err := config.Load()
+	secret, _, err := loadJWTConfig()
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +105,7 @@ func ValidateJWT(tokenString string) (*JWTClaims, error) {
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
 		}
-		return []byte(cfg.JWT.Secret), nil
+		return []byte(secret), nil
 	})
 
 	if err != nil {
@@ -94,7 +132,10 @@ func BlacklistToken(token string, expiration time.Time) error {
 		TokenHash: hash,
 		ExpiredAt: expiration,
 	}
-	return db.DB().Create(&tokenBlacklist).Error
+	return db.DB().Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "token_hash"}},
+		DoNothing: true,
+	}).Create(&tokenBlacklist).Error
 }
 
 // IsTokenBlacklisted 检查token是否在黑名单中

@@ -168,6 +168,7 @@ import { ref, onMounted, computed } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { organizationAPI, userAPI } from '@/services/api'
+import { useAuthStore } from '@/stores/auth'
 import { formatDate } from '@/utils/format'
 
 interface Organization {
@@ -199,6 +200,7 @@ const submitting = ref(false)
 const dialogVisible = ref(false)
 const isEditMode = ref(false)
 const organizations = ref<Organization[]>([])
+const authStore = useAuthStore()
 
 const formRef = ref<FormInstance>()
 const form = ref({
@@ -368,7 +370,7 @@ const resetForm = () => {
 // 处理成员管理
 const handleManageMembers = async (row: Organization) => {
   // 获取当前用户在该组织的角色
-  currentUser.value = { id: 'current-user-id', role: row.role }
+  currentUser.value = { id: authStore.user?.id || '', role: row.role }
   selectedOrg.value = row
   await loadMembers()
 }

@@ -1,7 +1,9 @@
 package db
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/jiangfire/cornerstone/backend/internal/config"
@@ -11,9 +13,59 @@ import (
 	"gorm.io/gorm"
 )
 
+type circuitBreaker struct {
+	mu        sync.Mutex
+	failures  int
+	threshold int
+	cooldown  time.Duration
+	openUntil time.Time
+}
+
+func newCircuitBreaker(threshold int, cooldown time.Duration) *circuitBreaker {
+	return &circuitBreaker{
+		threshold: threshold,
+		cooldown:  cooldown,
+	}
+}
+
+func (cb *circuitBreaker) allow() bool {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+
+	return time.Now().After(cb.openUntil)
+}
+
+func (cb *circuitBreaker) markSuccess() {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+
+	cb.failures = 0
+	cb.openUntil = time.Time{}
+}
+
+func (cb *circuitBreaker) markFailure() {
+	cb.mu.Lock()
+	defer cb.mu.Unlock()
+
+	cb.failures++
+	if cb.failures >= cb.threshold {
+		cb.openUntil = time.Now().Add(cb.cooldown)
+	}
+}
+
+var (
+	viewRefreshBreaker  = newCircuitBreaker(3, 2*time.Minute)
+	tokenCleanupBreaker = newCircuitBreaker(3, 2*time.Minute)
+)
+
 // InitDB 初始化数据库连接（包装pkg/db中的函数）
 func InitDB(cfg config.DatabaseConfig) error {
 	return pkgdb.InitDB(cfg)
+}
+
+// CloseDB 关闭数据库连接
+func CloseDB() error {
+	return pkgdb.CloseDB()
 }
 
 // Migrate 执行所有数据库迁移
@@ -46,9 +98,11 @@ func Migrate() error {
 		&models.File{},
 		&models.Plugin{},
 		&models.PluginBinding{},
+		&models.PluginExecution{},
 
 		// 活动日志
 		&models.ActivityLog{},
+		&models.AppSettings{},
 
 		// 安全相关
 		&models.TokenBlacklist{},
@@ -79,6 +133,23 @@ func Migrate() error {
 
 	logger.Info("Token blacklist索引创建完成")
 
+	// 初始化默认系统设置（单例）
+	if err := database.FirstOrCreate(&models.AppSettings{ID: 1}, &models.AppSettings{
+		ID:                1,
+		SystemName:        "Cornerstone",
+		SystemDescription: "数据管理平台",
+		AllowRegistration: true,
+		MaxFileSize:       50,
+		DBType:            "postgresql",
+		DBPoolSize:        10,
+		DBTimeout:         30,
+		PluginTimeout:     300,
+		PluginWorkDir:     "./plugins",
+		PluginAutoUpdate:  false,
+	}).Error; err != nil {
+		return fmt.Errorf("初始化系统设置失败: %w", err)
+	}
+
 	logger.Info("数据库迁移完成 ✅")
 	return nil
 }
@@ -87,16 +158,6 @@ func Migrate() error {
 func createIndexes(db *gorm.DB) error {
 	// records表的JSONB GIN索引
 	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_records_data ON records USING GIN(data)").Error; err != nil {
-		return err
-	}
-
-	// database_access复合索引（权限查询优化）
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_database_access_user_db ON database_access(user_id, database_id)").Error; err != nil {
-		return err
-	}
-
-	// organization_members复合索引（组织成员查询优化）
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_org_members_org_user ON organization_members(organization_id, user_id)").Error; err != nil {
 		return err
 	}
 
@@ -125,12 +186,17 @@ func createIndexes(db *gorm.DB) error {
 		return err
 	}
 
-	// field_permissions复合索引（权限查询优化）
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_field_permissions_table_field_role ON field_permissions(table_id, field_id, role)").Error; err != nil {
+	// field_permissions按角色索引（权限查询优化）
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_field_permissions_role ON field_permissions(role)").Error; err != nil {
 		return err
 	}
 
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_field_permissions_role ON field_permissions(role)").Error; err != nil {
+	// plugin_executions 索引（执行记录查询优化）
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_plugin_executions_plugin_created ON plugin_executions(plugin_id, created_at DESC)").Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_plugin_executions_table_trigger ON plugin_executions(table_id, trigger)").Error; err != nil {
 		return err
 	}
 
@@ -223,29 +289,80 @@ func CleanupExpiredTokens() error {
 	return nil
 }
 
-// SetupPeriodicTasks 设置定时任务（建议在main.go中调用）
-func SetupPeriodicTasks() {
+// SetupPeriodicTasks 设置定时任务并返回用于等待退出的 WaitGroup
+func SetupPeriodicTasks(ctx context.Context) *sync.WaitGroup {
+	wg := &sync.WaitGroup{}
+
 	// 每5分钟刷新一次物化视图
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
+
 		ticker := time.NewTicker(5 * time.Minute)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			if err := RefreshMaterializedViews(); err != nil {
-				zap.L().Error("定时刷新物化视图失败", zap.Error(err))
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := runProtectedTask("刷新物化视图", viewRefreshBreaker, RefreshMaterializedViews); err != nil {
+					zap.L().Error("定时刷新物化视图失败", zap.Error(err))
+				}
 			}
 		}
 	}()
 
 	// 每小时清理一次过期token
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
+
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
 
-		for range ticker.C {
-			if err := CleanupExpiredTokens(); err != nil {
-				zap.L().Error("定时清理过期token失败", zap.Error(err))
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := runProtectedTask("清理过期token", tokenCleanupBreaker, CleanupExpiredTokens); err != nil {
+					zap.L().Error("定时清理过期token失败", zap.Error(err))
+				}
 			}
 		}
 	}()
+
+	return wg
+}
+
+func runProtectedTask(name string, breaker *circuitBreaker, task func() error) error {
+	if !breaker.allow() {
+		zap.L().Warn("任务熔断中，进入降级模式并跳过执行", zap.String("task", name))
+		return nil
+	}
+
+	err := retry(task, 3, 500*time.Millisecond)
+	if err != nil {
+		breaker.markFailure()
+		return err
+	}
+
+	breaker.markSuccess()
+	return nil
+}
+
+func retry(task func() error, maxAttempts int, baseDelay time.Duration) error {
+	var lastErr error
+	for i := 0; i < maxAttempts; i++ {
+		if err := task(); err != nil {
+			lastErr = err
+			if i < maxAttempts-1 {
+				time.Sleep(baseDelay * time.Duration(i+1))
+			}
+			continue
+		}
+		return nil
+	}
+	return lastErr
 }

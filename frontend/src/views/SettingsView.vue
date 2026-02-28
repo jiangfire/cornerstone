@@ -1,6 +1,6 @@
 <template>
   <div class="settings">
-    <el-card class="box-card">
+    <el-card class="box-card" v-loading="loading">
       <template #header>
         <div class="card-header">
           <span>系统设置</span>
@@ -28,7 +28,9 @@
               <el-input-number v-model="systemForm.maxFileSize" :min="1" :max="1024" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="saveSystemConfig">保存配置</el-button>
+              <el-button type="primary" @click="saveSystemConfig" :loading="saving"
+                >保存配置</el-button
+              >
             </el-form-item>
           </el-form>
         </el-tab-pane>
@@ -49,7 +51,7 @@
               <el-input-number v-model="dbForm.timeout" :min="1" :max="300" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="saveDbConfig">保存配置</el-button>
+              <el-button type="primary" @click="saveDbConfig" :loading="saving">保存配置</el-button>
             </el-form-item>
           </el-form>
         </el-tab-pane>
@@ -66,7 +68,9 @@
               <el-switch v-model="pluginForm.autoUpdate" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="savePluginConfig">保存配置</el-button>
+              <el-button type="primary" @click="savePluginConfig" :loading="saving"
+                >保存配置</el-button
+              >
             </el-form-item>
           </el-form>
         </el-tab-pane>
@@ -76,10 +80,13 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
+import { settingsAPI } from '@/services/api'
 
 const activeTab = ref('system')
+const loading = ref(false)
+const saving = ref(false)
 
 // 系统配置
 const systemForm = ref({
@@ -103,17 +110,79 @@ const pluginForm = ref({
   autoUpdate: false,
 })
 
-const saveSystemConfig = () => {
-  ElMessage.success('系统配置已保存')
+const loadSettings = async () => {
+  loading.value = true
+  try {
+    const response = await settingsAPI.get()
+    if (response.success && response.data) {
+      systemForm.value = {
+        name: response.data.system_name || 'Cornerstone',
+        description: response.data.system_description || '',
+        allowRegistration: response.data.allow_registration,
+        maxFileSize: response.data.max_file_size,
+      }
+
+      dbForm.value = {
+        type: response.data.db_type || 'postgresql',
+        poolSize: response.data.db_pool_size,
+        timeout: response.data.db_timeout,
+      }
+
+      pluginForm.value = {
+        timeout: response.data.plugin_timeout,
+        workDir: response.data.plugin_work_dir || './plugins',
+        autoUpdate: response.data.plugin_auto_update,
+      }
+    }
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error ? error.message : '加载系统设置失败')
+  } finally {
+    loading.value = false
+  }
 }
 
-const saveDbConfig = () => {
-  ElMessage.success('数据库配置已保存')
+const saveSettings = async (successMessage: string) => {
+  saving.value = true
+  try {
+    const response = await settingsAPI.update({
+      system_name: systemForm.value.name,
+      system_description: systemForm.value.description,
+      allow_registration: systemForm.value.allowRegistration,
+      max_file_size: systemForm.value.maxFileSize,
+      db_type: dbForm.value.type,
+      db_pool_size: dbForm.value.poolSize,
+      db_timeout: dbForm.value.timeout,
+      plugin_timeout: pluginForm.value.timeout,
+      plugin_work_dir: pluginForm.value.workDir,
+      plugin_auto_update: pluginForm.value.autoUpdate,
+    })
+    if (!response.success) {
+      throw new Error(response.message || '保存配置失败')
+    }
+
+    ElMessage.success(successMessage)
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error ? error.message : '保存配置失败')
+  } finally {
+    saving.value = false
+  }
 }
 
-const savePluginConfig = () => {
-  ElMessage.success('插件配置已保存')
+const saveSystemConfig = async () => {
+  await saveSettings('系统配置已保存')
 }
+
+const saveDbConfig = async () => {
+  await saveSettings('数据库配置已保存')
+}
+
+const savePluginConfig = async () => {
+  await saveSettings('插件配置已保存')
+}
+
+onMounted(() => {
+  loadSettings()
+})
 </script>
 
 <style scoped lang="scss">

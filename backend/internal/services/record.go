@@ -1,10 +1,13 @@
 package services
 
 import (
+	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
@@ -50,7 +53,7 @@ type QueryRequest struct {
 	TableID string `form:"table_id" binding:"required"`
 	Limit   int    `form:"limit" binding:"min=1,max=100"`
 	Offset  int    `form:"offset" binding:"min=0"`
-	Filter  string `form:"filter"` // JSON字符串格式的过滤条件
+	Filter  string `form:"filter"` // 支持 JSON 过滤或关键字搜索
 }
 
 // QueryResponse 查询响应
@@ -248,6 +251,42 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 	return nil
 }
 
+func (s *RecordService) applyRecordFilter(query *gorm.DB, filter string) (*gorm.DB, error) {
+	filter = strings.TrimSpace(filter)
+	if filter == "" {
+		return query, nil
+	}
+
+	var structuredFilter map[string]interface{}
+	if err := json.Unmarshal([]byte(filter), &structuredFilter); err == nil && len(structuredFilter) > 0 {
+		dialectorName := s.db.Dialector.Name()
+		isSQLite := dialectorName == "sqlite"
+
+		for fieldID, value := range structuredFilter {
+			jsonValue, _ := json.Marshal(value)
+			if isSQLite {
+				var scalar interface{}
+				if err := json.Unmarshal(jsonValue, &scalar); err != nil {
+					return nil, fmt.Errorf("过滤条件格式错误: %w", err)
+				}
+				query = query.Where("JSON_EXTRACT(data, ?) = ?", fmt.Sprintf("$.%s", fieldID), scalar)
+			} else {
+				query = query.Where("data @> ?", fmt.Sprintf(`{"%s":%s}`, fieldID, string(jsonValue)))
+			}
+		}
+		return query, nil
+	}
+
+	// 回退到关键字搜索
+	keyword := "%" + filter + "%"
+	if s.db.Dialector.Name() == "sqlite" {
+		query = query.Where("CAST(data AS TEXT) LIKE ?", keyword)
+	} else {
+		query = query.Where("CAST(data AS TEXT) ILIKE ?", keyword)
+	}
+	return query, nil
+}
+
 // CreateRecord 创建记录
 func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*models.Record, error) {
 	// 1. 检查表访问权限（owner, admin, editor可以创建记录）
@@ -279,6 +318,12 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 		return nil, fmt.Errorf("创建记录失败: %w", err)
 	}
 
+	NewPluginService(s.db).TriggerByTable(req.TableID, "create", record.ID, userID, map[string]interface{}{
+		"record_id": record.ID,
+		"data":      req.Data,
+		"user_id":   userID,
+	})
+
 	return &record, nil
 }
 
@@ -297,31 +342,10 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 	// 3. 构建查询
 	query := s.db.Where("table_id = ? AND deleted_at IS NULL", req.TableID)
 
-	// 4. 解析过滤条件
-	if req.Filter != "" {
-		var filter map[string]interface{}
-		if err := json.Unmarshal([]byte(req.Filter), &filter); err != nil {
-			return nil, errors.New("过滤条件格式错误")
-		}
-
-		// 检测数据库类型并使用适当的查询方式
-		//nolint:staticcheck // QF1008 - Storing dialector name in variable is more readable than repeating s.db.Dialector.Name()
-		dialectorName := s.db.Dialector.Name()
-		isSQLite := dialectorName == "sqlite"
-
-		// 构建查询条件
-		for fieldID, value := range filter {
-			jsonValue, _ := json.Marshal(value)
-
-			if isSQLite {
-				// SQLite 使用 JSON_EXTRACT 函数
-				// data 是 JSON 字符串，需要使用 JSON_EXTRACT(data, '$.fieldID') = 'value'
-				query = query.Where("JSON_EXTRACT(data, ?) = ?", fmt.Sprintf("$.%s", fieldID), string(jsonValue[1:len(jsonValue)-1]))
-			} else {
-				// PostgreSQL 使用 JSONB @> 操作符
-				query = query.Where("data @> ?", fmt.Sprintf(`{"%s":%s}`, fieldID, string(jsonValue)))
-			}
-		}
+	// 4. 过滤条件（支持结构化过滤和关键字搜索）
+	query, err := s.applyRecordFilter(query, req.Filter)
+	if err != nil {
+		return nil, err
 	}
 
 	// 5. 执行查询
@@ -334,26 +358,9 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 	// 6. 获取总数
 	var total int64
 	countQuery := s.db.Model(&models.Record{}).Where("table_id = ? AND deleted_at IS NULL", req.TableID)
-	if req.Filter != "" {
-		var filter map[string]interface{}
-		if err := json.Unmarshal([]byte(req.Filter), &filter); err == nil {
-			// 检测数据库类型并使用适当的查询方式
-			//nolint:staticcheck // QF1008 - Storing dialector name in variable is more readable
-			dialectorName := s.db.Dialector.Name()
-			isSQLite := dialectorName == "sqlite"
-
-			for fieldID, value := range filter {
-				jsonValue, _ := json.Marshal(value)
-
-				if isSQLite {
-					// SQLite 使用 JSON_EXTRACT 函数
-					countQuery = countQuery.Where("JSON_EXTRACT(data, ?) = ?", fmt.Sprintf("$.%s", fieldID), string(jsonValue[1:len(jsonValue)-1]))
-				} else {
-					// PostgreSQL 使用 JSONB @> 操作符
-					countQuery = countQuery.Where("data @> ?", fmt.Sprintf(`{"%s":%s}`, fieldID, string(jsonValue)))
-				}
-			}
-		}
+	countQuery, err = s.applyRecordFilter(countQuery, req.Filter)
+	if err != nil {
+		return nil, err
 	}
 	countQuery.Count(&total)
 
@@ -383,6 +390,129 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 		Total:   total,
 		HasMore: int64(req.Offset+len(records)) < total,
 	}, nil
+}
+
+func stringifyExportValue(value interface{}) string {
+	if value == nil {
+		return ""
+	}
+
+	switch v := value.(type) {
+	case string:
+		return v
+	case float64, float32, int, int64, int32, bool:
+		return fmt.Sprintf("%v", v)
+	default:
+		b, err := json.Marshal(v)
+		if err != nil {
+			return fmt.Sprintf("%v", v)
+		}
+		return string(b)
+	}
+}
+
+// ExportRecords 导出记录数据
+func (s *RecordService) ExportRecords(tableID, userID, format, filter string) ([]byte, string, string, error) {
+	if err := s.checkTableAccess(tableID, userID, []string{"owner", "admin", "editor", "viewer"}); err != nil {
+		return nil, "", "", err
+	}
+
+	var fields []models.Field
+	if err := s.db.Where("table_id = ? AND deleted_at IS NULL", tableID).
+		Order("created_at ASC").
+		Find(&fields).Error; err != nil {
+		return nil, "", "", fmt.Errorf("读取字段定义失败: %w", err)
+	}
+
+	query := s.db.Where("table_id = ? AND deleted_at IS NULL", tableID).Order("created_at DESC")
+	query, err := s.applyRecordFilter(query, filter)
+	if err != nil {
+		return nil, "", "", err
+	}
+
+	var records []models.Record
+	if err := query.Find(&records).Error; err != nil {
+		return nil, "", "", fmt.Errorf("读取记录失败: %w", err)
+	}
+
+	switch strings.ToLower(format) {
+	case "json":
+		exportRows := make([]map[string]interface{}, 0, len(records))
+		for _, record := range records {
+			row := map[string]interface{}{
+				"id":         record.ID,
+				"table_id":   record.TableID,
+				"version":    record.Version,
+				"created_at": record.CreatedAt.Format(time.RFC3339),
+				"updated_at": record.UpdatedAt.Format(time.RFC3339),
+			}
+
+			var payload map[string]interface{}
+			if record.Data != "" {
+				_ = json.Unmarshal([]byte(record.Data), &payload)
+			}
+			row["data"] = payload
+			exportRows = append(exportRows, row)
+		}
+
+		data, err := json.MarshalIndent(exportRows, "", "  ")
+		if err != nil {
+			return nil, "", "", fmt.Errorf("导出JSON失败: %w", err)
+		}
+
+		filename := fmt.Sprintf("records_%s_%s.json", tableID, time.Now().Format("20060102150405"))
+		return data, "application/json; charset=utf-8", filename, nil
+
+	case "csv":
+		var buf bytes.Buffer
+		writer := csv.NewWriter(&buf)
+
+		header := []string{"id"}
+		for _, field := range fields {
+			header = append(header, field.Name)
+		}
+		header = append(header, "version", "created_at", "updated_at")
+		if err := writer.Write(header); err != nil {
+			return nil, "", "", fmt.Errorf("写入CSV表头失败: %w", err)
+		}
+
+		for _, record := range records {
+			row := []string{record.ID}
+			payload := map[string]interface{}{}
+			if record.Data != "" {
+				_ = json.Unmarshal([]byte(record.Data), &payload)
+			}
+
+			for _, field := range fields {
+				value := payload[field.Name]
+				if value == nil {
+					value = payload[field.ID]
+				}
+				row = append(row, stringifyExportValue(value))
+			}
+
+			row = append(row,
+				fmt.Sprintf("%d", record.Version),
+				record.CreatedAt.Format(time.RFC3339),
+				record.UpdatedAt.Format(time.RFC3339),
+			)
+
+			if err := writer.Write(row); err != nil {
+				return nil, "", "", fmt.Errorf("写入CSV数据失败: %w", err)
+			}
+		}
+
+		writer.Flush()
+		if err := writer.Error(); err != nil {
+			return nil, "", "", fmt.Errorf("生成CSV失败: %w", err)
+		}
+
+		filename := fmt.Sprintf("records_%s_%s.csv", tableID, time.Now().Format("20060102150405"))
+		return buf.Bytes(), "text/csv; charset=utf-8", filename, nil
+
+	default:
+		return nil, "", "", errors.New("不支持的导出格式，仅支持 csv/json")
+	}
 }
 
 // GetRecord 获取单个记录
@@ -422,7 +552,7 @@ func (s *RecordService) GetRecord(recordID, userID string) (*RecordResponse, err
 func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, userID string) (*models.Record, error) {
 	// 1. 获取记录
 	var record models.Record
-	err := s.db.Where("id = ?", recordID).First(&record).Error
+	err := s.db.Where("id = ? AND deleted_at IS NULL", recordID).First(&record).Error
 	if err != nil {
 		return nil, fmt.Errorf("记录不存在: %w", err)
 	}
@@ -448,14 +578,34 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 		return nil, fmt.Errorf("数据序列化失败: %w", err)
 	}
 
-	// 6. 更新记录
-	record.Data = string(dataJSON)
-	record.UpdatedBy = userID
-	record.Version = record.Version + 1
-
-	if err := s.db.Save(&record).Error; err != nil {
-		return nil, fmt.Errorf("更新记录失败: %w", err)
+	// 6. 原子更新，避免并发覆盖写
+	updateQuery := s.db.Model(&models.Record{}).
+		Where("id = ? AND deleted_at IS NULL", recordID)
+	if req.Version > 0 {
+		updateQuery = updateQuery.Where("version = ?", req.Version)
 	}
+
+	updateResult := updateQuery.Updates(map[string]interface{}{
+		"data":       string(dataJSON),
+		"updated_by": userID,
+		"version":    gorm.Expr("version + 1"),
+	})
+	if updateResult.Error != nil {
+		return nil, fmt.Errorf("更新记录失败: %w", updateResult.Error)
+	}
+	if updateResult.RowsAffected == 0 {
+		return nil, errors.New("记录已被其他用户修改，请刷新后重试")
+	}
+
+	if err := s.db.Where("id = ?", recordID).First(&record).Error; err != nil {
+		return nil, fmt.Errorf("读取更新后记录失败: %w", err)
+	}
+
+	NewPluginService(s.db).TriggerByTable(record.TableID, "update", record.ID, userID, map[string]interface{}{
+		"record_id": record.ID,
+		"data":      req.Data,
+		"user_id":   userID,
+	})
 
 	return &record, nil
 }
@@ -478,6 +628,19 @@ func (s *RecordService) DeleteRecord(recordID, userID string) error {
 	if err := s.db.Delete(&record).Error; err != nil {
 		return fmt.Errorf("删除记录失败: %w", err)
 	}
+
+	payload := map[string]interface{}{
+		"record_id": record.ID,
+		"user_id":   userID,
+	}
+	if record.Data != "" {
+		var deletedData map[string]interface{}
+		if err := json.Unmarshal([]byte(record.Data), &deletedData); err == nil {
+			payload["data"] = deletedData
+		}
+	}
+
+	NewPluginService(s.db).TriggerByTable(record.TableID, "delete", record.ID, userID, payload)
 
 	return nil
 }
@@ -514,15 +677,10 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 
 	// 使用事务确保原子性
 	tx := s.db.Begin()
-	for i, record := range records {
+	for _, record := range records {
 		if err := tx.Create(record).Error; err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("批量创建失败: %w", err)
-		}
-		// Add small delay between records to ensure unique IDs
-		// This prevents ID collisions when GenerateID() uses nanosecond timestamps
-		if i < len(records)-1 {
-			time.Sleep(1 * time.Millisecond)
 		}
 	}
 

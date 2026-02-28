@@ -95,7 +95,22 @@ export const userAPI = {
       phone?: string
       bio?: string
       avatar?: string
-    }>('/user/profile')
+    }>('/users/me')
+  },
+  updateProfile(data: {
+    username: string
+    email: string
+    phone?: string
+    bio?: string
+    avatar?: string
+  }) {
+    return request.put('/users/me', data)
+  },
+  changePassword(data: { current_password: string; new_password: string }) {
+    return request.put('/users/me/password', data)
+  },
+  deleteAccount(data: { password: string }) {
+    return request.delete('/users/me', data)
   },
   list(params?: Record<string, unknown>) {
     return request.get<{ users: Array<{ id: string; username: string; email: string }> }>(
@@ -152,10 +167,10 @@ export const fieldAPI = {
     return request.get<{ permissions: any[] }>(`/tables/${tableId}/field-permissions`)
   },
   setPermission(tableId: string, permission: unknown) {
-    return request.post(`/tables/${tableId}/field-permissions`, permission)
+    return request.put(`/tables/${tableId}/field-permissions`, permission)
   },
   batchSetPermissions(tableId: string, permissions: unknown[]) {
-    return request.post(`/tables/${tableId}/field-permissions/batch`, { permissions })
+    return request.put(`/tables/${tableId}/field-permissions/batch`, { permissions })
   },
 }
 
@@ -178,7 +193,7 @@ export const recordAPI = {
 // 文件 API
 export const fileAPI = {
   listByRecord(recordId: string) {
-    return request.get<any[]>('/files', { record_id: recordId })
+    return request.get<any[]>(`/records/${recordId}/files`)
   },
   download(fileId: string): string {
     return `${API_CONFIG.baseURL}/files/${fileId}/download`
@@ -209,7 +224,7 @@ export const organizationAPI = {
     return request.post(`/organizations/${orgId}/members`, data)
   },
   updateMemberRole(orgId: string, memberId: string, role: string) {
-    return request.put(`/organizations/${orgId}/members/${memberId}`, { role })
+    return request.put(`/organizations/${orgId}/members/${memberId}/role`, { role })
   },
   removeMember(orgId: string, memberId: string) {
     return request.delete(`/organizations/${orgId}/members/${memberId}`)
@@ -237,7 +252,42 @@ export const pluginAPI = {
     return request.get<any[]>(`/plugins/${pluginId}/bindings`)
   },
   unbind(pluginId: string, data: Record<string, unknown>) {
-    return request.post(`/plugins/${pluginId}/unbind`, data)
+    return request.delete(`/plugins/${pluginId}/unbind`, data)
+  },
+}
+
+// 系统设置 API
+export const settingsAPI = {
+  get() {
+    return request.get<{
+      system_name: string
+      system_description: string
+      allow_registration: boolean
+      max_file_size: number
+      db_type: string
+      db_pool_size: number
+      db_timeout: number
+      plugin_timeout: number
+      plugin_work_dir: string
+      plugin_auto_update: boolean
+    }>('/settings')
+  },
+  update(data: Record<string, unknown>) {
+    return request.put('/settings', data)
+  },
+}
+
+// 导出 API
+export const exportAPI = {
+  downloadRecords(tableId: string, format: 'csv' | 'json' = 'csv', filter = '') {
+    const params: Record<string, string> = {
+      table_id: tableId,
+      format,
+    }
+    if (filter.trim() !== '') {
+      params.filter = filter.trim()
+    }
+    return api.get<Blob, Blob>('/records/export', { params, responseType: 'blob' })
   },
 }
 

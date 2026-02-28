@@ -9,6 +9,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // FieldService 字段管理服务
@@ -430,6 +431,21 @@ type BatchFieldPermissionsRequest struct {
 	Permissions []FieldPermissionRequest `json:"permissions" binding:"required"`
 }
 
+func logPermissionActivity(tx *gorm.DB, userID, tableID, fieldID, role string, canRead, canWrite, canDelete bool) error {
+	description := fmt.Sprintf(
+		"更新字段权限 table=%s field=%s role=%s r=%t w=%t d=%t",
+		tableID, fieldID, role, canRead, canWrite, canDelete,
+	)
+
+	return tx.Create(&models.ActivityLog{
+		UserID:       userID,
+		Action:       "permission_update",
+		ResourceType: "field_permission",
+		ResourceID:   fieldID,
+		Description:  description,
+	}).Error
+}
+
 // getUserRole 获取用户在表所属数据库中的角色
 func (s *FieldService) getUserRole(tableID, userID string) (string, error) {
 	var table models.Table
@@ -543,33 +559,28 @@ func (s *FieldService) SetFieldPermission(tableID string, req FieldPermissionReq
 		return errors.New("字段不存在")
 	}
 
-	// 3. 查找是否已存在权限配置
-	var permission models.FieldPermission
-	err = s.db.Where("field_id = ? AND role = ?", req.FieldID, req.Role).First(&permission).Error
+	// 3. 原子 upsert 权限配置
+	permission := models.FieldPermission{
+		TableID:   tableID,
+		FieldID:   req.FieldID,
+		Role:      req.Role,
+		CanRead:   req.CanRead,
+		CanWrite:  req.CanWrite,
+		CanDelete: req.CanDelete,
+	}
+	if err := s.db.Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "table_id"},
+			{Name: "field_id"},
+			{Name: "role"},
+		},
+		DoUpdates: clause.AssignmentColumns([]string{"can_read", "can_write", "can_delete", "updated_at"}),
+	}).Create(&permission).Error; err != nil {
+		return fmt.Errorf("设置权限配置失败: %w", err)
+	}
 
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		// 创建新权限配置
-		permission = models.FieldPermission{
-			TableID:   tableID,
-			FieldID:   req.FieldID,
-			Role:      req.Role,
-			CanRead:   req.CanRead,
-			CanWrite:  req.CanWrite,
-			CanDelete: req.CanDelete,
-		}
-		if err := s.db.Create(&permission).Error; err != nil {
-			return fmt.Errorf("创建权限配置失败: %w", err)
-		}
-	} else if err != nil {
-		return fmt.Errorf("查询权限配置失败: %w", err)
-	} else {
-		// 更新已有权限配置
-		permission.CanRead = req.CanRead
-		permission.CanWrite = req.CanWrite
-		permission.CanDelete = req.CanDelete
-		if err := s.db.Save(&permission).Error; err != nil {
-			return fmt.Errorf("更新权限配置失败: %w", err)
-		}
+	if err := logPermissionActivity(s.db, userID, tableID, req.FieldID, req.Role, req.CanRead, req.CanWrite, req.CanDelete); err != nil {
+		return fmt.Errorf("写入权限审计日志失败: %w", err)
 	}
 
 	return nil
@@ -592,33 +603,27 @@ func (s *FieldService) BatchSetFieldPermissions(tableID string, req BatchFieldPe
 				return fmt.Errorf("字段 %s 不存在", permReq.FieldID)
 			}
 
-			// 查找是否已存在权限配置
-			var permission models.FieldPermission
-			err = tx.Where("field_id = ? AND role = ?", permReq.FieldID, permReq.Role).First(&permission).Error
+			permission := models.FieldPermission{
+				TableID:   tableID,
+				FieldID:   permReq.FieldID,
+				Role:      permReq.Role,
+				CanRead:   permReq.CanRead,
+				CanWrite:  permReq.CanWrite,
+				CanDelete: permReq.CanDelete,
+			}
+			if err := tx.Clauses(clause.OnConflict{
+				Columns: []clause.Column{
+					{Name: "table_id"},
+					{Name: "field_id"},
+					{Name: "role"},
+				},
+				DoUpdates: clause.AssignmentColumns([]string{"can_read", "can_write", "can_delete", "updated_at"}),
+			}).Create(&permission).Error; err != nil {
+				return fmt.Errorf("设置权限配置失败: %w", err)
+			}
 
-			if errors.Is(err, gorm.ErrRecordNotFound) {
-				// 创建新权限配置
-				permission = models.FieldPermission{
-					TableID:   tableID,
-					FieldID:   permReq.FieldID,
-					Role:      permReq.Role,
-					CanRead:   permReq.CanRead,
-					CanWrite:  permReq.CanWrite,
-					CanDelete: permReq.CanDelete,
-				}
-				if err := tx.Create(&permission).Error; err != nil {
-					return fmt.Errorf("创建权限配置失败: %w", err)
-				}
-			} else if err != nil {
-				return fmt.Errorf("查询权限配置失败: %w", err)
-			} else {
-				// 更新已有权限配置
-				permission.CanRead = permReq.CanRead
-				permission.CanWrite = permReq.CanWrite
-				permission.CanDelete = permReq.CanDelete
-				if err := tx.Save(&permission).Error; err != nil {
-					return fmt.Errorf("更新权限配置失败: %w", err)
-				}
+			if err := logPermissionActivity(tx, userID, tableID, permReq.FieldID, permReq.Role, permReq.CanRead, permReq.CanWrite, permReq.CanDelete); err != nil {
+				return fmt.Errorf("写入权限审计日志失败: %w", err)
 			}
 		}
 		return nil

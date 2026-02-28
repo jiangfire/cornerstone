@@ -1,12 +1,20 @@
 package services
 
 import (
+	"bytes"
+	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"os/exec"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // PluginService 插件服务
@@ -37,6 +45,14 @@ type UpdatePluginRequest struct {
 	Timeout      int    `json:"timeout" binding:"min=1,max=300"`
 	Config       string `json:"config" binding:"omitempty"`
 	ConfigValues string `json:"config_values" binding:"omitempty"`
+}
+
+// ExecutePluginRequest 手动执行插件请求
+type ExecutePluginRequest struct {
+	TableID  string                 `json:"table_id" binding:"required"`
+	RecordID string                 `json:"record_id"`
+	Trigger  string                 `json:"trigger" binding:"required,oneof=create update delete manual"`
+	Payload  map[string]interface{} `json:"payload"`
 }
 
 // CreatePlugin 创建插件
@@ -135,15 +151,18 @@ func (s *PluginService) BindPlugin(pluginID, tableID, trigger string) error {
 		return errors.New("表不存在")
 	}
 
-	// 创建绑定
+	// 创建绑定（幂等并发安全）
 	binding := models.PluginBinding{
 		PluginID: pluginID,
 		TableID:  tableID,
 		Trigger:  trigger,
 	}
-
-	if err := s.db.Create(&binding).Error; err != nil {
-		return fmt.Errorf("绑定插件失败: %w", err)
+	result := s.db.Clauses(clause.OnConflict{DoNothing: true}).Create(&binding)
+	if result.Error != nil {
+		return fmt.Errorf("绑定插件失败: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("绑定关系已存在")
 	}
 
 	return nil
@@ -174,31 +193,253 @@ type BindingDetail struct {
 
 // ListBindings 列出插件的所有绑定
 func (s *PluginService) ListBindings(pluginID string) ([]BindingDetail, error) {
-	var bindings []models.PluginBinding
-	if err := s.db.Where("plugin_id = ?", pluginID).Find(&bindings).Error; err != nil {
+	var details []BindingDetail
+	err := s.db.Table("plugin_bindings pb").
+		Select(`
+			pb.id,
+			pb.table_id,
+			t.name AS table_name,
+			t.database_id,
+			d.name AS database_name,
+			pb.trigger,
+			pb.created_at
+		`).
+		Joins("JOIN tables t ON t.id = pb.table_id").
+		Joins("JOIN databases d ON d.id = t.database_id").
+		Where("pb.plugin_id = ?", pluginID).
+		Order("pb.created_at DESC").
+		Scan(&details).Error
+	if err != nil {
 		return nil, fmt.Errorf("查询绑定失败: %w", err)
 	}
 
-	var details []BindingDetail
-	for _, binding := range bindings {
-		var table models.Table
-		if err := s.db.Where("id = ?", binding.TableID).First(&table).Error; err != nil {
-			continue
-		}
+	return details, nil
+}
 
-		var database models.Database
-		s.db.Where("id = ?", table.DatabaseID).First(&database)
+func truncateText(content string, maxLength int) string {
+	if len(content) <= maxLength {
+		return content
+	}
+	return content[:maxLength] + "...(truncated)"
+}
 
-		details = append(details, BindingDetail{
-			ID:           binding.ID,
-			TableID:      binding.TableID,
-			TableName:    table.Name,
-			DatabaseID:   table.DatabaseID,
-			DatabaseName: database.Name,
-			Trigger:      binding.Trigger,
-			CreatedAt:    binding.CreatedAt,
-		})
+func clonePayload(payload map[string]interface{}) map[string]interface{} {
+	if payload == nil {
+		return map[string]interface{}{}
 	}
 
-	return details, nil
+	b, err := json.Marshal(payload)
+	if err != nil {
+		return map[string]interface{}{}
+	}
+
+	var copied map[string]interface{}
+	if err := json.Unmarshal(b, &copied); err != nil {
+		return map[string]interface{}{}
+	}
+	return copied
+}
+
+func buildPluginCommand(language, scriptPath string) (string, []string, error) {
+	switch language {
+	case "go":
+		return "go", []string{"run", scriptPath}, nil
+	case "python":
+		return "python", []string{scriptPath}, nil
+	case "bash":
+		return "bash", []string{scriptPath}, nil
+	default:
+		return "", nil, fmt.Errorf("不支持的插件语言: %s", language)
+	}
+}
+
+func resolveScriptPath(workDir, entryFile string) (string, error) {
+	cleanEntry := filepath.Clean(strings.TrimSpace(entryFile))
+	if cleanEntry == "" || cleanEntry == "." {
+		return "", errors.New("插件入口文件不能为空")
+	}
+	if strings.Contains(cleanEntry, "..") {
+		return "", errors.New("插件入口文件路径非法")
+	}
+	if filepath.IsAbs(cleanEntry) {
+		return "", errors.New("插件入口文件不能是绝对路径")
+	}
+	return filepath.Join(workDir, cleanEntry), nil
+}
+
+func (s *PluginService) executePlugin(plugin models.Plugin, tableID, recordID, trigger string, payload map[string]interface{}, actorID string) (*models.PluginExecution, error) {
+	timeoutSec := plugin.Timeout
+	workDir := "./plugins"
+	settingsService := NewSettingsService(s.db)
+	defaultTimeout, defaultWorkDir, settingsErr := settingsService.GetPluginRuntimeConfig()
+	if settingsErr == nil {
+		workDir = defaultWorkDir
+		if timeoutSec <= 0 {
+			timeoutSec = defaultTimeout
+		}
+	} else if timeoutSec <= 0 {
+		timeoutSec = 300
+	}
+
+	scriptPath, err := resolveScriptPath(workDir, plugin.EntryFile)
+	if err != nil {
+		return nil, err
+	}
+
+	command, args, err := buildPluginCommand(plugin.Language, scriptPath)
+	if err != nil {
+		return nil, err
+	}
+
+	execution := &models.PluginExecution{
+		PluginID:  plugin.ID,
+		TableID:   tableID,
+		RecordID:  recordID,
+		Trigger:   trigger,
+		Status:    "running",
+		StartedAt: time.Now(),
+		CreatedBy: actorID,
+	}
+	if execution.CreatedBy == "" {
+		execution.CreatedBy = plugin.CreatedBy
+	}
+
+	if err := s.db.Create(execution).Error; err != nil {
+		return nil, fmt.Errorf("创建插件执行记录失败: %w", err)
+	}
+
+	inputPayload := map[string]interface{}{
+		"plugin_id": plugin.ID,
+		"trigger":   trigger,
+		"table_id":  tableID,
+		"record_id": recordID,
+		"payload":   payload,
+	}
+	inputBytes, _ := json.Marshal(inputPayload)
+
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec)*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, command, args...)
+	cmd.Dir = workDir
+	cmd.Stdin = bytes.NewReader(inputBytes)
+	cmd.Env = append(cmd.Environ(),
+		fmt.Sprintf("PLUGIN_ID=%s", plugin.ID),
+		fmt.Sprintf("PLUGIN_TRIGGER=%s", trigger),
+		fmt.Sprintf("PLUGIN_CONFIG=%s", plugin.ConfigValues),
+	)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	started := time.Now()
+	runErr := cmd.Run()
+	finished := time.Now()
+	durationMS := finished.Sub(started).Milliseconds()
+
+	status := "success"
+	errMsg := ""
+	if runErr != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			status = "timeout"
+			errMsg = "插件执行超时"
+		} else {
+			status = "failed"
+			errMsg = runErr.Error()
+		}
+	}
+
+	execution.Status = status
+	execution.Output = truncateText(stdout.String(), 8192)
+	execution.Error = truncateText(strings.TrimSpace(fmt.Sprintf("%s\n%s", errMsg, stderr.String())), 8192)
+	execution.DurationMS = durationMS
+	execution.FinishedAt = &finished
+
+	if err := s.db.Save(execution).Error; err != nil {
+		return nil, fmt.Errorf("更新插件执行记录失败: %w", err)
+	}
+
+	if runErr != nil {
+		return execution, fmt.Errorf("插件执行失败: %w", runErr)
+	}
+
+	return execution, nil
+}
+
+// TriggerByTable 根据表和触发器执行绑定插件（异步最佳努力）
+func (s *PluginService) TriggerByTable(tableID, trigger, recordID, actorID string, payload map[string]interface{}) {
+	payloadCopy := clonePayload(payload)
+	go func(data map[string]interface{}) {
+		var bindings []models.PluginBinding
+		if err := s.db.Where("table_id = ? AND trigger = ?", tableID, trigger).Find(&bindings).Error; err != nil {
+			zap.L().Error("查询插件绑定失败", zap.String("table_id", tableID), zap.String("trigger", trigger), zap.Error(err))
+			return
+		}
+
+		for _, binding := range bindings {
+			var plugin models.Plugin
+			if err := s.db.Where("id = ?", binding.PluginID).First(&plugin).Error; err != nil {
+				zap.L().Warn("读取插件信息失败", zap.String("plugin_id", binding.PluginID), zap.Error(err))
+				continue
+			}
+
+			if _, err := s.executePlugin(plugin, tableID, recordID, trigger, data, actorID); err != nil {
+				zap.L().Warn("插件触发执行失败",
+					zap.String("plugin_id", plugin.ID),
+					zap.String("table_id", tableID),
+					zap.String("trigger", trigger),
+					zap.Error(err),
+				)
+			}
+		}
+	}(payloadCopy)
+}
+
+// ExecutePlugin 手动执行插件
+func (s *PluginService) ExecutePlugin(pluginID, userID string, req ExecutePluginRequest) (*models.PluginExecution, error) {
+	var plugin models.Plugin
+	if err := s.db.Where("id = ? AND created_by = ?", pluginID, userID).First(&plugin).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("插件不存在或无权执行")
+		}
+		return nil, fmt.Errorf("查询插件失败: %w", err)
+	}
+
+	var binding models.PluginBinding
+	if err := s.db.Where("plugin_id = ? AND table_id = ? AND trigger = ?", pluginID, req.TableID, req.Trigger).
+		First(&binding).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("插件未绑定到该表和触发器")
+		}
+		return nil, fmt.Errorf("查询插件绑定失败: %w", err)
+	}
+
+	return s.executePlugin(plugin, req.TableID, req.RecordID, req.Trigger, req.Payload, userID)
+}
+
+// ListExecutions 查询插件执行记录
+func (s *PluginService) ListExecutions(pluginID, userID string, limit int) ([]models.PluginExecution, error) {
+	if limit <= 0 || limit > 200 {
+		limit = 50
+	}
+
+	var plugin models.Plugin
+	if err := s.db.Where("id = ? AND created_by = ?", pluginID, userID).First(&plugin).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("插件不存在或无权限")
+		}
+		return nil, fmt.Errorf("查询插件失败: %w", err)
+	}
+
+	var executions []models.PluginExecution
+	if err := s.db.Where("plugin_id = ?", pluginID).
+		Order("created_at DESC").
+		Limit(limit).
+		Find(&executions).Error; err != nil {
+		return nil, fmt.Errorf("查询插件执行记录失败: %w", err)
+	}
+
+	return executions, nil
 }

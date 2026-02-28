@@ -13,6 +13,8 @@
     "test:unit": "vitest",
     "test:e2e": "playwright test",
     "build-only": "vite build",
+    "embed-dist": "node scripts/embed-dist.cjs",
+    "build:embed": "pnpm run build-only && pnpm run embed-dist",
     "type-check": "vue-tsc --build",
     "lint": "eslint . --fix --cache",
     "format": "prettier --write --experimental-cli src/"

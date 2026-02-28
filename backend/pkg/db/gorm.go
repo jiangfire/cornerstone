@@ -1,6 +1,8 @@
 package db
 
 import (
+	"time"
+
 	"github.com/jiangfire/cornerstone/backend/internal/config"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
@@ -38,7 +40,23 @@ func InitDB(cfg config.DatabaseConfig) error {
 
 	sqlDB.SetMaxOpenConns(cfg.MaxOpen)
 	sqlDB.SetMaxIdleConns(cfg.MaxIdle)
-	sqlDB.SetConnMaxLifetime(0) // 0表示无限制
+	if cfg.MaxLifetime > 0 {
+		sqlDB.SetConnMaxLifetime(time.Duration(cfg.MaxLifetime) * time.Second)
+	}
 
 	return nil
+}
+
+// CloseDB 关闭底层数据库连接池
+func CloseDB() error {
+	if db == nil {
+		return nil
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return err
+	}
+
+	return sqlDB.Close()
 }

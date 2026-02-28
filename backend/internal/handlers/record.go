@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
@@ -41,6 +42,30 @@ func CreateRecord(c *gin.Context) {
 		"version":    record.Version,
 		"created_at": record.CreatedAt,
 	})
+}
+
+// ExportRecords 导出记录
+func ExportRecords(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	tableID := c.Query("table_id")
+	if tableID == "" {
+		types.Error(c, 400, "table_id 不能为空")
+		return
+	}
+
+	format := c.DefaultQuery("format", "csv")
+	filter := c.Query("filter")
+
+	recordService := services.NewRecordService(db.DB())
+	data, contentType, filename, err := recordService.ExportRecords(tableID, userID, format, filter)
+	if err != nil {
+		types.Error(c, 400, err.Error())
+		return
+	}
+
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filename))
+	c.Header("Cache-Control", "no-store")
+	c.Data(http.StatusOK, contentType, data)
 }
 
 // ListRecords 获取记录列表

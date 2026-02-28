@@ -48,13 +48,7 @@ jobs:
         run: |
           cd frontend
           pnpm install --frozen-lockfile
-          pnpm run build-only
-
-      - name: Embed frontend dist into backend
-        run: |
-          rm -rf backend/internal/frontend/dist
-          mkdir -p backend/internal/frontend/dist
-          cp -r frontend/dist/* backend/internal/frontend/dist/
+          pnpm run build:embed
 
       - name: Set up Go
         uses: actions/setup-go@v5

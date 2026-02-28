@@ -58,6 +58,68 @@ func GetUserInfo(c *gin.Context) {
 	types.Success(c, user)
 }
 
+// UpdateUserInfo 更新用户资料
+func UpdateUserInfo(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+
+	var req services.UpdateProfileRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		types.Error(c, 400, "参数错误: "+err.Error())
+		return
+	}
+
+	authService := services.NewAuthService(db.DB())
+	user, err := authService.UpdateProfile(userID, req)
+	if err != nil {
+		types.Error(c, 400, err.Error())
+		return
+	}
+
+	types.Success(c, user)
+}
+
+// ChangeUserPassword 修改用户密码
+func ChangeUserPassword(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+
+	var req services.ChangePasswordRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		types.Error(c, 400, "参数错误: "+err.Error())
+		return
+	}
+
+	authService := services.NewAuthService(db.DB())
+	if err := authService.ChangePassword(userID, req); err != nil {
+		types.Error(c, 400, err.Error())
+		return
+	}
+
+	types.Success(c, gin.H{
+		"message": "密码修改成功",
+	})
+}
+
+// DeleteUserAccount 删除用户账户
+func DeleteUserAccount(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+
+	var req services.DeleteAccountRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		types.Error(c, 400, "参数错误: "+err.Error())
+		return
+	}
+
+	authService := services.NewAuthService(db.DB())
+	if err := authService.DeleteAccount(userID, req); err != nil {
+		types.Error(c, 400, err.Error())
+		return
+	}
+
+	types.Success(c, gin.H{
+		"message": "账户已删除",
+	})
+}
+
 // Logout 用户登出
 func Logout(c *gin.Context) {
 	// 从 Authorization header 获取 token
