@@ -1,6 +1,6 @@
 # Cornerstone 开发指南
 
-**版本**: v1.7 | **最后更新**: 2026-01-11
+**版本**: v1.8 | **最后更新**: 2026-03-28
 
 ---
 
@@ -11,26 +11,28 @@
 - 动态字段支持（JSONB存储）
 - 三层权限模型（数据库/表/字段级权限）
 - 插件扩展系统（Go/Python子进程）
+- HTTP MCP（Model Context Protocol，面向模型调用的协议）查询 / 建库 / SSE 主动通知
+- 治理任务中心（任务、审核、证据、评论、回写 outbox）
 
 ### 技术栈
 
 | 层级 | 技术 | 版本 |
 |------|------|------|
-| 后端 | Go + Gin + GORM | 1.21+ |
+| 后端 | Go + Gin + GORM | 1.25+ |
 | 数据库 | PostgreSQL | 15+ |
-| 前端 | Vue 3 + TypeScript | 3.4+ |
-| UI库 | Element Plus | 2.5+ |
-| 状态管理 | Pinia | 2.1+ |
-| 构建工具 | Vite | 5.0+ |
+| 前端 | Vue 3 + TypeScript | 3.5+ |
+| UI库 | Element Plus | 2.13+ |
+| 状态管理 | Pinia | 3.0+ |
+| 构建工具 | rolldown-vite | 7.x |
 
 ---
 
 ## 快速开始
 
 ### 环境要求
-- Go 1.21+
+- Go 1.25+
 - PostgreSQL 15+ (推荐) 或 SQLite 3.35+
-- Node.js 18+ (pnpm)
+- Node.js 20+ (pnpm)
 
 ### 1. 克隆项目
 ```bash
@@ -66,14 +68,25 @@ cd frontend
 pnpm install
 
 # 配置环境变量
-cp .env.example .env.local
-# 编辑 .env.local 文件，设置 API 地址
+cp .env.example .env
+# 编辑 .env 文件，设置 API 地址
 
 # 启动开发服务器
 pnpm dev
 ```
 
 前端服务将运行在 `http://localhost:5173`
+
+### 4. 嵌入前端到后端
+
+如果要让 Go 服务直接提供最新前端静态资源：
+
+```bash
+cd frontend
+pnpm run build:embed
+```
+
+该命令会先构建前端，再把产物同步到 `backend/internal/frontend/dist`。
 
 ### 4. 验证安装
 - 访问健康检查: `http://localhost:8080/health`
@@ -114,10 +127,12 @@ frontend/
 │   ├── services/            # API 服务层
 │   ├── views/               # 页面视图
 │   ├── components/          # 通用组件
+│   ├── utils/               # 前端工具函数
 │   ├── assets/              # 静态资源
 │   ├── App.vue              # 根组件
 │   └── main.ts              # 入口文件
-├── public/
+├── e2e/                     # Playwright 端到端测试
+├── scripts/                 # 构建与嵌入脚本
 ├── package.json
 ├── vite.config.ts
 ├── tsconfig.json
@@ -232,6 +247,27 @@ onMounted(() => {
 }
 ```
 
+#### HTTP MCP 与治理能力
+
+当前代码基线已经包含：
+
+- `/mcp` HTTP MCP endpoint
+- `GET /mcp` SSE 长连接和 `Last-Event-ID` 断线续传
+- 治理任务中心前端页面 `src/views/GovernanceView.vue`
+- 治理任务、审核、证据、评论和回写触发相关 API 封装
+
+如果新增这两类能力，优先遵循已有模式，不要再起第二套协议或前端状态模型。
+
+#### 前端包体约束
+
+2026-03-28 起，前端构建已做以下约束：
+
+- `@element-plus/icons-vue` 仅允许页面局部按需引入，禁止再次做全量全局注册
+- `Element Plus` 组件采用项目级按需注册，而不是 `app.use(ElementPlus)` 整包挂载
+- `vite.config.ts` 已对 `framework / vendor / element-plus-*` 做稳定分块
+
+如果后续再引入新 UI 组件或大依赖，先看是否会把主入口重新打大。
+
 #### 添加 API 方法
 
 在 `src/services/api.ts` 添加：
@@ -301,11 +337,17 @@ go test -cover ./...
 ```bash
 cd frontend
 
+# 运行类型检查
+pnpm type-check
+
 # 运行单元测试
-pnpm test
+pnpm test:unit
 
 # 运行 E2E 测试
 pnpm test:e2e
+
+# 构建并嵌入到后端
+pnpm run build:embed
 ```
 
 ---
@@ -373,6 +415,10 @@ docker-compose up -d
 | `PORT` | 服务端口 | 8080 |
 | `SERVER_MODE` | 运行模式 (debug/release) | debug |
 | `LOG_LEVEL` | 日志级别 | info |
+| `MCP_ALLOWED_ORIGINS` | `/mcp` 允许的浏览器 Origin 白名单 | 当前 Host 同源 |
+| `MCP_SSE_KEEPALIVE_SEC` | SSE keepalive 间隔（秒） | 15 |
+| `MCP_SSE_RETRY_MS` | SSE `retry:` 建议间隔（毫秒） | 3000 |
+| `MCP_SSE_REPLAY_BUFFER` | 每用户 SSE 重放缓冲条数 | 100 |
 
 ### 前端环境变量
 
@@ -412,6 +458,7 @@ curl -X GET http://localhost:8080/health
 ## 相关文档
 
 - [API 文档](./API.md) - 完整 API 接口文档
+- [MCP 文档](./MCP.md) - HTTP MCP、SSE、通知与工具说明
 - [权限系统](./PERMISSION-SYSTEM.md) - 三层权限模型详解
 - [测试报告](./E2E-TEST-REPORT.md) - E2E 测试报告
 - [项目状态](./PROJECT-STATUS.md) - 项目进度状态

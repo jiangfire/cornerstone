@@ -1,6 +1,6 @@
 # Cornerstone HTTP MCP
 
-**最后校对**: 2026-03-27
+**最后校对**: 2026-03-28
 
 ## 目标
 
@@ -22,6 +22,12 @@ POST    /mcp
 GET     /mcp
 OPTIONS /mcp
 ```
+
+说明：
+
+- 当前只提供 **HTTP 版 MCP**，不提供 CLI / `stdio` 版 MCP。
+- `POST /mcp` 用于 JSON-RPC 调用；`GET /mcp` 用于建立 SSE 长连接并接收主动通知。
+- MCP 能力默认复用当前 Cornerstone 服务的认证、权限和业务服务层，不单独维护第二套权限模型。
 
 认证方式：
 
@@ -47,6 +53,8 @@ Content-Type: application/json
 | `create_database` | 创建数据库 |
 | `list_databases` | 列出当前用户可访问数据库 |
 | `get_table_schema` | 获取 Query DSL 可访问表的字段清单 |
+
+当前没有暴露表、字段、记录的通用写入 tool；这是有意收口，不是遗漏。
 
 ## Tool 参数
 
@@ -110,7 +118,6 @@ Content-Type: application/json
 
 ## 当前边界
 
-- 当前只实现 HTTP 端点，不提供 CLI/`stdio` 版 MCP。
 - 当前是 **Streamable HTTP 简化实现**：
   - `POST /mcp` 支持普通 JSON 响应
   - 当客户端发送 `Accept: text/event-stream` 时，`POST /mcp` 会以 SSE 返回本次请求的 JSON-RPC 响应
@@ -123,6 +130,23 @@ Content-Type: application/json
   - 空 batch 请求 `[]` 会被直接拒绝，不会再被错误接受为 `202`
 - 若请求携带 `Origin`，服务会校验其是否与当前 Host 一致，或命中 `MCP_ALLOWED_ORIGINS`。
 - 当前 focus 在“查询”和“创建数据库”最小闭环，没有暴露表、字段、记录的写入工具。
+
+## 当前通知覆盖范围
+
+截至 2026-03-28，SSE 主动通知已覆盖以下主链：
+
+- 数据库创建、更新
+- 表创建、更新
+- 字段创建、更新
+- 治理任务创建、更新、审核状态联动
+- 治理审核创建、通过、驳回、回写触发
+
+以下业务仍**未**接入 MCP SSE 主动通知：
+
+- 记录 CRUD
+- 文件上传 / 删除
+- 插件绑定 / 执行
+- 组织、成员和用户资料类事件
 
 ## SSE 主动通知
 
@@ -144,6 +168,15 @@ Content-Type: application/json
 - 数据库、表、字段类通知按当前成功操作用户投递。
 - 治理类通知按参与人投递，当前覆盖创建者、负责人、审核人和当前操作者。
 - SSE 历史缓冲按用户维度隔离，不同用户之间不会共享 `Last-Event-ID` 重放历史。
+
+## 验证建议
+
+若要验证当前 HTTP MCP 能力，建议至少做下面 4 项：
+
+1. 用有效 JWT 调用 `POST /mcp` 的 `query_data`，确认 Query DSL 权限过滤生效。
+2. 用有效 JWT 调用 `POST /mcp` 的 `create_database`，确认数据库创建成功且当前用户自动成为 owner。
+3. 用 `Accept: text/event-stream` 建立 `GET /mcp` 长连接，再通过 REST 或 MCP 创建数据库 / 修改表字段，确认能收到主动通知。
+4. 携带有效 `Last-Event-ID` 重连 `GET /mcp`，确认恢复、回放和缓冲失效提示行为符合预期。
 
 恢复请求示例：
 

@@ -119,6 +119,26 @@ pnpm dev
 
 前端默认地址：`http://localhost:5173`
 
+### 嵌入式前端资源
+
+如果要把前端产物嵌入到 Go 服务中，使用：
+
+```bash
+cd frontend
+pnpm run build:embed
+```
+
+这会先构建 `frontend/dist`，再同步到 `backend/internal/frontend/dist`。
+
+### Windows 双击启动
+
+如果你是在 Windows 下交付本地可执行包：
+
+- `start.bat`：前台启动 `cornerstone.exe`，打开浏览器，按键退出时会结束进程
+- `Cornerstone.vbs`：无窗口后台启动，自动打开浏览器，关闭弹窗不会结束服务
+
+详细说明见：`README-DOUBLE-CLICK.md`
+
 ---
 
 ## 核心能力
@@ -131,6 +151,7 @@ pnpm dev
 - 文件系统：上传、下载、删除、关联记录
 - 插件系统：创建、绑定、触发配置
 - 统计分析：概览统计、近期活动
+- 治理任务中心：任务、审核、证据、评论、外部资源链接与回写触发
 - HTTP MCP：通过 `/mcp` 按当前 JWT 用户上下文查询、创建数据库，并通过 SSE 接收数据库、表、字段、治理任务/审核等变更通知
 
 ---
@@ -141,6 +162,7 @@ pnpm dev
 - 兼容路径：`/api/v1`
 - API 文档：`docs/API.md`
 - HTTP MCP 文档：`docs/MCP.md`
+- 项目现状：`docs/PROJECT-STATUS.md`
 
 ---
 

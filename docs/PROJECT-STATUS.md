@@ -1,8 +1,8 @@
 # Cornerstone 项目状态
 
-**最后校对**: 2026-03-27  
-**当前阶段**: 治理域一期可用，HTTP MCP 查询/建库/SSE 通知链路已扩展到主要业务变更，进入“回写闭环与跨系统联调”阶段  
-**状态结论**: **核心业务可运行，治理闭环骨架已落地，HTTP MCP 已具备查询、建库、SSE 推送与 REST 变更联动能力，但真实双系统联调仍未完成**
+**最后校对**: 2026-03-28  
+**当前阶段**: 治理域一期可用，HTTP MCP 查询/建库/SSE 通知链路已扩展到主要业务变更，进入“回写闭环与跨系统联调 + 前端交付收口”阶段  
+**状态结论**: **核心业务可运行，治理闭环骨架已落地，HTTP MCP 已具备查询、建库、SSE 推送与 REST 变更联动能力；前端治理台与嵌入式静态资源已收口，但真实双系统联调仍未完成**
 
 ## 1. 当前结论
 
@@ -18,6 +18,7 @@
 | 审核通过后回写 | **已实现骨架** | 支持 apply、outbox、重试、死信，但仍待真实下游联调 |
 | HTTP MCP | **已实现增强闭环** | 支持按当前 JWT 用户上下文查询、创建数据库，并支持 SSE 长连接、断线重放与业务变更主动通知 |
 | 自动化测试 | **部分完善** | 后端单测已补，治理页 Playwright 回归已补；仍缺真实跨系统 E2E |
+| 前端构建与嵌入 | **已收口** | 治理页、内嵌静态资源、Windows 启动入口已补齐，主入口包已做真实拆分 |
 | 文档可信度 | **已修正** | `docs/API.md`、`docs/PROJECT-STATUS.md` 已按代码真值重写 |
 
 ## 2. 本轮已落地
@@ -60,6 +61,15 @@
   - 审核模板 JSON 快速填充
 - 嵌入前端资源的脚本已从 CJS 改为 ESM，前端 lint 可通过。
 - 已重建嵌入到 Go 服务中的前端静态资源。
+- 前端构建已做真实体积收缩：
+  - 移除了 `@element-plus/icons-vue` 的全量全局注册
+  - `Element Plus` 改为按当前项目实际组件注册，避免把整包组件运行时代码塞进主入口
+  - Vite 已增加 `framework / vendor / element-plus-shell / element-plus-form / element-plus-data` 分块策略
+  - 2026-03-28 实测主入口 JS 已从约 `1,179 KB` 降到约 `16 KB`
+  - 2026-03-28 实测最大单个 JS chunk 已降到约 `352 KB`，构建时已无 `>500 KB` 的 JS chunk 告警
+- Windows 本地交付入口已补齐：
+  - `start.bat` 用于前台启动并在退出后主动结束 `cornerstone.exe`
+  - `Cornerstone.vbs` 用于无窗口后台启动，并自动打开浏览器
 
 ### 2.3 自动化测试
 
@@ -71,6 +81,7 @@
 | Go 单元测试 | HTTP MCP server / handler / Origin / SSE 边界校验 | 已补 |
 | Go 集成测试 | 多用户隔离、同用户多连接并发、REST -> MCP SSE、治理回写闭环 | 已补 |
 | Playwright UI 回归 | 登录后治理页、任务详情、外链、审核模板、回写重试 | 已补 |
+| 前端构建验证 | `pnpm type-check`、`pnpm run build:embed`、静态资源嵌入 | 已补 |
 
 说明：
 
@@ -116,14 +127,15 @@
 | `cd backend && go test ./...` | 已通过 |
 | `cd backend && go test -race ./internal/handlers -run MCP -count=1` | 已通过 |
 | `cd frontend && pnpm type-check` | 已通过 |
-| `cd frontend && pnpm lint` | 已通过 |
+| `cd frontend && pnpm run build-only` | 已通过 |
 | `cd frontend && pnpm run build:embed` | 已通过 |
-| `cd frontend && pnpm test:e2e -- governance.spec.ts` | 待本轮执行结果回填 |
+| `cd frontend && pnpm lint` | 已通过 |
+| `cd frontend && pnpm test:e2e -- governance.spec.ts` | 待真实环境再次回填 |
 
 说明：
 
-- 前四项在前一轮改动后已通过。
-- 本轮新增治理页 Playwright 回归后，需要再跑一次前端验证与定向 E2E。
+- 2026-03-28 已再次完成前端类型检查、生产构建和嵌入校验。
+- 治理页 Playwright 用例仍建议在稳定浏览器环境下再跑一次，避免把“文档已写”误当成“联调已完成”。
 
 ## 5. 仍然存在的真实缺口
 
@@ -136,7 +148,8 @@
 | HTTP MCP 业务通知仍不完整 | **部分完成** | 已扩展到数据库/表/字段/治理任务/审核，但记录、文件、插件等事件仍未接入 |
 | 治理域全链路 E2E | **未完成** | 当前新增的是 mock UI 回归，不覆盖真实数据库和真实后端 |
 | 历史 Playwright 套件稳定性 | **未复核** | 现有权限类 E2E 仍偏依赖真实环境与测试账号 |
-| 文档与测试资产清理 | **部分完成** | 两份主文档已修；其余历史 README / 报告仍可能滞后 |
+| 前端样式体积 | **部分完成** | JS 已拆分收口，但 `Element Plus` CSS 仍是较大的公共样式块 |
+| 文档与测试资产清理 | **部分完成** | 主文档已修；个别历史报告与 README 仍需后续继续去重和收敛 |
 
 ## 6. 后续建议
 
@@ -147,7 +160,8 @@
    `fuckcmdb` 产生事件 -> `cornerstone` 自动建单 -> 人工审核 -> 回写成功。
 3. 若 HTTP MCP 要对接更多客户端，继续扩展 `GET /mcp` 的通知类型、重连恢复和更完整的 Streamable HTTP 约定。
 4. 清理或重写历史 Playwright 套件与 `frontend/e2e/README.md`，避免继续误导测试范围。
-5. 若治理域继续扩展，再补 SLA、任务看板、批量处理和更细的权限模型。
+5. 若继续做前端交付优化，下一步优先处理 `Element Plus` 按组件样式拆分或样式按需加载，继续压缩公共 CSS。
+6. 若治理域继续扩展，再补 SLA、任务看板、批量处理和更细的权限模型。
 
 ## 7. 相关文档
 
