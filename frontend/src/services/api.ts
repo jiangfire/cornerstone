@@ -1,5 +1,6 @@
 import axios, { type AxiosInstance, type AxiosResponse, type AxiosError } from 'axios'
 import type { ApiResponse } from '@/types/api'
+import type { GovernanceTask, GovernanceTaskDetail, GovernanceReview } from '@/types/api'
 
 // API 配置
 const API_CONFIG = {
@@ -298,6 +299,43 @@ export const statsAPI = {
   },
   getActivities(limit: number) {
     return request.get<any[]>('/stats/activities', { limit })
+  },
+}
+
+// 治理域 API
+export const governanceAPI = {
+  list(params?: Record<string, unknown>) {
+    return request.get<{ tasks: GovernanceTask[]; total: number }>('/governance/tasks', params)
+  },
+  getDetail(id: string) {
+    return request.get<GovernanceTaskDetail>(`/governance/tasks/${id}`)
+  },
+  create(data: Record<string, unknown>) {
+    return request.post<GovernanceTask>('/governance/tasks', data)
+  },
+  update(id: string, data: Record<string, unknown>) {
+    return request.put<GovernanceTask>(`/governance/tasks/${id}`, data)
+  },
+  addEvidence(taskId: string, data: Record<string, unknown>) {
+    return request.post(`/governance/tasks/${taskId}/evidences`, data)
+  },
+  addComment(taskId: string, data: Record<string, unknown>) {
+    return request.post(`/governance/tasks/${taskId}/comments`, data)
+  },
+  createReview(data: Record<string, unknown>) {
+    return request.post<GovernanceReview>('/governance/reviews', data)
+  },
+  getReview(id: string) {
+    return request.get<GovernanceReview>(`/governance/reviews/${id}`)
+  },
+  approveReview(id: string, data: { decision_payload: string }) {
+    return request.post<GovernanceReview>(`/governance/reviews/${id}/approve`, data)
+  },
+  rejectReview(id: string, data: { decision_payload: string }) {
+    return request.post<GovernanceReview>(`/governance/reviews/${id}/reject`, data)
+  },
+  applyReview(id: string) {
+    return request.post(`/governance/reviews/${id}/apply`)
   },
 }
 

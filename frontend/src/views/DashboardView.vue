@@ -91,6 +91,14 @@
             </div>
           </el-card>
         </el-col>
+        <el-col :xs="24" :sm="12" :md="8">
+          <el-card class="action-card" @click="$router.push('/governance')">
+            <div class="action-content">
+              <el-icon><Plus /></el-icon>
+              <span>治理任务中心</span>
+            </div>
+          </el-card>
+        </el-col>
       </el-row>
     </div>
 

@@ -68,6 +68,12 @@ const router = createRouter({
       meta: { requiresAuth: true, title: '插件管理' },
     },
     {
+      path: '/governance',
+      name: 'governance',
+      component: () => import('../views/GovernanceView.vue'),
+      meta: { requiresAuth: true, title: '治理任务中心' },
+    },
+    {
       path: '/settings',
       name: 'settings',
       component: () => import('../views/SettingsView.vue'),

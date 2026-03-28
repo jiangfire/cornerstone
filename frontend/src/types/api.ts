@@ -284,3 +284,80 @@ export interface DatabaseUserRemoved {
   success: boolean
   message?: string
 }
+
+// 治理域相关
+export interface GovernanceTask {
+  id: string
+  title: string
+  description: string
+  task_type: string
+  status: string
+  priority: string
+  source_system?: string
+  resource_type?: string
+  resource_id?: string
+  assignee_id?: string
+  created_by: string
+  due_at?: string
+  completed_at?: string
+  last_comment_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface GovernanceReview {
+  id: string
+  task_id: string
+  review_type: string
+  status: string
+  proposal_source?: string
+  proposal_payload: string
+  decision_payload?: string
+  apply_status: string
+  apply_error?: string
+  apply_result?: string
+  apply_target?: string
+  reviewer_id: string
+  created_by: string
+  reviewed_at?: string
+  applied_at?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface GovernanceEvidence {
+  id: string
+  task_id: string
+  evidence_type: string
+  content: string
+  file_id?: string
+  created_by: string
+  created_at: string
+}
+
+export interface GovernanceComment {
+  id: string
+  task_id: string
+  content: string
+  created_by: string
+  created_at: string
+}
+
+export interface GovernanceExternalLink {
+  id: string
+  task_id: string
+  source_system: string
+  resource_type: string
+  resource_id: string
+  display_name?: string
+  target_url?: string
+  created_at: string
+}
+
+export interface GovernanceTaskDetail {
+  task: GovernanceTask
+  reviews: GovernanceReview[]
+  evidences: GovernanceEvidence[]
+  comments: GovernanceComment[]
+  external_links: GovernanceExternalLink[]
+}

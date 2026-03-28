@@ -31,6 +31,10 @@
           <el-icon><Connection /></el-icon>
           <template #title>插件管理</template>
         </el-menu-item>
+        <el-menu-item index="/governance">
+          <el-icon><DataAnalysis /></el-icon>
+          <template #title>治理任务</template>
+        </el-menu-item>
         <el-menu-item index="/settings">
           <el-icon><Setting /></el-icon>
           <template #title>系统设置</template>
@@ -89,6 +93,7 @@ import {
   OfficeBuilding,
   Coin,
   Connection,
+  DataAnalysis,
   Setting,
   Fold,
   Expand,
