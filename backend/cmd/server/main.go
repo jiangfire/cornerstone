@@ -51,11 +51,16 @@ func main() {
 
 	// 5. 设置定时任务（物化视图刷新和token清理）
 	taskCtx, cancelTasks := context.WithCancel(context.Background())
-	periodicTaskWG := db.SetupPeriodicTasks(taskCtx)
+	periodicTaskWG := db.SetupPeriodicTasks(taskCtx, cfg.Integrations)
 
 	// 6. 创建Gin引擎
 	gin.SetMode(cfg.Server.Mode)
 	r := gin.New()
+	handlers.ConfigureMCP(handlers.MCPOptions{
+		SSEKeepaliveInterval: time.Duration(cfg.MCP.SSEKeepaliveSec) * time.Second,
+		SSERetryInterval:     time.Duration(cfg.MCP.SSERetryMS) * time.Millisecond,
+		SSEReplayBuffer:      cfg.MCP.SSEReplayBuffer,
+	})
 
 	// 7. 注册中间件
 	r.Use(gin.Recovery())
@@ -73,6 +78,15 @@ func main() {
 		})
 	})
 
+	// HTTP MCP 路由
+	r.OPTIONS("/mcp", handlers.HandleMCPOptions)
+	mcpRoute := r.Group("/mcp")
+	mcpRoute.Use(middleware.MCPOriginGuard(), middleware.Auth())
+	{
+		mcpRoute.POST("", handlers.HandleMCP)
+		mcpRoute.GET("", handlers.HandleMCPGet)
+	}
+
 	// 9. API路由组
 	api := r.Group("/api")
 	{
@@ -81,6 +95,13 @@ func main() {
 		{
 			auth.POST("/register", handlers.Register)
 			auth.POST("/login", handlers.Login)
+		}
+
+		// 系统集成事件（使用集成 token）
+		integrations := api.Group("/integrations")
+		integrations.Use(middleware.IntegrationTokenAuth())
+		{
+			integrations.POST("/events", handlers.ReceiveIntegrationEvent)
 		}
 
 		// 需要认证的路由
@@ -173,9 +194,33 @@ func main() {
 			protected.GET("/stats/summary", handlers.GetStatsSummary)
 			protected.GET("/stats/activities", handlers.GetRecentActivities)
 
+			// 查询 DSL 相关
+			queryHandler := handlers.NewQueryHandler()
+			protected.GET("/query", queryHandler.Query)
+			protected.POST("/query", queryHandler.Query)
+			protected.GET("/query/simple", queryHandler.SimplifiedQuery)
+			protected.POST("/query/batch", queryHandler.BatchQuery)
+			protected.POST("/query/explain", queryHandler.QueryExplain)
+			protected.POST("/query/validate", queryHandler.QueryValidate)
+			protected.GET("/query/tables", queryHandler.ListTables)
+			protected.GET("/query/schema/:table", queryHandler.GetTableSchema)
+
 			// 系统设置
 			protected.GET("/settings", handlers.GetSettings)
 			protected.PUT("/settings", handlers.UpdateSettings)
+
+			// 治理任务与审核
+			protected.POST("/governance/tasks", handlers.CreateGovernanceTask)
+			protected.GET("/governance/tasks", handlers.ListGovernanceTasks)
+			protected.GET("/governance/tasks/:id", handlers.GetGovernanceTask)
+			protected.PUT("/governance/tasks/:id", handlers.UpdateGovernanceTask)
+			protected.POST("/governance/tasks/:id/evidences", handlers.CreateGovernanceEvidence)
+			protected.POST("/governance/tasks/:id/comments", handlers.CreateGovernanceComment)
+			protected.POST("/governance/reviews", handlers.CreateGovernanceReview)
+			protected.GET("/governance/reviews/:id", handlers.GetGovernanceReview)
+			protected.POST("/governance/reviews/:id/approve", handlers.ApproveGovernanceReview)
+			protected.POST("/governance/reviews/:id/reject", handlers.RejectGovernanceReview)
+			protected.POST("/governance/reviews/:id/apply", handlers.ApplyGovernanceReview)
 		}
 	}
 

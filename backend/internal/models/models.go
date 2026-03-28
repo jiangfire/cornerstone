@@ -376,6 +376,200 @@ func (a *AppSettings) BeforeCreate(tx *gorm.DB) (err error) {
 	return nil
 }
 
+// GovernanceTask 治理任务主表 (gvt_前缀)
+type GovernanceTask struct {
+	ID            string     `gorm:"type:varchar(50);primaryKey" json:"id"`
+	Title         string     `gorm:"type:varchar(255);not null" json:"title"`
+	Description   string     `gorm:"type:text" json:"description"`
+	TaskType      string     `gorm:"type:varchar(50);not null;index" json:"task_type"`
+	Status        string     `gorm:"type:varchar(50);not null;default:'open';index" json:"status"`
+	Priority      string     `gorm:"type:varchar(20);not null;default:'medium';index" json:"priority"`
+	SourceSystem  string     `gorm:"type:varchar(50);index" json:"source_system"`
+	ResourceType  string     `gorm:"type:varchar(50);index" json:"resource_type"`
+	ResourceID    string     `gorm:"type:varchar(100);index" json:"resource_id"`
+	AssigneeID    string     `gorm:"type:varchar(50);index" json:"assignee_id"`
+	CreatedBy     string     `gorm:"type:varchar(50);not null;index" json:"created_by"`
+	DueAt         *time.Time `gorm:"type:timestamp" json:"due_at,omitempty"`
+	CompletedAt   *time.Time `gorm:"type:timestamp" json:"completed_at,omitempty"`
+	LastCommentAt *time.Time `gorm:"type:timestamp" json:"last_comment_at,omitempty"`
+	CreatedAt     time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt     time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	DeletedAt     *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+}
+
+func (GovernanceTask) TableName() string {
+	return "governance_tasks"
+}
+
+func (g *GovernanceTask) BeforeCreate(tx *gorm.DB) (err error) {
+	if g.ID == "" {
+		g.ID = GenerateID("gvt")
+	}
+	return nil
+}
+
+// GovernanceReview 治理审核/审批表 (gvr_前缀)
+type GovernanceReview struct {
+	ID              string     `gorm:"type:varchar(50);primaryKey" json:"id"`
+	TaskID          string     `gorm:"type:varchar(50);index" json:"task_id"`
+	ReviewType      string     `gorm:"type:varchar(50);not null;index" json:"review_type"`
+	Status          string     `gorm:"type:varchar(20);not null;default:'pending';index" json:"status"`
+	ProposalSource  string     `gorm:"type:varchar(50)" json:"proposal_source"`
+	ProposalPayload string     `gorm:"type:text" json:"proposal_payload"`
+	DecisionPayload string     `gorm:"type:text" json:"decision_payload"`
+	ApplyStatus     string     `gorm:"type:varchar(20);not null;default:'not_requested';index" json:"apply_status"`
+	ApplyError      string     `gorm:"type:text" json:"apply_error"`
+	ApplyResult     string     `gorm:"type:text" json:"apply_result"`
+	ApplyTarget     string     `gorm:"type:varchar(50);index" json:"apply_target"`
+	ReviewerID      string     `gorm:"type:varchar(50);not null;index" json:"reviewer_id"`
+	CreatedBy       string     `gorm:"type:varchar(50);not null;index" json:"created_by"`
+	ReviewedAt      *time.Time `gorm:"type:timestamp" json:"reviewed_at,omitempty"`
+	AppliedAt       *time.Time `gorm:"type:timestamp" json:"applied_at,omitempty"`
+	CreatedAt       time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt       time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+}
+
+func (GovernanceReview) TableName() string {
+	return "governance_reviews"
+}
+
+func (g *GovernanceReview) BeforeCreate(tx *gorm.DB) (err error) {
+	if g.ID == "" {
+		g.ID = GenerateID("gvr")
+	}
+	return nil
+}
+
+// GovernanceEvidence 治理整改证据 (gve_前缀)
+type GovernanceEvidence struct {
+	ID           string    `gorm:"type:varchar(50);primaryKey" json:"id"`
+	TaskID       string    `gorm:"type:varchar(50);not null;index" json:"task_id"`
+	EvidenceType string    `gorm:"type:varchar(30);not null" json:"evidence_type"`
+	Content      string    `gorm:"type:text" json:"content"`
+	FileID       string    `gorm:"type:varchar(50);index" json:"file_id"`
+	CreatedBy    string    `gorm:"type:varchar(50);not null;index" json:"created_by"`
+	CreatedAt    time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+}
+
+func (GovernanceEvidence) TableName() string {
+	return "governance_evidences"
+}
+
+func (g *GovernanceEvidence) BeforeCreate(tx *gorm.DB) (err error) {
+	if g.ID == "" {
+		g.ID = GenerateID("gve")
+	}
+	return nil
+}
+
+// GovernanceExternalLink 治理任务与外部资源引用 (gxl_前缀)
+type GovernanceExternalLink struct {
+	ID           string    `gorm:"type:varchar(50);primaryKey" json:"id"`
+	TaskID       string    `gorm:"type:varchar(50);not null;index" json:"task_id"`
+	SourceSystem string    `gorm:"type:varchar(50);not null;index" json:"source_system"`
+	ResourceType string    `gorm:"type:varchar(50);not null;index" json:"resource_type"`
+	ResourceID   string    `gorm:"type:varchar(100);not null;index" json:"resource_id"`
+	DisplayName  string    `gorm:"type:varchar(255)" json:"display_name"`
+	TargetURL    string    `gorm:"-" json:"target_url,omitempty"`
+	CreatedAt    time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+}
+
+func (GovernanceExternalLink) TableName() string {
+	return "governance_external_links"
+}
+
+func (g *GovernanceExternalLink) BeforeCreate(tx *gorm.DB) (err error) {
+	if g.ID == "" {
+		g.ID = GenerateID("gxl")
+	}
+	return nil
+}
+
+// GovernanceComment 治理任务评论/批注 (gcm_前缀)
+type GovernanceComment struct {
+	ID        string    `gorm:"type:varchar(50);primaryKey" json:"id"`
+	TaskID    string    `gorm:"type:varchar(50);not null;index" json:"task_id"`
+	Content   string    `gorm:"type:text;not null" json:"content"`
+	CreatedBy string    `gorm:"type:varchar(50);not null;index" json:"created_by"`
+	CreatedAt time.Time `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+}
+
+func (GovernanceComment) TableName() string {
+	return "governance_comments"
+}
+
+func (g *GovernanceComment) BeforeCreate(tx *gorm.DB) (err error) {
+	if g.ID == "" {
+		g.ID = GenerateID("gcm")
+	}
+	return nil
+}
+
+// IntegrationInboundEvent 入站集成事件 (iev_前缀)
+type IntegrationInboundEvent struct {
+	ID           string     `gorm:"type:varchar(50);primaryKey" json:"id"`
+	EventID      string     `gorm:"type:varchar(100);not null;uniqueIndex:uk_integration_event_source" json:"event_id"`
+	EventType    string     `gorm:"type:varchar(100);not null;index" json:"event_type"`
+	SourceSystem string     `gorm:"type:varchar(50);not null;index;uniqueIndex:uk_integration_event_source" json:"source_system"`
+	ResourceType string     `gorm:"type:varchar(50);index" json:"resource_type"`
+	ResourceID   string     `gorm:"type:varchar(100);index" json:"resource_id"`
+	ActorID      string     `gorm:"type:varchar(100)" json:"actor_id"`
+	TraceID      string     `gorm:"type:varchar(100);index" json:"trace_id"`
+	Payload      string     `gorm:"type:text;not null" json:"payload"`
+	Status       string     `gorm:"type:varchar(20);not null;default:'received';index" json:"status"`
+	ResultTaskID string     `gorm:"type:varchar(50);index" json:"result_task_id"`
+	Error        string     `gorm:"type:text" json:"error"`
+	ReceivedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"received_at"`
+	ProcessedAt  *time.Time `gorm:"type:timestamp" json:"processed_at,omitempty"`
+	CreatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+}
+
+func (IntegrationInboundEvent) TableName() string {
+	return "integration_inbound_events"
+}
+
+func (e *IntegrationInboundEvent) BeforeCreate(tx *gorm.DB) (err error) {
+	if e.ID == "" {
+		e.ID = GenerateID("iev")
+	}
+	return nil
+}
+
+// GovernanceOutboxEvent 治理域出站事件/回写任务
+type GovernanceOutboxEvent struct {
+	ID               string     `gorm:"type:varchar(50);primaryKey" json:"id"`
+	EventType        string     `gorm:"type:varchar(100);not null;index" json:"event_type"`
+	SourceSystem     string     `gorm:"type:varchar(50);not null;index" json:"source_system"`
+	TargetSystem     string     `gorm:"type:varchar(50);not null;index" json:"target_system"`
+	HTTPMethod       string     `gorm:"type:varchar(10);not null;default:'POST'" json:"http_method"`
+	Endpoint         string     `gorm:"type:text;not null" json:"endpoint"`
+	Payload          string     `gorm:"type:text;not null" json:"payload"`
+	Status           string     `gorm:"type:varchar(20);not null;default:'pending';index" json:"status"`
+	RetryCount       int        `gorm:"type:integer;not null;default:0" json:"retry_count"`
+	MaxRetries       int        `gorm:"type:integer;not null;default:5" json:"max_retries"`
+	NextAttemptAt    *time.Time `gorm:"type:timestamp;index" json:"next_attempt_at,omitempty"`
+	LastError        string     `gorm:"type:text" json:"last_error"`
+	LastResponseCode int        `gorm:"type:integer;default:0" json:"last_response_code"`
+	ResultPayload    string     `gorm:"type:text" json:"result_payload"`
+	TaskID           string     `gorm:"type:varchar(50);index" json:"task_id"`
+	ReviewID         string     `gorm:"type:varchar(50);index" json:"review_id"`
+	ProcessedAt      *time.Time `gorm:"type:timestamp" json:"processed_at,omitempty"`
+	CreatedAt        time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt        time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+}
+
+func (GovernanceOutboxEvent) TableName() string {
+	return "governance_outbox_events"
+}
+
+func (e *GovernanceOutboxEvent) BeforeCreate(tx *gorm.DB) (err error) {
+	if e.ID == "" {
+		e.ID = GenerateID("gox")
+	}
+	return nil
+}
+
 // GenerateID 生成带前缀的唯一ID
 func GenerateID(prefix string) string {
 	return prefix + "_" + strings.ReplaceAll(uuid.NewString(), "-", "")

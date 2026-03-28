@@ -77,6 +77,8 @@ Cornerstone 采用三层权限模型，提供细粒度的访问控制：
 
 **使用场景**: 数据库创建者，项目负责人
 
+> 注：当前实现不允许通过“分享数据库”或“修改成员角色”接口创建额外的 `owner`；可授予的数据库角色为 `admin`、`editor`、`viewer`。
+
 ### Admin (管理员)
 
 **权限范围**: 管理权限（不能删除数据库）
@@ -303,7 +305,7 @@ const db = await databaseAPI.create({
 // 2. 分享给其他用户（仅 Owner 和 Admin 可以）
 await databaseAPI.share(db.id, {
     user_id: 'usr_xxx',
-    role: 'editor'  // owner, admin, editor, viewer
+    role: 'editor'  // admin, editor, viewer
 })
 ```
 
@@ -455,7 +457,7 @@ try {
 ```typescript
 // 分享数据库
 POST /api/databases/:id/share
-Body: { user_id: string, role: string }
+Body: { user_id: string, role: 'admin' | 'editor' | 'viewer' }
 
 // 获取数据库用户列表
 GET /api/databases/:id/users
@@ -465,7 +467,7 @@ DELETE /api/databases/:id/users/:user_id
 
 // 更新用户角色
 PUT /api/databases/:id/users/:user_id/role
-Body: { role: string }
+Body: { role: 'admin' | 'editor' | 'viewer' }
 ```
 
 ### 字段权限 API
@@ -487,13 +489,13 @@ Body: { permissions: [...] }
 
 ## 常见问题
 
-### Q: Owner 为什么不能直接分享给 Editor/Viewer？
+### Q: Owner 可以分享哪些数据库角色？
 
-A: 这是业务逻辑设计。Owner 只能分享给其他 Owner，需要通过 Admin 角色来分享给 Editor/Viewer。这样可以确保权限管理的层级性。
+A: Owner 和 Admin 都可以授予 `admin`、`editor`、`viewer`；当前不支持通过分享或改角色接口创建额外的 `owner`，避免出现多个所有者。
 
 ### Q: 如何修改用户角色？
 
-A: 使用 `PUT /api/databases/:id/users/:user_id/role` API，只有 Owner 和 Admin 可以修改角色。
+A: 使用 `PUT /api/databases/:id/users/:user_id/role` API，请求体只需要 `role`。当前只有 Owner 可以修改数据库成员角色。
 
 ### Q: 字段权限如何继承？
 

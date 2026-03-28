@@ -1,906 +1,88 @@
 # Cornerstone API 文档
 
-**版本**: v1.9 | **最后更新**: 2026-02-25 | **基础地址**: `http://localhost:8080`
+**最后校对**: 2026-03-28  
+**基准代码**: `backend/cmd/server/main.go`、`backend/internal/handlers/*`、`backend/pkg/query/*`  
+**基础地址**: `http://localhost:8080`  
+**路由真值**: 以 [backend/cmd/server/main.go](../backend/cmd/server/main.go) 为准
 
-**状态**: ✅ 生产就绪 | **总端点**: 65（以 `backend/cmd/server/main.go` 为准）
+## 1. 总览
 
-> 说明：本文件包含历史段落，后续会继续清理重复章节；接口真值以代码路由为准。
+Cornerstone 当前提供四类接口：
 
----
+| 类别 | 路径前缀 | 认证方式 | 用途 |
+|---|---|---|---|
+| 公共接口 | `/health`、`/api/auth/*` | 无 / JWT | 健康检查、注册、登录 |
+| 业务接口 | `/api/*` | JWT | 用户、组织、数据库、记录、治理、查询 DSL |
+| 系统集成接口 | `/api/integrations/*` | Integration Token（系统间令牌） | 接收入站治理事件 |
+| HTTP MCP 接口 | `/mcp` | JWT + Origin 校验 | 通过 MCP 查询和创建数据库，并通过 SSE 接收业务变更通知 |
 
-## 概述
+补充说明：
 
-Cornerstone 提供完整的 RESTful API 接口，支持用户认证、组织管理、数据库管理、表/字段/记录的完整 CRUD 操作。最新版本新增统计分析、活动日志、插件管理和文件管理功能。
+- `/api/v1/*` 已做兼容转发到 `/api/*`。
+- 成功响应统一为 `{"success": true, "data": ...}`。
+- 失败响应统一为 `{"success": false, "message": "...", "code": 4xx/5xx}`。
 
-**技术栈**: Go 1.21+ + Gin + GORM + PostgreSQL 15+
+## 2. 认证约定
 
-**核心特性**:
-- ✅ JWT 认证 (带令牌黑名单)
-- ✅ 三层权限模型 (数据库/表/字段级)
-- ✅ JSONB 动态字段存储
-- ✅ 乐观锁并发控制
-- ✅ 活动日志审计
-- ✅ 插件扩展系统
-- ✅ 文件上传/预览/下载
+### 2.1 JWT 认证
 
----
+除 `/health`、`/api/auth/register`、`/api/auth/login` 外，其余业务接口默认要求：
 
-## API 端点统计
-
-| 模块 | 接口数 | 状态 | 说明 |
-|------|--------|------|------|
-| 认证 | 3 | ✅ | 用户注册/登录/登出 |
-| 用户 | 6 | ✅ | 用户详情/资料更新/改密/删号/搜索/列表 |
-| 组织 | 8 | ✅ | 组织 CRUD + 成员管理 |
-| 数据库 | 9 | ✅ | 数据库 CRUD + 权限管理 |
-| 表 | 5 | ✅ | 表 CRUD 操作 |
-| 字段 | 5 | ✅ | 字段 CRUD 操作 |
-| 字段权限 | 3 | ✅ | 字段级 R/W/D 权限控制 |
-| 记录 | 7 | ✅ | 记录 CRUD + 批量创建 + 搜索 + 导出 |
-| 文件 | 5 | ✅ ⭐ | 上传/预览/下载/删除 |
-| 插件 | 10 | ✅ ⭐ | 插件 CRUD + 绑定管理 + 执行 |
-| 统计 | 2 | ✅ ⭐ | 统计数据 + 活动日志 |
-| 系统设置 | 2 | ✅ | 查询与更新系统设置 |
-| **总计** | **65** | **100%** | **全部已实现** |
-
----
-
-## 快速开始
-
-### 环境要求
-- Go 1.21+
-- PostgreSQL 15+ (推荐) 或 SQLite 3.35+
-- Node.js 18+ (前端开发)
-
-### 启动后端服务
-```bash
-cd backend
-go run ./cmd/server/main.go
-```
-
-服务将运行在 `http://localhost:8080`
-
----
-
-## 认证机制
-
-### JWT 认证
-- **Token 格式**: `Bearer <JWT_TOKEN>`
-- **过期时间**: 24 小时
-- **Claims**: `user_id`, `username`, `role`
-- **黑名单**: PostgreSQL 实现，无需 Redis
-
-### 认证头格式
 ```http
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+Authorization: Bearer <jwt-token>
 ```
 
----
+相关接口：
 
-## API 端点
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/auth/register` | 注册 |
+| `POST` | `/api/auth/login` | 登录 |
+| `POST` | `/api/auth/logout` | 登出并拉黑当前 token |
+| `GET` | `/api/users/me` | 获取当前用户 |
 
-### 基础端点
+### 2.2 集成令牌认证
 
-#### 健康检查 ✅
+`/api/integrations/events` 不走 JWT，而是使用系统间令牌：
+
 ```http
-GET /health
+X-Source-System: fuckcmdb
+Authorization: Bearer <integration-token>
 ```
 
-**响应** (200 OK):
-```json
-{
-  "status": "healthy",
-  "service": "cornerstone-backend",
-  "time": "2026-01-13T19:00:00Z"
-}
-```
+鉴权优先级：
 
-**代码示例**:
-```bash
-# curl
-curl http://localhost:8080/health
-```
+1. `INTEGRATION_SHARED_TOKEN`
+2. `INTEGRATION_TOKENS` 中按 `sourceSystem=token` 匹配
 
-```go
-// Go
-resp, _ := http.Get("http://localhost:8080/health")
-```
+### 2.3 HTTP MCP 认证
 
-```typescript
-// JavaScript
-fetch('http://localhost:8080/health').then(r => r.json())
-```
+`/mcp` 使用 JWT 登录态，而不是系统集成 token：
 
-```python
-# Python
-import requests
-requests.get('http://localhost:8080/health').json()
-```
-
----
-
-### 认证模块 ✅
-
-#### 注册
 ```http
-POST /api/auth/register
+Authorization: Bearer <jwt-token>
+Content-Type: application/json
 ```
 
-**请求体**:
-```json
-{
-  "username": "字符串 (3-50字符, 字母数字下划线连字符)",
-  "email": "字符串 (有效邮箱格式)",
-  "password": "字符串 (6-50字符, 必须包含字母和数字)"
-}
-```
+补充说明：
 
-**响应** (201 Created):
+- `OPTIONS /mcp` 不要求 JWT，用于预检。
+- 若请求携带 `Origin`，服务会校验其是否与当前 Host 一致，或命中 `MCP_ALLOWED_ORIGINS`。
+- `/mcp` 返回 **JSON-RPC / MCP 响应**，不使用业务 API 的统一 `{success,data}` 包装。
+
+## 3. 响应格式
+
+### 3.1 成功响应
+
 ```json
 {
   "success": true,
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "user": {
-      "id": "usr_20260113190000_123456",
-      "username": "john_doe",
-      "email": "john@example.com",
-      "created_at": "2026-01-13T19:00:00Z"
-    }
-  }
+  "data": {}
 }
 ```
 
-**代码示例**:
-```bash
-curl -X POST http://localhost:8080/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","email":"test@example.com","password":"Test123456"}'
-```
+### 3.2 失败响应
 
-```go
-// Go
-type RegisterRequest struct {
-    Username string `json:"username"`
-    Email    string `json:"email"`
-    Password string `json:"password"`
-}
-
-reqBody := RegisterRequest{
-    Username: "testuser",
-    Email:    "test@example.com",
-    Password: "Test123456",
-}
-jsonBody, _ := json.Marshal(reqBody)
-resp, _ := http.Post("http://localhost:8080/api/auth/register", "application/json", bytes.NewBuffer(jsonBody))
-```
-
-```typescript
-// JavaScript
-const response = await fetch('http://localhost:8080/api/auth/register', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    username: 'testuser',
-    email: 'test@example.com',
-    password: 'Test123456'
-  })
-})
-```
-
-```python
-# Python
-import requests
-response = requests.post('http://localhost:8080/api/auth/register', json={
-    'username': 'testuser',
-    'email': 'test@example.com',
-    'password': 'Test123456'
-})
-```
-
-#### 登录
-```http
-POST /api/auth/login
-```
-
-**请求体**:
-```json
-{
-  "username": "字符串 (用户名或邮箱)",
-  "password": "字符串"
-}
-```
-
-**响应** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "user": {
-      "id": "usr_20260113190000_123456",
-      "username": "john_doe",
-      "email": "john@example.com"
-    }
-  }
-}
-```
-
-#### 登出
-```http
-POST /api/auth/logout
-```
-
-**认证**: 必需
-
-**响应** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "message": "登出成功"
-  }
-}
-```
-
-#### 获取用户信息
-```http
-GET /api/users/me
-```
-
-**认证**: 必需
-
-**响应** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "usr_20260113190000_123456",
-    "username": "john_doe",
-    "email": "john@example.com",
-    "created_at": "2026-01-13T19:00:00Z"
-  }
-}
-```
-
----
-
-### 用户管理 ✅
-
-#### 搜索用户
-```http
-GET /api/users/search?q=<query>
-```
-
-**认证**: 必需
-
-**查询参数**:
-- `q`: 搜索关键词 (用户名或邮箱)
-
-**响应** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "usr_20260113190000_123456",
-      "username": "john_doe",
-      "email": "john@example.com"
-    }
-  ]
-}
-```
-
-#### 列出用户
-```http
-GET /api/users
-```
-
-**认证**: 必需
-
-**查询参数**:
-- `org_id` (可选): 组织ID，过滤组织成员
-- `db_id` (可选): 数据库ID，过滤数据库用户
-
-**响应** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "usr_20260113190000_123456",
-      "username": "john_doe",
-      "email": "john@example.com"
-    }
-  ]
-}
-```
-
----
-
-### 组织管理 ✅
-
-#### 创建组织
-```http
-POST /api/organizations
-```
-
-**认证**: 必需
-
-**请求体**:
-```json
-{
-  "name": "字符串 (2-100字符)",
-  "description": "字符串 (最多500字符, 可选)"
-}
-```
-
-**响应** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "org_20260113190000_123456",
-    "name": "Engineering Team",
-    "description": "Hardware engineering department",
-    "owner_id": "usr_20260113190000_123456",
-    "created_at": "2026-01-13T19:00:00Z"
-  }
-}
-```
-
-#### 组织操作
-```http
-GET /api/organizations                    # 列出组织
-GET /api/organizations/:id                # 获取详情
-PUT /api/organizations/:id                # 更新组织
-DELETE /api/organizations/:id             # 删除组织
-GET /api/organizations/:id/members        # 获取成员列表
-POST /api/organizations/:id/members       # 添加成员
-DELETE /api/organizations/:id/members/:member_id  # 移除成员
-PUT /api/organizations/:id/members/:member_id/role # 更新成员角色
-```
-
-**成员角色**: owner/admin/member
-
----
-
-### 数据库管理 ✅
-
-#### 创建数据库
-```http
-POST /api/databases
-```
-
-**认证**: 必需
-
-**请求体**:
-```json
-{
-  "name": "字符串 (2-255字符)",
-  "description": "字符串 (最多500字符, 可选)",
-  "is_public": false,
-  "is_personal": true
-}
-```
-
-**响应** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "db_20260113190000_123456",
-    "name": "Project Database",
-    "description": "Project data storage",
-    "owner_id": "usr_20260113190000_123456",
-    "is_public": false,
-    "is_personal": true,
-    "created_at": "2026-01-13T19:00:00Z"
-  }
-}
-```
-
-#### 数据库操作
-```http
-GET /api/databases                        # 列出数据库
-GET /api/databases/:id                    # 获取详情
-PUT /api/databases/:id                    # 更新数据库
-DELETE /api/databases/:id                 # 删除数据库
-POST /api/databases/:id/share             # 分享数据库
-GET /api/databases/:id/users              # 获取数据库用户
-DELETE /api/databases/:id/users/:user_id  # 移除用户
-PUT /api/databases/:id/users/:user_id/role # 更新用户角色
-GET /api/databases/:id/tables             # 获取数据库表列表
-```
-
-**数据库角色**: owner/admin/editor/viewer
-
----
-
-### 表管理 ✅
-
-#### 创建表
-```http
-POST /api/tables
-```
-
-**认证**: 必需 (数据库所有者、管理员或编辑者)
-
-**请求体**:
-```json
-{
-  "database_id": "db_20260113190000_123456",
-  "name": "字符串 (2-255字符)",
-  "description": "字符串 (最多500字符, 可选)"
-}
-```
-
-**响应** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "tbl_20260113190000_123456",
-    "database_id": "db_20260113190000_123456",
-    "name": "Customer Table",
-    "description": "Customer information",
-    "created_at": "2026-01-13T19:00:00Z"
-  }
-}
-```
-
-#### 表操作
-```http
-GET /api/tables/:id                       # 获取表详情
-PUT /api/tables/:id                       # 更新表
-DELETE /api/tables/:id                    # 删除表
-GET /api/tables/:id/fields                # 获取表字段列表
-```
-
----
-
-### 字段管理 ✅
-
-#### 创建字段
-```http
-POST /api/fields
-```
-
-**认证**: 必需 (数据库所有者、管理员或编辑者)
-
-**请求体**:
-```json
-{
-  "table_id": "tbl_20260113190000_123456",
-  "name": "字符串 (1-255字符)",
-  "type": "string | number | boolean | date | datetime | select | multiselect",
-  "required": false,
-  "options": "选项1,选项2,选项3"  // 仅对 select/multiselect 有效
-}
-```
-
-**字段类型说明**:
-- `string`: 文本
-- `number`: 数字
-- `boolean`: 真/假
-- `date`: 日期字符串 (YYYY-MM-DD)
-- `datetime`: 日期时间字符串 (YYYY-MM-DD HH:mm:ss)
-- `select`: 从选项中单选
-- `multiselect`: 从选项中多选
-
-**响应** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "fld_20260113190000_123456",
-    "table_id": "tbl_20260113190000_123456",
-    "name": "customer_name",
-    "type": "string",
-    "required": true,
-    "created_at": "2026-01-13T19:00:00Z"
-  }
-}
-```
-
-#### 字段操作
-```http
-GET /api/fields/:id                       # 获取字段详情
-PUT /api/fields/:id                       # 更新字段
-DELETE /api/fields/:id                    # 删除字段
-```
-
----
-
-### 字段权限管理 ✅
-
-#### 获取表字段权限配置
-```http
-GET /api/tables/:tableId/field-permissions
-```
-
-**认证**: 必需 (需要表访问权限)
-
-**响应** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "permissions": [
-      {
-        "id": "flp_20260113190000_123456",
-        "table_id": "tbl_20260113190000_123456",
-        "field_id": "fld_20260113190000_123456",
-        "role": "editor",
-        "can_read": true,
-        "can_write": true,
-        "can_delete": false
-      }
-    ]
-  }
-}
-```
-
-#### 设置字段权限
-```http
-PUT /api/tables/:tableId/field-permissions
-```
-
-**认证**: 必需 (数据库所有者或管理员)
-
-**请求体**:
-```json
-{
-  "field_id": "fld_20260113190000_123456",
-  "role": "editor",
-  "can_read": true,
-  "can_write": true,
-  "can_delete": false
-}
-```
-
-**角色权限限制**:
-- `owner` / `admin`: 始终拥有全部权限 (R/W/D)，不可修改
-- `editor`: 可配置 R/W，不能配置 D
-- `viewer`: 只能配置 R
-
-#### 批量设置字段权限
-```http
-PUT /api/tables/:tableId/field-permissions/batch
-```
-
-**请求体**:
-```json
-{
-  "permissions": [
-    {
-      "field_id": "fld_20260113190000_123456",
-      "role": "editor",
-      "can_read": true,
-      "can_write": true,
-      "can_delete": false
-    }
-  ]
-}
-```
-
----
-
-### 记录管理 ✅
-
-#### 创建记录
-```http
-POST /api/records
-```
-
-**认证**: 必需 (数据库所有者、管理员或编辑者)
-
-**请求体**:
-```json
-{
-  "table_id": "tbl_20260113190000_123456",
-  "data": {
-    "customer_name": "张三",
-    "age": 25,
-    "is_active": true,
-    "join_date": "2026-01-13"
-  }
-}
-```
-
-**响应** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "rec_20260113190000_123456",
-    "table_id": "tbl_20260113190000_123456",
-    "data": {
-      "customer_name": "张三",
-      "age": 25,
-      "is_active": true,
-      "join_date": "2026-01-13"
-    },
-    "version": 1,
-    "created_at": "2026-01-13T19:00:00Z",
-    "updated_at": "2026-01-13T19:00:00Z"
-  }
-}
-```
-
-#### 列出记录（支持搜索）
-```http
-GET /api/records
-```
-
-**认证**: 必需
-
-**查询参数**:
-- `table_id` (必需): 要查询的表ID
-- `limit` (可选, 默认: 20, 最大: 100): 分页限制
-- `offset` (可选, 默认: 0): 分页偏移
-- `filter` (可选): 搜索关键词（实时搜索，300ms防抖）
-
-**示例**:
-```
-GET /api/records?table_id=tbl_xxx&limit=20&offset=0&filter=张三
-```
-
-**响应** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "records": [
-      {
-        "id": "rec_20260113190000_123456",
-        "data": {"customer_name": "张三", "age": 25},
-        "version": 1,
-        "created_at": "2026-01-13T19:00:00Z"
-      }
-    ],
-    "total": 1
-  }
-}
-```
-
-#### 记录操作
-```http
-GET /api/records/:id                      # 获取记录详情
-PUT /api/records/:id                      # 更新记录（乐观锁）
-DELETE /api/records/:id                   # 删除记录
-POST /api/records/batch                   # 批量创建记录
-```
-
-**更新记录（乐观锁）**:
-```json
-{
-  "data": {"age": 26},
-  "version": 1  // 版本号，用于并发控制
-}
-```
-
-**批量创建**:
-```json
-{
-  "table_id": "tbl_20260113190000_123456",
-  "records": [
-    {"name": "张三", "age": 25},
-    {"name": "李四", "age": 30}
-  ]
-}
-```
-
----
-
-### 文件管理 ✅ ⭐
-
-#### 上传文件
-```http
-POST /api/files/upload
-```
-
-**认证**: 必需
-
-**请求体** (multipart/form-data):
-- `record_id`: 关联的记录ID
-- `file`: 文件二进制数据
-
-**响应** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "fil_20260113190000_123456",
-    "record_id": "rec_20260113190000_123456",
-    "file_name": "document.pdf",
-    "file_size": 1024000,
-    "created_at": "2026-01-13T19:00:00Z"
-  }
-}
-```
-
-#### 文件操作
-```http
-GET /api/files/:id                        # 获取文件信息
-GET /api/files/:id/download               # 下载文件
-DELETE /api/files/:id                     # 删除文件
-GET /api/records/:id/files                # 获取记录的附件列表
-```
-
-**下载文件**:
-```bash
-# curl
-curl -H "Authorization: Bearer $TOKEN" \
-  http://localhost:8080/api/files/fil_xxx/download -o document.pdf
-```
-
----
-
-### 插件管理 ✅ ⭐
-
-#### 创建插件
-```http
-POST /api/plugins
-```
-
-**认证**: 必需
-
-**请求体**:
-```json
-{
-  "name": "字符串 (2-255字符)",
-  "description": "字符串",
-  "language": "go | python | bash",
-  "entry_file": "main.go | main.py | main.sh",
-  "timeout": 30,
-  "config": "[{\"name\":\"api_key\",\"type\":\"string\",\"required\":true}]",
-  "config_values": "{\"api_key\":\"your_key\"}"
-}
-```
-
-**响应** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "plg_20260113190000_123456",
-    "name": "Data Processor",
-    "language": "go",
-    "timeout": 30,
-    "created_at": "2026-01-13T19:00:00Z"
-  }
-}
-```
-
-#### 插件操作
-```http
-GET /api/plugins                          # 列出插件
-GET /api/plugins/:id                      # 获取插件详情
-PUT /api/plugins/:id                      # 更新插件
-DELETE /api/plugins/:id                   # 删除插件
-POST /api/plugins/:id/bind                # 绑定插件到表
-DELETE /api/plugins/:id/unbind            # 解绑插件
-GET /api/plugins/:id/bindings             # 获取插件绑定列表
-```
-
-#### 绑定插件到表
-```http
-POST /api/plugins/:id/bind
-```
-
-**请求体**:
-```json
-{
-  "table_id": "tbl_20260113190000_123456",
-  "trigger": "create | update | delete | manual"
-}
-```
-
-**触发器说明**:
-- `create`: 创建记录时触发
-- `update`: 更新记录时触发
-- `delete`: 删除记录时触发
-- `manual`: 手动触发
-
-#### 获取插件绑定列表
-```http
-GET /api/plugins/:id/bindings
-```
-
-**响应** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "id": "pbd_20260113190000_123456",
-      "plugin_id": "plg_20260113190000_123456",
-      "table_id": "tbl_20260113190000_123456",
-      "database_name": "Project DB",
-      "table_name": "Customer Table",
-      "trigger": "create",
-      "created_at": "2026-01-13T19:00:00Z"
-    }
-  ]
-}
-```
-
----
-
-### 统计分析 ✅ ⭐
-
-#### 获取统计数据
-```http
-GET /api/stats/summary
-```
-
-**认证**: 必需
-
-**响应** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "users": 15,
-    "organizations": 3,
-    "databases": 8,
-    "plugins": 5
-  }
-}
-```
-
-#### 获取活动日志
-```http
-GET /api/stats/activities
-```
-
-**认证**: 必需
-
-**查询参数**:
-- `limit` (可选, 默认: 10): 返回记录数量
-
-**响应** (200 OK):
-```json
-{
-  "success": true,
-  "data": [
-    {
-      "content": "用户 john_doe 创建了数据库 'Project DB'",
-      "time": "2026-01-13T19:00:00Z",
-      "type": "primary"
-    },
-    {
-      "content": "用户 jane_doe 上传了文件 'report.pdf'",
-      "time": "2026-01-13T18:30:00Z",
-      "type": "success"
-    }
-  ]
-}
-```
-
-**活动类型**:
-- `primary`: 主要操作
-- `success`: 成功操作
-- `warning`: 警告操作
-- `danger`: 删除/危险操作
-- `info`: 信息操作
-
----
-
-## 响应格式
-
-### 成功响应
-```json
-{
-  "success": true,
-  "data": {
-    // 响应数据
-  }
-}
-```
-
-### 错误响应
 ```json
 {
   "success": false,
@@ -909,1105 +91,415 @@ GET /api/stats/activities
 }
 ```
 
-### HTTP 状态码
-| 状态码 | 说明 |
-|--------|------|
-| `200 OK` | 成功 |
-| `201 Created` | 资源创建成功 |
-| `400 Bad Request` | 无效输入/验证错误 |
-| `401 Unauthorized` | 缺少或无效的身份验证 |
-| `403 Forbidden` | 权限不足 |
-| `404 Not Found` | 资源未找到 |
-| `500 Internal Server Error` | 服务器错误 |
-
----
-
-## 数据模型
-
-### 核心表结构 (共15张)
-
-| 表名 | 前缀 | 说明 |
-|------|------|------|
-| users | `usr_` | 用户表 |
-| organizations | `org_` | 组织表 |
-| organization_members | `mem_` | 组织成员 |
-| databases | `db_` | 数据库 |
-| database_access | `acc_` | 数据库权限 |
-| tables | `tbl_` | 表定义 |
-| fields | `fld_` | 字段定义 |
-| field_permissions | `flp_` | 字段权限 |
-| records | `rec_` | 数据记录 |
-| files | `fil_` | 文件附件 ⭐ |
-| plugins | `plg_` | 插件定义 ⭐ |
-| plugin_bindings | `pbd_` | 插件绑定 ⭐ |
-| activity_logs | `act_` | 活动日志 ⭐ |
-| token_blacklist | - | JWT黑名单 |
-| user_database_permissions | - | 物化视图 |
-
-### ID 格式
-所有 ID 使用 UUID 风格格式带前缀：`usr_001`, `db_001`, `tbl_001`, `fld_001`, `rec_001`
-
----
-
-## 权限模型
-
-### 三层权限架构
-```
-L1: 数据库级权限 (owner/admin/editor/viewer)
-L2: 表级权限 (继承自数据库)
-L3: 字段级权限 (owner/admin/editor/viewer + R/W/D)
-```
-
-### 权限优先级
-```
-字段级权限配置 > 表级默认权限 > 数据库级权限
-```
-
-### 角色说明
-
-#### 数据库级角色
-| 角色 | 权限 |
-|------|------|
-| owner | 完全控制 |
-| admin | 编辑权限 + 用户管理 |
-| editor | 编辑数据 |
-| viewer | 只读 |
-
-#### 字段级权限
-| 角色 | 可配置权限 |
-|------|-----------|
-| owner / admin | 始终拥有全部权限 (R/W/D)，不可修改 |
-| editor | 可配置 R/W，不能配置 D |
-| viewer | 只能配置 R |
-
----
-
-## 配置
-
-### 环境变量
-```bash
-# 数据库
-DATABASE_URL=postgres://user:pass@host:5432/dbname?sslmode=disable
-DB_MAX_OPEN=10
-DB_MAX_IDLE=5
-DB_MAX_LIFETIME=3600
-
-# 服务器
-SERVER_MODE=debug  # debug | release
-PORT=8080
-
-# JWT
-JWT_SECRET=your-secret-key-here
-JWT_EXPIRATION=24  # 小时
-
-# 日志
-LOG_LEVEL=info
-LOG_OUTPUT=logs/app.log
-LOG_ERROR=logs/error.log
-LOG_MAX_SIZE=100
-LOG_MAX_AGE=7
-LOG_MAX_BACKUPS=5
-```
-
-### 默认值
-- 数据库: PostgreSQL
-- 端口: 8080
-- JWT 过期时间: 24小时
-- 日志级别: info
-
----
-
-## 使用示例
-
-### 完整工作流示例
-
-#### 1. 注册并登录
-```bash
-# 注册
-curl -X POST http://localhost:8080/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","email":"test@example.com","password":"Test123456"}'
-
-# 登录获取 Token
-TOKEN=$(curl -s -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","password":"Test123456"}' | jq -r '.data.token')
-```
-
-#### 2. 创建组织和数据库
-```bash
-# 创建组织
-ORG_ID=$(curl -s -X POST http://localhost:8080/api/organizations \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"My Team","description":"Development team"}' | jq -r '.data.id')
-
-# 创建数据库
-DB_ID=$(curl -s -X POST http://localhost:8080/api/databases \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Customer DB","description":"Customer data"}' | jq -r '.data.id')
-```
-
-#### 3. 创建表和字段
-```bash
-# 创建表
-TABLE_ID=$(curl -s -X POST http://localhost:8080/api/tables \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"database_id\":\"$DB_ID\",\"name\":\"Customers\",\"description\":\"Customer records\"}" | jq -r '.data.id')
-
-# 创建字段
-curl -X POST http://localhost:8080/api/fields \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"table_id\":\"$TABLE_ID\",\"name\":\"name\",\"type\":\"string\",\"required\":true}"
-
-curl -X POST http://localhost:8080/api/fields \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"table_id\":\"$TABLE_ID\",\"name\":\"age\",\"type\":\"number\",\"required\":false}"
-```
-
-#### 4. 操作记录
-```bash
-# 创建记录
-curl -X POST http://localhost:8080/api/records \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d "{\"table_id\":\"$TABLE_ID\",\"data\":{\"name\":\"张三\",\"age\":25}}"
-
-# 搜索记录
-curl -G http://localhost:8080/api/records \
-  -H "Authorization: Bearer $TOKEN" \
-  -d "table_id=$TABLE_ID" \
-  -d "filter=张三"
-```
-
-### Go 客户端
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "fmt"
-    "net/http"
-)
-
-type LoginRequest struct {
-    Username string `json:"username"`
-    Password string `json:"password"`
-}
-
-type LoginResponse struct {
-    Success bool `json:"success"`
-    Data struct {
-        Token string `json:"token"`
-        User  struct {
-            ID       string `json:"id"`
-            Username string `json:"username"`
-        } `json:"user"`
-    } `json:"data"`
-}
-
-func main() {
-    // 登录
-    reqBody := LoginRequest{
-        Username: "testuser",
-        Password: "Test123456",
-    }
-    jsonBody, _ := json.Marshal(reqBody)
-
-    resp, _ := http.Post(
-        "http://localhost:8080/api/auth/login",
-        "application/json",
-        bytes.NewBuffer(jsonBody),
-    )
-    defer resp.Body.Close()
-
-    var loginResp LoginResponse
-    json.NewDecoder(resp.Body).Decode(&loginResp)
-
-    token := loginResp.Data.Token
-    fmt.Printf("Token: %s\n", token)
-
-    // 使用 token 获取组织列表
-    client := &http.Client{}
-    req, _ := http.NewRequest("GET", "http://localhost:8080/api/organizations", nil)
-    req.Header.Set("Authorization", "Bearer "+token)
-
-    response, _ := client.Do(req)
-    defer response.Body.Close()
-
-    // 处理响应...
-}
-```
-
-### JavaScript 客户端
-```typescript
-// 登录
-const login = async (credentials: { username: string; password: string }) => {
-  const response = await fetch('http://localhost:8080/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(credentials),
-  });
-  return response.json();
-};
-
-// 使用 Token 获取数据
-const getOrganizations = async (token: string) => {
-  const response = await fetch('http://localhost:8080/api/organizations', {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  });
-  return response.json();
-};
-
-// 搜索记录
-const searchRecords = async (token: string, tableId: string, filter: string) => {
-  const params = new URLSearchParams({
-    table_id: tableId,
-    filter: filter,
-    limit: '20'
-  });
-
-  const response = await fetch(`http://localhost:8080/api/records?${params}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  });
-  return response.json();
-};
-```
-
-### Python 客户端
-```python
-import requests
-import json
-
-# 登录
-def login(username: str, password: str):
-    response = requests.post(
-        'http://localhost:8080/api/auth/login',
-        json={'username': username, 'password': password}
-    )
-    return response.json()
-
-# 使用 Token
-def get_organizations(token: str):
-    headers = {'Authorization': f'Bearer {token}'}
-    response = requests.get('http://localhost:8080/api/organizations', headers=headers)
-    return response.json()
-
-# 创建记录
-def create_record(token: str, table_id: str, data: dict):
-    headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json'}
-    payload = {'table_id': table_id, 'data': data}
-    response = requests.post(
-        'http://localhost:8080/api/records',
-        headers=headers,
-        json=payload
-    )
-    return response.json()
-
-# 搜索记录
-def search_records(token: str, table_id: str, filter_text: str):
-    headers = {'Authorization': f'Bearer {token}'}
-    params = {'table_id': table_id, 'filter': filter_text, 'limit': 20}
-    response = requests.get(
-        'http://localhost:8080/api/records',
-        headers=headers,
-        params=params
-    )
-    return response.json()
-
-# 文件上传
-def upload_file(token: str, record_id: str, file_path: str):
-    headers = {'Authorization': f'Bearer {token}'}
-    files = {'file': open(file_path, 'rb')}
-    data = {'record_id': record_id}
-    response = requests.post(
-        'http://localhost:8080/api/files/upload',
-        headers=headers,
-        files=files,
-        data=data
-    )
-    return response.json()
-```
-
----
-
-## 重要说明
-
-1. **时间戳格式**: 所有时间戳均为 ISO 8601 格式 (UTC)
-2. **软删除**: 所有删除操作均为软删除 (GORM DeletedAt)
-3. **中文字符**: 完全支持 Unicode/中文字符
-4. **JSONB 存储**: 记录数据使用 JSONB 存储实现动态字段
-5. **乐观锁**: 更新记录时支持版本号并发控制
-6. **实时搜索**: 记录搜索支持 300ms 防抖优化
-7. **文件限制**: 单文件最大 50MB，最多 5 个附件
-
----
-
-## 安全特性
-
-- **认证**: JWT tokens 使用 HS256 签名
-- **授权**: 基于角色的访问控制 (RBAC)
-- **输入验证**: 所有端点进行服务器端验证
-- **密码安全**: 使用 bcrypt 哈希 (cost: 10)
-- **并发保护**: 乐观锁防止数据冲突
-- **令牌黑名单**: PostgreSQL 实现，无需 Redis
-- **权限验证**: 后端严格验证字段级权限
-
----
-
-## 相关文档
-
-- [开发指南](./DEVELOPER-GUIDE.md) - 完整开发指南
-- [测试报告](./E2E-TEST-REPORT.md) - E2E 测试报告
-- [项目状态](./PROJECT-STATUS.md) - 项目进度状态
-- [权限系统](./PERMISSION-SYSTEM.md) - 权限系统文档
-
----
-
-## 快速开始
-
-### 环境要求
-- Go 1.21+
-- PostgreSQL 15+ (推荐) 或 SQLite 3.35+
-- Node.js 18+ (前端开发)
-
-### 启动后端服务
-```bash
-cd backend
-go run ./cmd/server/main.go
-```
-
-服务将运行在 `http://localhost:8080`
-
----
-
-## 认证机制
-
-### JWT 认证
-- **Token 格式**: `Bearer <JWT_TOKEN>`
-- **过期时间**: 24 小时
-- **Claims**: `user_id`, `username`, `role`
-
-### 认证头格式
-```http
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
-```
-
----
-
-## API 端点
-
-### 基础端点
-
-#### 健康检查
-```http
-GET /health
-```
-
-**响应** (200 OK):
+常见状态码：
+
+| 状态码 | 含义 |
+|---|---|
+| `200` | 成功 |
+| `400` | 参数错误或业务校验失败 |
+| `401` | 未认证或认证失败 |
+| `403` | 有 token 但权限不足 |
+| `404` | 资源不存在 |
+| `500` | 服务端错误 |
+
+## 4. 路由清单
+
+### 4.1 健康检查
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `GET` | `/health` | 服务健康检查，返回 `status/service/version/time` |
+
+### 4.2 用户与认证
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/auth/register` | 注册 |
+| `POST` | `/api/auth/login` | 登录 |
+| `POST` | `/api/auth/logout` | 登出 |
+| `GET` | `/api/users/me` | 当前用户资料 |
+| `PUT` | `/api/users/me` | 更新个人资料 |
+| `PUT` | `/api/users/me/password` | 修改密码 |
+| `DELETE` | `/api/users/me` | 注销账号 |
+| `GET` | `/api/users` | 列出用户，可按组织/数据库过滤 |
+| `GET` | `/api/users/search` | 搜索用户 |
+
+### 4.3 组织
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/organizations` | 创建组织 |
+| `GET` | `/api/organizations` | 组织列表 |
+| `GET` | `/api/organizations/:id` | 组织详情 |
+| `PUT` | `/api/organizations/:id` | 更新组织 |
+| `DELETE` | `/api/organizations/:id` | 删除组织 |
+| `GET` | `/api/organizations/:id/members` | 成员列表 |
+| `POST` | `/api/organizations/:id/members` | 添加成员，`role` 仅允许 `admin`/`member` |
+| `DELETE` | `/api/organizations/:id/members/:member_id` | 移除成员 |
+| `PUT` | `/api/organizations/:id/members/:member_id/role` | 更新成员角色，`role` 仅允许 `admin`/`member` |
+
+### 4.4 数据库、表、字段、字段权限
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/databases` | 创建数据库 |
+| `GET` | `/api/databases` | 数据库列表 |
+| `GET` | `/api/databases/:id` | 数据库详情 |
+| `PUT` | `/api/databases/:id` | 更新数据库 |
+| `DELETE` | `/api/databases/:id` | 删除数据库 |
+| `POST` | `/api/databases/:id/share` | 分享数据库，`role` 仅允许 `admin`/`editor`/`viewer` |
+| `GET` | `/api/databases/:id/users` | 数据库成员 |
+| `DELETE` | `/api/databases/:id/users/:user_id` | 移除数据库成员 |
+| `PUT` | `/api/databases/:id/users/:user_id/role` | 更新数据库角色，body 仅需 `role`，且仅允许 `admin`/`editor`/`viewer` |
+| `POST` | `/api/tables` | 创建表 |
+| `GET` | `/api/databases/:id/tables` | 数据库下表列表 |
+| `GET` | `/api/tables/:id` | 表详情 |
+| `PUT` | `/api/tables/:id` | 更新表 |
+| `DELETE` | `/api/tables/:id` | 删除表 |
+| `POST` | `/api/fields` | 创建字段 |
+| `GET` | `/api/tables/:id/fields` | 表字段列表 |
+| `GET` | `/api/fields/:id` | 字段详情 |
+| `PUT` | `/api/fields/:id` | 更新字段 |
+| `DELETE` | `/api/fields/:id` | 删除字段 |
+| `GET` | `/api/tables/:id/field-permissions` | 获取字段权限矩阵 |
+| `PUT` | `/api/tables/:id/field-permissions` | 设置单条字段权限 |
+| `PUT` | `/api/tables/:id/field-permissions/batch` | 批量设置字段权限 |
+
+### 4.5 记录与文件
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/records` | 创建记录 |
+| `GET` | `/api/records` | 记录列表 |
+| `GET` | `/api/records/export` | 导出记录 |
+| `GET` | `/api/records/:id` | 记录详情 |
+| `PUT` | `/api/records/:id` | 更新记录 |
+| `DELETE` | `/api/records/:id` | 删除记录 |
+| `POST` | `/api/records/batch` | 批量创建记录 |
+| `POST` | `/api/files/upload` | 上传附件 |
+| `GET` | `/api/files/:id` | 获取文件元数据 |
+| `GET` | `/api/files/:id/download` | 下载文件 |
+| `DELETE` | `/api/files/:id` | 删除文件 |
+| `GET` | `/api/records/:id/files` | 记录附件列表 |
+
+### 4.6 插件、统计、系统设置
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/plugins` | 创建插件 |
+| `GET` | `/api/plugins` | 插件列表 |
+| `GET` | `/api/plugins/:id` | 插件详情 |
+| `PUT` | `/api/plugins/:id` | 更新插件 |
+| `DELETE` | `/api/plugins/:id` | 删除插件 |
+| `POST` | `/api/plugins/:id/bind` | 绑定插件到表 |
+| `DELETE` | `/api/plugins/:id/unbind` | 解绑插件 |
+| `GET` | `/api/plugins/:id/bindings` | 插件绑定列表 |
+| `POST` | `/api/plugins/:id/execute` | 手动执行插件 |
+| `GET` | `/api/plugins/:id/executions` | 插件执行记录 |
+| `GET` | `/api/stats/summary` | 统计汇总 |
+| `GET` | `/api/stats/activities` | 最近活动 |
+| `GET` | `/api/settings` | 读取系统设置 |
+| `PUT` | `/api/settings` | 更新系统设置 |
+
+### 4.7 Query DSL（查询 DSL，面向受控查询的 JSON 查询语言）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `GET`/`POST` | `/api/query` | 执行完整 DSL 查询 |
+| `GET` | `/api/query/simple` | 简化查询接口 |
+| `POST` | `/api/query/batch` | 批量查询 |
+| `POST` | `/api/query/explain` | 返回权限收口后的 SQL |
+| `POST` | `/api/query/validate` | 只做校验，不执行 |
+| `GET` | `/api/query/tables` | 当前用户可访问的 DSL 表清单 |
+| `GET` | `/api/query/schema/:table` | 指定表的可访问字段清单 |
+
+关键限制：
+
+- 不是任意 SQL 执行器，只允许访问白名单表与字段。
+- `users.password` 明确禁止查询。
+- `database_access`、`field_permissions` 需要数据库 `owner/admin` 权限。
+- `records`、`tables`、`fields`、`files`、`plugin_bindings`、`plugin_executions` 会自动按当前用户权限补充过滤条件。
+- 默认限制来自 `backend/pkg/query/model.go`：
+  - 最多 `3` 个 `JOIN`
+  - 最大页大小 `1000`
+  - 最大嵌套深度 `5`
+  - 最大字段数 `100`
+
+完整 DSL 示例：
+
 ```json
 {
-  "status": "healthy",
-  "service": "cornerstone-backend",
-  "time": "2026-01-10T19:00:00Z"
-}
-```
-
----
-
-### 认证模块
-
-#### 注册
-```http
-POST /api/auth/register
-```
-
-**请求体**:
-```json
-{
-  "username": "字符串 (3-50字符, 字母数字下划线连字符)",
-  "email": "字符串 (有效邮箱格式)",
-  "password": "字符串 (6-50字符, 必须包含字母和数字)"
-}
-```
-
-**响应** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "user": {
-      "id": "usr_20260110190000_123456",
-      "username": "john_doe",
-      "email": "john@example.com",
-      "created_at": "2026-01-10T19:00:00Z"
-    }
-  }
-}
-```
-
-#### 登录
-```http
-POST /api/auth/login
-```
-
-**请求体**:
-```json
-{
-  "username": "字符串 (用户名或邮箱)",
-  "password": "字符串"
-}
-```
-
-**响应** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
-    "user": {
-      "id": "usr_20260110190000_123456",
-      "username": "john_doe",
-      "email": "john@example.com"
-    }
-  }
-}
-```
-
-#### 登出
-```http
-POST /api/auth/logout
-```
-
-**认证**: 必需
-
-**响应** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "message": "登出成功"
-  }
-}
-```
-
-#### 获取用户信息
-```http
-GET /api/users/me
-```
-
-**认证**: 必需
-
----
-
-### 组织管理
-
-#### 创建组织
-```http
-POST /api/organizations
-```
-
-**认证**: 必需
-
-**请求体**:
-```json
-{
-  "name": "字符串 (2-100字符)",
-  "description": "字符串 (最多500字符, 可选)"
-}
-```
-
-**响应** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "org_20260110190000_123456",
-    "name": "Engineering Team",
-    "description": "Hardware engineering department",
-    "owner_id": "usr_20260110190000_123456",
-    "created_at": "2026-01-10T19:00:00Z"
-  }
-}
-```
-
-#### 列出组织
-```http
-GET /api/organizations
-```
-
-**认证**: 必需
-
-#### 获取组织详情
-```http
-GET /api/organizations/:id
-```
-
-**认证**: 必需 (用户必须是组织成员)
-
-#### 更新组织
-```http
-PUT /api/organizations/:id
-```
-
-**认证**: 必需 (所有者或管理员)
-
-#### 删除组织
-```http
-DELETE /api/organizations/:id
-```
-
-**认证**: 必需 (所有者)
-
-#### 组织成员管理
-```http
-GET /api/organizations/:id/members
-POST /api/organizations/:id/members
-DELETE /api/organizations/:id/members/:member_id
-PUT /api/organizations/:id/members/:member_id/role
-```
-
----
-
-### 数据库管理
-
-#### 创建数据库
-```http
-POST /api/databases
-```
-
-**认证**: 必需
-
-**请求体**:
-```json
-{
-  "name": "字符串 (2-255字符)",
-  "description": "字符串 (最多500字符, 可选)",
-  "is_public": false,
-  "is_personal": true
-}
-```
-
-**响应** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "db_20260110190000_123456",
-    "name": "Project Database",
-    "description": "Project data storage",
-    "owner_id": "usr_20260110190000_123456",
-    "is_public": false,
-    "is_personal": true,
-    "created_at": "2026-01-10T19:00:00Z"
-  }
-}
-```
-
-#### 数据库操作
-```http
-GET /api/databases
-GET /api/databases/:id
-PUT /api/databases/:id
-DELETE /api/databases/:id
-POST /api/databases/:id/share
-GET /api/databases/:id/users
-DELETE /api/databases/:id/users/:user_id
-PUT /api/databases/:id/users/:user_id/role
-```
-
----
-
-### 表管理
-
-#### 创建表
-```http
-POST /api/tables
-```
-
-**认证**: 必需 (数据库所有者、管理员或编辑者)
-
-**请求体**:
-```json
-{
-  "database_id": "db_20260110190000_123456",
-  "name": "字符串 (2-255字符)",
-  "description": "字符串 (最多500字符, 可选)"
-}
-```
-
-**响应** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "tbl_20260110190000_123456",
-    "database_id": "db_20260110190000_123456",
-    "name": "Customer Table",
-    "description": "Customer information",
-    "created_at": "2026-01-10T19:00:00Z"
-  }
-}
-```
-
-#### 表操作
-```http
-GET /api/databases/:id/tables
-GET /api/tables/:id
-PUT /api/tables/:id
-DELETE /api/tables/:id
-```
-
----
-
-### 字段管理
-
-#### 创建字段
-```http
-POST /api/fields
-```
-
-**认证**: 必需 (数据库所有者、管理员或编辑者)
-
-**请求体**:
-```json
-{
-  "table_id": "tbl_20260110190000_123456",
-  "name": "字符串 (1-255字符)",
-  "type": "string | number | boolean | date | datetime | single_select | multi_select",
-  "required": false,
-  "config": {
-    "max_length": 255,
-    "validation": "regex pattern"
-  }
-}
-```
-
-**字段类型说明**:
-- `string`: 文本
-- `number`: 数字
-- `boolean`: 真/假
-- `date`: 日期字符串 (YYYY-MM-DD)
-- `datetime`: 日期时间字符串 (ISO 8601)
-- `single_select`: 从选项中单选
-- `multi_select`: 从选项中多选
-
-**响应** (201 Created):
-```json
-{
-  "success": true,
-  "data": {
-    "id": "fld_20260110190000_123456",
-    "table_id": "tbl_20260110190000_123456",
-    "name": "customer_name",
-    "type": "string",
-    "required": true,
-    "created_at": "2026-01-10T19:00:00Z"
-  }
-}
-```
-
-#### 字段操作
-```http
-GET /api/tables/:id/fields
-GET /api/fields/:id
-PUT /api/fields/:id
-DELETE /api/fields/:id
-```
-
----
-
-### 字段权限管理 ⭐ 新增
-
-#### 获取表字段权限配置
-```http
-GET /api/tables/:tableId/field-permissions
-```
-
-**认证**: 必需 (需要表访问权限)
-
-**响应** (200 OK):
-```json
-{
-  "success": true,
-  "data": {
-    "permissions": [
+  "from": "tables",
+  "select": ["id", "database_id", "name", "created_at"],
+  "where": {
+    "and": [
       {
-        "id": "flp_20260111190000_123456",
-        "table_id": "tbl_20260110190000_123456",
-        "field_id": "fld_20260110190000_123456",
-        "role": "editor",
-        "can_read": true,
-        "can_write": true,
-        "can_delete": false
+        "field": "database_id",
+        "op": "eq",
+        "value": "db_xxx"
       }
     ]
-  }
-}
-```
-
-#### 设置字段权限
-```http
-PUT /api/tables/:tableId/field-permissions
-```
-
-**认证**: 必需 (数据库所有者或管理员)
-
-**请求体**:
-```json
-{
-  "field_id": "fld_20260110190000_123456",
-  "role": "editor",
-  "can_read": true,
-  "can_write": true,
-  "can_delete": false
-}
-```
-
-**角色权限限制**:
-- `owner` / `admin`: 始终拥有全部权限 (R/W/D)，不可修改
-- `editor`: 可配置 R/W，不能配置 D
-- `viewer`: 只能配置 R
-
-#### 批量设置字段权限
-```http
-PUT /api/tables/:tableId/field-permissions/batch
-```
-
-**请求体**:
-```json
-{
-  "permissions": [
+  },
+  "orderBy": [
     {
-      "field_id": "fld_20260110190000_123456",
-      "role": "editor",
-      "can_read": true,
-      "can_write": true,
-      "can_delete": false
+      "field": "created_at",
+      "dir": "desc"
     }
-  ]
+  ],
+  "page": 1,
+  "size": 20
 }
 ```
 
----
+简化查询示例：
 
-### 记录管理
-
-#### 创建记录
 ```http
-POST /api/records
+GET /api/query/simple?table=tables&filter={"database_id":"db_xxx"}&sort=-created_at&page=1&size=20
 ```
 
-**认证**: 必需 (数据库所有者、管理员或编辑者)
+### 4.8 治理域
 
-**请求体**:
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/governance/tasks` | 创建治理任务 |
+| `GET` | `/api/governance/tasks` | 查询治理任务列表 |
+| `GET` | `/api/governance/tasks/:id` | 治理任务详情 |
+| `PUT` | `/api/governance/tasks/:id` | 更新治理任务 |
+| `POST` | `/api/governance/tasks/:id/evidences` | 添加整改证据 |
+| `POST` | `/api/governance/tasks/:id/comments` | 添加评论 |
+| `POST` | `/api/governance/reviews` | 发起治理审核 |
+| `GET` | `/api/governance/reviews/:id` | 查询治理审核详情 |
+| `POST` | `/api/governance/reviews/:id/approve` | 审核通过 |
+| `POST` | `/api/governance/reviews/:id/reject` | 审核驳回 |
+| `POST` | `/api/governance/reviews/:id/apply` | 触发或重试审核回写 |
+
+当前已实现的治理行为：
+
+- 入站事件可自动建单。
+- 自动建单对当前登录用户可见，并可进入详情、评论、补证据、发起审核。
+- 已通过审核可触发回写；支持 `term_binding`、`classification`、`dq_rule` 三类审核回写。
+- 回写通过 outbox（出站待发送队列）执行，支持状态流转、重试和终止。
+
+治理任务详情返回结构：
+
 ```json
 {
-  "table_id": "tbl_20260110190000_123456",
-  "data": {
-    "customer_name": "张三",
-    "age": 25,
-    "is_active": true
+  "task": {},
+  "reviews": [],
+  "evidences": [],
+  "comments": [],
+  "external_links": []
+}
+```
+
+创建治理审核示例：
+
+```json
+{
+  "task_id": "gvt_xxx",
+  "review_type": "term_binding",
+  "reviewer_id": "usr_xxx",
+  "proposal_source": "manual",
+  "proposal_payload": "{\"summary\":\"确认 panel_id 的术语绑定建议\"}"
+}
+```
+
+审核结论示例：
+
+```json
+{
+  "decision_payload": "{\"decision\":\"approved\",\"note\":\"确认建议可落地\"}"
+}
+```
+
+### 4.9 集成事件
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/api/integrations/events` | 接收入站治理事件 |
+
+请求头：
+
+```http
+X-Source-System: fuckcmdb
+Authorization: Bearer <integration-token>
+Content-Type: application/json
+```
+
+请求体示例：
+
+```json
+{
+  "event_id": "evt_20260324_001",
+  "event_type": "metadata.schema.changed",
+  "occurred_at": "2026-03-24T09:00:00Z",
+  "resource_type": "column",
+  "resource_id": "col_panel_id",
+  "actor_id": "system",
+  "trace_id": "trace_123",
+  "payload": {
+    "change_type": "column_added",
+    "display_name": "panel_id",
+    "summary": "新增字段需要治理确认"
   }
 }
 ```
 
-**响应** (201 Created):
+当前支持自动建单的事件类型：
+
+| 事件类型 | 生成任务类型 |
+|---|---|
+| `dq.alert.triggered` | `dq_issue` |
+| `dq.rule.failed` | `dq_issue` |
+| `metadata.schema.changed` | `schema_change` |
+| `ai.recommendation.generated` + `recommendation_type=term_binding` | `term_review` |
+| `ai.recommendation.generated` + `recommendation_type=classification` | `classification_review` |
+
+幂等性说明：
+
+- 幂等键为 `source_system + event_id`。
+- 同一来源系统下，相同 `event_id` 重放不会重复建单，而是返回既有入站事件结果。
+- 不同来源系统可使用相同 `event_id`，不会互相冲突。
+
+### 4.10 HTTP MCP
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| `POST` | `/mcp` | 执行 MCP JSON-RPC 请求 |
+| `GET` | `/mcp` | 当 `Accept: text/event-stream` 时建立并维持 SSE 流 |
+| `OPTIONS` | `/mcp` | 预检请求 |
+
+当前已提供的 MCP tools：
+
+| Tool | 说明 |
+|---|---|
+| `query_data` | 执行受权限约束的 Query DSL 查询 |
+| `create_database` | 创建数据库 |
+| `list_databases` | 列出当前用户可访问数据库 |
+| `get_table_schema` | 获取 Query DSL 表字段清单 |
+
+初始化示例：
+
 ```json
 {
-  "success": true,
-  "data": {
-    "id": "rec_20260110190000_123456",
-    "table_id": "tbl_20260110190000_123456",
-    "data": {
-      "customer_name": "张三",
-      "age": 25,
-      "is_active": true
-    },
-    "version": 1,
-    "created_at": "2026-01-10T19:00:00Z"
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-03-26"
   }
 }
 ```
 
-#### 列出记录
-```http
-GET /api/records
-```
+查询工具调用示例：
 
-**认证**: 必需
-
-**查询参数**:
-- `table_id` (必需): 要查询的表ID
-- `limit` (可选, 默认: 20, 最大: 100): 分页限制
-- `offset` (可选, 默认: 0): 分页偏移
-- `filter` (可选): JSON字符串用于过滤
-
-**示例**: `GET /api/records?table_id=tbl_xxx&limit=20&offset=0&filter={"age":25}`
-
-#### 记录操作
-```http
-GET /api/records/:id
-PUT /api/records/:id
-DELETE /api/records/:id
-```
-
-#### 批量创建记录
-```http
-POST /api/records/batch
-```
-
-**查询参数**:
-- `count` (可选, 默认: 1, 最大: 100): 要创建的记录数量
-
----
-
-## 响应格式
-
-### 成功响应
 ```json
 {
-  "success": true,
-  "data": {
-    // 响应数据
-  }
-}
-```
-
-### 错误响应
-```json
-{
-  "success": false,
-  "message": "错误描述",
-  "code": 400
-}
-```
-
-### HTTP 状态码
-| 状态码 | 说明 |
-|--------|------|
-| `200 OK` | 成功 |
-| `201 Created` | 资源创建成功 |
-| `400 Bad Request` | 无效输入/验证错误 |
-| `401 Unauthorized` | 缺少或无效的身份验证 |
-| `403 Forbidden` | 权限不足 |
-| `404 Not Found` | 资源未找到 |
-| `500 Internal Server Error` | 服务器错误 |
-
----
-
-## 数据模型
-
-### 核心表结构 (共14张)
-
-| 表名 | 前缀 | 说明 |
-|------|------|------|
-| users | `usr_` | 用户表 |
-| organizations | `org_` | 组织表 |
-| organization_members | `mem_` | 组织成员 |
-| databases | `db_` | 数据库 |
-| database_access | `acc_` | 数据库权限 |
-| tables | `tbl_` | 表定义 |
-| fields | `fld_` | 字段定义 |
-| field_permissions | `flp_` | 字段权限 ⭐ 新增 |
-| records | `rec_` | 数据记录 |
-| files | `fil_` | 文件附件 |
-| plugins | `plg_` | 插件定义 |
-| plugin_bindings | `pbd_` | 插件绑定 |
-| token_blacklist | - | JWT黑名单 |
-| user_database_permissions | - | 物化视图 |
-
-### ID 格式
-所有 ID 使用 UUID 风格格式带前缀：`usr_001`, `db_001`, `tbl_001`, `fld_001`, `rec_001`
-
----
-
-## 权限模型
-
-### 三层权限架构
-```
-L1: 数据库级权限 (owner/admin/editor/viewer)
-L2: 表级权限 (继承自数据库)
-L3: 字段级权限 (owner/admin/editor/viewer + R/W/D)
-```
-
-### 权限优先级
-```
-字段级权限配置 > 表级默认权限 > 数据库级权限
-```
-
-### 角色说明
-
-#### 数据库级角色
-| 角色 | 权限 |
-|------|------|
-| owner | 完全控制 |
-| admin | 编辑权限 + 用户管理 |
-| editor | 编辑数据 |
-| viewer | 只读 |
-
-#### 字段级权限
-| 角色 | 可配置权限 |
-|------|-----------|
-| owner / admin | 始终拥有全部权限 (R/W/D)，不可修改 |
-| editor | 可配置 R/W，不能配置 D |
-| viewer | 只能配置 R |
-
----
-
-## 配置
-
-### 环境变量
-```bash
-# 数据库
-DATABASE_URL=postgres://user:pass@host:5432/dbname?sslmode=disable
-DB_MAX_OPEN=10
-DB_MAX_IDLE=5
-DB_MAX_LIFETIME=3600
-
-# 服务器
-SERVER_MODE=debug  # debug | release
-PORT=8080
-
-# JWT
-JWT_SECRET=your-secret-key-here
-JWT_EXPIRATION=24  # 小时
-
-# 日志
-LOG_LEVEL=info
-LOG_OUTPUT=logs/app.log
-LOG_ERROR=logs/error.log
-LOG_MAX_SIZE=100
-LOG_MAX_AGE=7
-LOG_MAX_BACKUPS=5
-```
-
-### 默认值
-- 数据库: PostgreSQL
-- 端口: 8080
-- JWT 过期时间: 24小时
-- 日志级别: info
-
----
-
-## 使用示例
-
-### curl 示例
-
-#### 注册
-```bash
-curl -X POST http://localhost:8080/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","email":"test@example.com","password":"Test123456"}'
-```
-
-#### 登录
-```bash
-curl -X POST http://localhost:8080/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"testuser","password":"Test123456"}'
-```
-
-#### 使用 Token 认证请求
-```bash
-TOKEN="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-curl -X GET http://localhost:8080/api/organizations \
-  -H "Authorization: Bearer $TOKEN"
-```
-
-### Go 客户端
-```go
-package main
-
-import (
-    "bytes"
-    "encoding/json"
-    "net/http"
-)
-
-type LoginRequest struct {
-    Username string `json:"username"`
-    Password string `json:"password"`
-}
-
-func main() {
-    reqBody := LoginRequest{
-        Username: "testuser",
-        Password: "Test123456",
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/call",
+  "params": {
+    "name": "query_data",
+    "arguments": {
+      "query": {
+        "from": "users",
+        "select": ["id", "username", "email"],
+        "page": 1,
+        "size": 20
+      }
     }
-    jsonBody, _ := json.Marshal(reqBody)
-    resp, _ := http.Post(
-        "http://localhost:8080/api/auth/login",
-        "application/json",
-        bytes.NewBuffer(jsonBody),
-    )
-    defer resp.Body.Close()
-    // 处理响应...
+  }
 }
 ```
 
-### JavaScript 客户端
-```typescript
-const login = async (credentials: { username: string; password: string }) => {
-  const response = await fetch('http://localhost:8080/api/auth/login', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(credentials),
-  });
-  return response.json();
-};
+建库工具调用示例：
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "create_database",
+    "arguments": {
+      "name": "MCP Created DB",
+      "description": "created via HTTP MCP",
+      "is_public": false,
+      "is_personal": true
+    }
+  }
+}
 ```
 
-### Python 客户端
-```python
-import requests
+SSE 调用说明：
 
-response = requests.post(
-    'http://localhost:8080/api/auth/login',
-    json={'username': 'testuser', 'password': 'Test123456'}
-)
-data = response.json()
-token = data['data']['token']
+- `POST /mcp` 默认返回普通 JSON-RPC 响应。
+- 若请求头包含 `Accept: text/event-stream`，服务会按 SSE 输出该次请求的响应事件。
+- `GET /mcp` 也支持 SSE；若未提供 `Accept: text/event-stream`，当前返回 `406`。
+- `GET /mcp` 建链后会持续保持连接，并定期发送 keepalive 注释帧；间隔由 `MCP_SSE_KEEPALIVE_SEC` 控制。
+- `GET /mcp` 会输出 SSE `retry:` 提示，建议客户端按 `MCP_SSE_RETRY_MS` 重连。
+- `GET /mcp` 支持 `Last-Event-ID`，可在缓冲窗口内重放断线期间遗漏的通知。
+- `GET /mcp` 建链后会收到 `notifications/stream/connected`；带有效 `Last-Event-ID` 时会收到 `notifications/stream/resumed`；无法重放时会收到 `notifications/stream/replay_unavailable`。
+- `create_database` 成功后，当前用户已建立的 `GET /mcp` SSE 流会收到 `notifications/databases/changed` 主动通知。
+- 业务 REST 成功路径当前也会复用同一条 SSE 通道下发通知，已覆盖数据库、表、字段、治理任务、治理审核等主要变更事件。
+- 治理类通知会按参与人投递，当前覆盖任务创建者、负责人、审核人和当前操作者；不同用户之间的 SSE 历史与重放缓冲相互隔离。
+- SSE 请求会在 handler 内局部关闭写超时，以保证流式连接不被截断；普通 API 仍保留服务端默认写超时保护。
+- 空 batch 请求 `[]` 当前会被直接拒绝为无效请求，不再返回 `202`。
 
-# 使用 token
-headers = {'Authorization': f'Bearer {token}'}
-response = requests.get('http://localhost:8080/api/organizations', headers=headers)
-```
+## 5. 配置项
 
----
+### 5.1 通用服务配置
 
-## 重要说明
+| 环境变量 | 默认值 | 说明 |
+|---|---|---|
+| `DB_TYPE` | `sqlite` | `sqlite` 或 `postgres` |
+| `DATABASE_URL` | `./cornerstone.db` | 数据库连接串或 SQLite 文件路径 |
+| `PORT` | `8080` | 服务端口 |
+| `SERVER_MODE` | `release` | Gin 模式 |
+| `JWT_SECRET` | 内置默认值 | 生产环境必须替换 |
+| `JWT_EXPIRATION` | `24` | JWT 过期小时数 |
+| `MCP_ALLOWED_ORIGINS` | 空 | `/mcp` 浏览器 Origin 白名单，多个值逗号分隔 |
+| `MCP_SSE_KEEPALIVE_SEC` | `25` | `/mcp` SSE keepalive 间隔（秒） |
+| `MCP_SSE_RETRY_MS` | `3000` | `/mcp` SSE `retry:` 提示（毫秒） |
+| `MCP_SSE_REPLAY_BUFFER` | `128` | `/mcp` 每用户 Last-Event-ID 重放缓冲条数 |
 
-1. **时间戳格式**: 所有时间戳均为 ISO 8601 格式 (UTC)
-2. **软删除**: 所有删除操作均为软删除 (GORM DeletedAt)
-3. **中文字符**: 完全支持 Unicode/中文字符
-4. **JSONB 存储**: 记录数据使用 JSONB 存储实现动态字段
-5. **乐观锁**: 更新记录时支持版本号并发控制
+### 5.2 集成与治理回写配置
 
----
+| 环境变量 | 说明 |
+|---|---|
+| `INTEGRATION_SHARED_TOKEN` | 入站/出站共享 token |
+| `INTEGRATION_TOKENS` | 入站 source 级 token，格式 `fuckcmdb=tokenA,other=tokenB` |
+| `INTEGRATION_BASE_URLS` | 出站目标系统 base URL，格式 `fuckcmdb=https://host` |
+| `OUTBOUND_INTEGRATION_TOKENS` | 出站目标系统 token，格式 `fuckcmdb=tokenA` |
+| `OUTBOUND_INTEGRATION_TIMEOUT_SEC` | 出站 HTTP 超时秒数或 Go duration |
+| `GOVERNANCE_OUTBOX_MAX_RETRIES` | 回写最大重试次数 |
+| `GOVERNANCE_OUTBOX_RETRY_INTERVAL_SEC` | 回写基础重试间隔 |
+| `GOVERNANCE_OUTBOX_WORKER_ENABLED` | 是否启用后台 outbox worker |
+| `INTEGRATION_UI_BASE_URLS` | 外部资源页面 URL 映射，用于详情外链 |
+| `FUCKCMDB_UI_BASE_URL` | `fuckcmdb` UI 链接 fallback |
+| `FUCKCMDB_BASE_URL` | `fuckcmdb` API base URL fallback |
 
-## 安全特性
+## 6. 数据模型摘要
 
-- **认证**: JWT tokens 使用 HS256 签名
-- **授权**: 基于角色的访问控制 (RBAC)
-- **输入验证**: 所有端点进行服务器端验证
-- **密码安全**: 使用 bcrypt 哈希 (cost: 10)
-- **并发保护**: 乐观锁防止数据冲突
+当前迁移会自动创建以下关键表：
 
----
+| 类别 | 关键表 |
+|---|---|
+| 核心业务 | `users`、`organizations`、`organization_members`、`databases`、`database_access`、`tables`、`fields`、`records` |
+| 权限与系统 | `field_permissions`、`token_blacklist`、`app_settings` |
+| 文件与插件 | `files`、`plugins`、`plugin_bindings`、`plugin_executions` |
+| 统计与审计 | `activity_logs` |
+| 治理域 | `governance_tasks`、`governance_reviews`、`governance_evidences`、`governance_external_links`、`governance_comments` |
+| 系统集成 | `integration_inbound_events`、`governance_outbox_events` |
 
-## 相关文档
+补充说明：
 
-- [开发指南](./DEVELOPER-GUIDE.md) - 完整开发指南
-- [测试报告](./E2E-TEST-REPORT.md) - E2E 测试报告
-- [项目状态](./PROJECT-STATUS.md) - 项目进度状态
+- PostgreSQL 下会创建 `user_database_permissions` 物化视图。
+- SQLite 不支持物化视图，因此该视图不会创建。
+
+## 7. 已知边界
+
+- 本文只描述当前仓库内已存在的服务接口，不代表下游系统 `fuckcmdb` 的真实接口契约。
+- 治理回写虽然已实现 outbox、重试和状态流转，但下游路径是否完全兼容，仍需双系统联调确认。
+- `/mcp` 当前是 HTTP 简化实现，已支持基于 SSE 的流式返回、断线重放和 server-initiated notifications；当前业务通知已覆盖数据库、表、字段、治理任务、治理审核，但记录、文件、插件等事件仍未接入。
+- 若文档与实现不一致，优先以路由文件和 handler/service 代码为准。

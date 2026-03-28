@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
@@ -150,7 +151,7 @@ type CreateFieldRequest struct {
 // UpdateFieldRequest 更新字段请求
 type UpdateFieldRequest struct {
 	Name     string      `json:"name" binding:"required,min=1,max=255"`
-	Type     string      `json:"type" binding:"required,oneof=string number boolean date datetime single_select multi_select"`
+	Type     string      `json:"type" binding:"required,oneof=string number boolean date datetime select multiselect single_select multi_select"`
 	Required bool        `json:"required"`
 	Config   FieldConfig `json:"config"`
 }
@@ -167,16 +168,57 @@ type FieldResponse struct {
 	UpdatedAt string      `json:"updated_at"`
 }
 
+func buildDeletedFieldName(name, fieldID string) string {
+	suffix := "__deleted__" + fieldID
+	maxPrefixLen := 255 - len(suffix)
+	if maxPrefixLen < 0 {
+		maxPrefixLen = 0
+	}
+	if len(name) > maxPrefixLen {
+		name = name[:maxPrefixLen]
+	}
+	return name + suffix
+}
+
+func (s *FieldService) getActiveTable(tableID string) (*models.Table, error) {
+	var table models.Table
+	err := s.db.Where("id = ? AND deleted_at IS NULL", tableID).First(&table).Error
+	if err != nil {
+		return nil, err
+	}
+	return &table, nil
+}
+
+func (s *FieldService) getActiveField(fieldID string) (*models.Field, error) {
+	var field models.Field
+	err := s.db.Where("id = ? AND deleted_at IS NULL", fieldID).First(&field).Error
+	if err != nil {
+		return nil, err
+	}
+	return &field, nil
+}
+
+func (s *FieldService) getActiveDatabaseAccess(databaseID, userID string) (*models.DatabaseAccess, error) {
+	var access models.DatabaseAccess
+	err := s.db.Table("database_access AS da").
+		Select("da.*").
+		Joins("INNER JOIN databases d ON d.id = da.database_id").
+		Where("da.database_id = ? AND da.user_id = ? AND d.deleted_at IS NULL", databaseID, userID).
+		First(&access).Error
+	if err != nil {
+		return nil, err
+	}
+	return &access, nil
+}
+
 // checkTableAccess 检查表访问权限
 func (s *FieldService) checkTableAccess(tableID, userID string, requiredRoles []string) error {
-	var table models.Table
-	err := s.db.Where("id = ?", tableID).First(&table).Error
+	table, err := s.getActiveTable(tableID)
 	if err != nil {
 		return errors.New("表不存在")
 	}
 
-	var access models.DatabaseAccess
-	err = s.db.Where("database_id = ? AND user_id = ?", table.DatabaseID, userID).First(&access).Error
+	access, err := s.getActiveDatabaseAccess(table.DatabaseID, userID)
 	if err != nil {
 		return errors.New("无权访问该数据库")
 	}
@@ -235,7 +277,7 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 
 	// 4. 检查是否已存在同名字段
 	var existingField models.Field
-	err := s.db.Where("table_id = ? AND name = ?", req.TableID, req.Name).First(&existingField).Error
+	err := s.db.Where("table_id = ? AND name = ? AND deleted_at IS NULL", req.TableID, req.Name).First(&existingField).Error
 	if err == nil {
 		return nil, errors.New("该表中已存在同名字段")
 	}
@@ -306,8 +348,7 @@ func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, erro
 // GetField 获取字段详情
 func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) {
 	// 1. 获取字段信息
-	var field models.Field
-	err := s.db.Where("id = ?", fieldID).First(&field).Error
+	field, err := s.getActiveField(fieldID)
 	if err != nil {
 		return nil, fmt.Errorf("字段不存在: %w", err)
 	}
@@ -339,8 +380,7 @@ func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) 
 // UpdateField 更新字段信息
 func (s *FieldService) UpdateField(fieldID string, req UpdateFieldRequest, userID string) (*models.Field, error) {
 	// 1. 获取字段信息
-	var field models.Field
-	err := s.db.Where("id = ?", fieldID).First(&field).Error
+	field, err := s.getActiveField(fieldID)
 	if err != nil {
 		return nil, fmt.Errorf("字段不存在: %w", err)
 	}
@@ -368,7 +408,7 @@ func (s *FieldService) UpdateField(fieldID string, req UpdateFieldRequest, userI
 
 	// 4. 检查是否已存在同名字段（排除当前字段）
 	var existingField models.Field
-	err = s.db.Where("table_id = ? AND name = ? AND id != ?", field.TableID, req.Name, fieldID).First(&existingField).Error
+	err = s.db.Where("table_id = ? AND name = ? AND id != ? AND deleted_at IS NULL", field.TableID, req.Name, fieldID).First(&existingField).Error
 	if err == nil {
 		return nil, errors.New("该表中已存在同名字段")
 	}
@@ -388,18 +428,17 @@ func (s *FieldService) UpdateField(fieldID string, req UpdateFieldRequest, userI
 	field.Required = req.Required
 	field.Options = string(configJSON)
 
-	if err := s.db.Save(&field).Error; err != nil {
+	if err := s.db.Save(field).Error; err != nil {
 		return nil, fmt.Errorf("更新字段失败: %w", err)
 	}
 
-	return &field, nil
+	return field, nil
 }
 
 // DeleteField 删除字段（软删除）
 func (s *FieldService) DeleteField(fieldID, userID string) error {
 	// 1. 获取字段信息
-	var field models.Field
-	err := s.db.Where("id = ?", fieldID).First(&field).Error
+	field, err := s.getActiveField(fieldID)
 	if err != nil {
 		return fmt.Errorf("字段不存在: %w", err)
 	}
@@ -410,8 +449,19 @@ func (s *FieldService) DeleteField(fieldID, userID string) error {
 	}
 
 	// 3. 软删除字段
-	if err := s.db.Delete(&field).Error; err != nil {
-		return fmt.Errorf("删除字段失败: %w", err)
+	now := time.Now()
+	result := s.db.Model(&models.Field{}).
+		Where("id = ? AND deleted_at IS NULL", fieldID).
+		Updates(map[string]interface{}{
+			"deleted_at": now,
+			"name":       buildDeletedFieldName(field.Name, fieldID),
+			"updated_at": now,
+		})
+	if result.Error != nil {
+		return fmt.Errorf("删除字段失败: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("字段不存在: %w", gorm.ErrRecordNotFound)
 	}
 
 	return nil
@@ -448,14 +498,12 @@ func logPermissionActivity(tx *gorm.DB, userID, tableID, fieldID, role string, c
 
 // getUserRole 获取用户在表所属数据库中的角色
 func (s *FieldService) getUserRole(tableID, userID string) (string, error) {
-	var table models.Table
-	err := s.db.Where("id = ?", tableID).First(&table).Error
+	table, err := s.getActiveTable(tableID)
 	if err != nil {
 		return "", fmt.Errorf("表不存在: %w", err)
 	}
 
-	var access models.DatabaseAccess
-	err = s.db.Where("database_id = ? AND user_id = ?", table.DatabaseID, userID).First(&access).Error
+	access, err := s.getActiveDatabaseAccess(table.DatabaseID, userID)
 	if err != nil {
 		return "", errors.New("无权访问该数据库")
 	}
@@ -466,8 +514,7 @@ func (s *FieldService) getUserRole(tableID, userID string) (string, error) {
 // CheckFieldPermission 检查用户对特定字段的权限
 func (s *FieldService) CheckFieldPermission(userID, fieldID, action string) error {
 	// 1. 获取字段信息
-	var field models.Field
-	err := s.db.Where("id = ?", fieldID).First(&field).Error
+	field, err := s.getActiveField(fieldID)
 	if err != nil {
 		return fmt.Errorf("字段不存在: %w", err)
 	}
@@ -554,7 +601,7 @@ func (s *FieldService) SetFieldPermission(tableID string, req FieldPermissionReq
 
 	// 2. 验证字段是否存在
 	var field models.Field
-	err := s.db.Where("id = ? AND table_id = ?", req.FieldID, tableID).First(&field).Error
+	err := s.db.Where("id = ? AND table_id = ? AND deleted_at IS NULL", req.FieldID, tableID).First(&field).Error
 	if err != nil {
 		return errors.New("字段不存在")
 	}
@@ -598,7 +645,7 @@ func (s *FieldService) BatchSetFieldPermissions(tableID string, req BatchFieldPe
 		for _, permReq := range req.Permissions {
 			// 验证字段是否存在
 			var field models.Field
-			err := tx.Where("id = ? AND table_id = ?", permReq.FieldID, tableID).First(&field).Error
+			err := tx.Where("id = ? AND table_id = ? AND deleted_at IS NULL", permReq.FieldID, tableID).First(&field).Error
 			if err != nil {
 				return fmt.Errorf("字段 %s 不存在", permReq.FieldID)
 			}

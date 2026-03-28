@@ -25,6 +25,8 @@ func CreateTable(c *gin.Context) {
 		return
 	}
 
+	publishTableChanged([]string{userID}, "created", table)
+
 	types.Success(c, gin.H{
 		"id":          table.ID,
 		"database_id": table.DatabaseID,
@@ -84,6 +86,8 @@ func UpdateTable(c *gin.Context) {
 		types.Error(c, 403, err.Error())
 		return
 	}
+
+	publishTableChanged([]string{userID}, "updated", table)
 
 	types.Success(c, gin.H{
 		"id":          table.ID,

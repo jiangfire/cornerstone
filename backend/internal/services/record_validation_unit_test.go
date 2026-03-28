@@ -71,17 +71,41 @@ func TestValidateFieldValue_MaxLength(t *testing.T) {
 func TestValidateFieldValue_SelectOptions(t *testing.T) {
 	service := &RecordService{}
 
+	// Select alias
+	selectField := models.Field{
+		Type:    "select",
+		Options: `{"options":["draft","approved"]}`,
+	}
+
+	err := service.validateFieldValue(selectField, "draft")
+	assert.NoError(t, err, "Valid select alias should pass")
+
+	err = service.validateFieldValue(selectField, "invalid")
+	assert.Error(t, err, "Invalid select alias should fail")
+
 	// Single select
 	singleSelectField := models.Field{
 		Type:    "single_select",
 		Options: `{"options":["Electronics","Books","Clothing"]}`,
 	}
 
-	err := service.validateFieldValue(singleSelectField, "Electronics")
+	err = service.validateFieldValue(singleSelectField, "Electronics")
 	assert.NoError(t, err, "Valid single select should pass")
 
 	err = service.validateFieldValue(singleSelectField, "InvalidCategory")
 	assert.Error(t, err, "Invalid single select should fail")
+
+	// Multiselect alias
+	multiselectField := models.Field{
+		Type:    "multiselect",
+		Options: `{"options":["New","Sale","Featured"]}`,
+	}
+
+	err = service.validateFieldValue(multiselectField, []interface{}{"New", "Featured"})
+	assert.NoError(t, err, "Valid multiselect alias should pass")
+
+	err = service.validateFieldValue(multiselectField, []interface{}{"New", "InvalidTag"})
+	assert.Error(t, err, "Invalid multiselect alias should fail")
 
 	// Multi select
 	multiSelectField := models.Field{

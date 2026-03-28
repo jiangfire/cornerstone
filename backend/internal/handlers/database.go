@@ -25,6 +25,8 @@ func CreateDatabase(c *gin.Context) {
 		return
 	}
 
+	publishDatabaseChanged([]string{userID, database.OwnerID}, "created", database)
+
 	types.Success(c, gin.H{
 		"id":          database.ID,
 		"name":        database.Name,
@@ -85,6 +87,8 @@ func UpdateDatabase(c *gin.Context) {
 		types.Error(c, 403, err.Error())
 		return
 	}
+
+	publishDatabaseChanged([]string{userID, database.OwnerID}, "updated", database)
 
 	types.Success(c, gin.H{
 		"id":          database.ID,
@@ -174,7 +178,7 @@ func UpdateDatabaseUserRole(c *gin.Context) {
 	dbID := c.Param("id")
 	updateUserID := c.Param("user_id")
 
-	var req services.ShareDBRequest
+	var req services.UpdateDBUserRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		types.Error(c, 400, "参数错误: "+err.Error())
 		return

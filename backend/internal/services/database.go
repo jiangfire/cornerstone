@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
@@ -52,7 +53,57 @@ type DBResponse struct {
 // ShareDBRequest 数据库分享请求
 type ShareDBRequest struct {
 	UserID string `json:"user_id" binding:"required"`
-	Role   string `json:"role" binding:"required,oneof=owner admin editor viewer"`
+	Role   string `json:"role" binding:"required,oneof=admin editor viewer"`
+}
+
+// UpdateDBUserRoleRequest 更新数据库用户角色请求
+type UpdateDBUserRoleRequest struct {
+	Role string `json:"role" binding:"required,oneof=admin editor viewer"`
+}
+
+var databaseShareRoles = map[string]struct{}{
+	"admin":  {},
+	"editor": {},
+	"viewer": {},
+}
+
+func isValidDatabaseShareRole(role string) bool {
+	_, ok := databaseShareRoles[role]
+	return ok
+}
+
+func buildDeletedDatabaseName(name, dbID string) string {
+	suffix := "__deleted__" + dbID
+	maxPrefixLen := 255 - len(suffix)
+	if maxPrefixLen < 0 {
+		maxPrefixLen = 0
+	}
+	if len(name) > maxPrefixLen {
+		name = name[:maxPrefixLen]
+	}
+	return name + suffix
+}
+
+func (s *DatabaseService) getActiveDatabase(dbID string) (*models.Database, error) {
+	var database models.Database
+	err := s.db.Where("id = ? AND deleted_at IS NULL", dbID).First(&database).Error
+	if err != nil {
+		return nil, err
+	}
+	return &database, nil
+}
+
+func (s *DatabaseService) getActiveDatabaseAccess(dbID, userID string) (*models.DatabaseAccess, error) {
+	var access models.DatabaseAccess
+	err := s.db.Table("database_access AS da").
+		Select("da.*").
+		Joins("INNER JOIN databases d ON d.id = da.database_id").
+		Where("da.database_id = ? AND da.user_id = ? AND d.deleted_at IS NULL", dbID, userID).
+		First(&access).Error
+	if err != nil {
+		return nil, err
+	}
+	return &access, nil
 }
 
 // validateDatabaseName 验证数据库名称
@@ -107,6 +158,14 @@ func (s *DatabaseService) CreateDatabase(req CreateDBRequest, ownerID string) (*
 	// 1. 输入验证和清理
 	req.Name, req.Description = sanitizeDatabaseInput(req.Name, req.Description)
 
+	var owner models.User
+	if err := s.db.Where("id = ?", ownerID).First(&owner).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("数据库所有者不存在")
+		}
+		return nil, fmt.Errorf("查询数据库所有者失败: %w", err)
+	}
+
 	if err := validateDatabaseName(req.Name); err != nil {
 		return nil, fmt.Errorf("数据库名称验证失败: %w", err)
 	}
@@ -117,7 +176,7 @@ func (s *DatabaseService) CreateDatabase(req CreateDBRequest, ownerID string) (*
 
 	// 2. 检查是否已存在同名数据库（同一用户）
 	var existingDB models.Database
-	err := s.db.Where("name = ? AND owner_id = ?", req.Name, ownerID).First(&existingDB).Error
+	err := s.db.Where("name = ? AND owner_id = ? AND deleted_at IS NULL", req.Name, ownerID).First(&existingDB).Error
 	if err == nil {
 		return nil, errors.New("您已创建过同名数据库")
 	}
@@ -212,8 +271,7 @@ func (s *DatabaseService) ListDatabases(userID string) ([]DBResponse, error) {
 // GetDatabase 获取数据库详情
 func (s *DatabaseService) GetDatabase(dbID, userID string) (*DBResponse, error) {
 	// 检查用户是否有权限访问该数据库
-	var access models.DatabaseAccess
-	err := s.db.Where("database_id = ? AND user_id = ?", dbID, userID).First(&access).Error
+	access, err := s.getActiveDatabaseAccess(dbID, userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("无权访问该数据库")
@@ -222,8 +280,7 @@ func (s *DatabaseService) GetDatabase(dbID, userID string) (*DBResponse, error) 
 	}
 
 	// 获取数据库信息
-	var database models.Database
-	err = s.db.Where("id = ?", dbID).First(&database).Error
+	database, err := s.getActiveDatabase(dbID)
 	if err != nil {
 		return nil, fmt.Errorf("数据库不存在: %w", err)
 	}
@@ -244,8 +301,7 @@ func (s *DatabaseService) GetDatabase(dbID, userID string) (*DBResponse, error) 
 // UpdateDatabase 更新数据库信息
 func (s *DatabaseService) UpdateDatabase(dbID string, req UpdateDBRequest, userID string) (*models.Database, error) {
 	// 1. 检查用户权限
-	var access models.DatabaseAccess
-	err := s.db.Where("database_id = ? AND user_id = ?", dbID, userID).First(&access).Error
+	access, err := s.getActiveDatabaseAccess(dbID, userID)
 	if err != nil {
 		return nil, errors.New("无权访问该数据库")
 	}
@@ -267,35 +323,60 @@ func (s *DatabaseService) UpdateDatabase(dbID string, req UpdateDBRequest, userI
 	}
 
 	// 4. 获取数据库并更新
-	var database models.Database
-	err = s.db.Where("id = ?", dbID).First(&database).Error
+	database, err := s.getActiveDatabase(dbID)
 	if err != nil {
 		return nil, fmt.Errorf("数据库不存在: %w", err)
+	}
+
+	var duplicate models.Database
+	err = s.db.Where("name = ? AND owner_id = ? AND id <> ? AND deleted_at IS NULL", req.Name, database.OwnerID, dbID).First(&duplicate).Error
+	if err == nil {
+		return nil, errors.New("您已创建过同名数据库")
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("数据库查询失败: %w", err)
 	}
 
 	database.Name = req.Name
 	database.Description = req.Description
 	database.IsPublic = req.IsPublic
 
-	if err := s.db.Save(&database).Error; err != nil {
+	if err := s.db.Save(database).Error; err != nil {
 		return nil, fmt.Errorf("更新数据库失败: %w", err)
 	}
 
-	return &database, nil
+	return database, nil
 }
 
 // DeleteDatabase 删除数据库（软删除）
 func (s *DatabaseService) DeleteDatabase(dbID, userID string) error {
 	// 1. 检查是否是所有者
-	var access models.DatabaseAccess
-	err := s.db.Where("database_id = ? AND user_id = ? AND role = ?", dbID, userID, "owner").First(&access).Error
+	access, err := s.getActiveDatabaseAccess(dbID, userID)
 	if err != nil {
 		return errors.New("只有所有者可以删除数据库")
 	}
+	if access.Role != "owner" {
+		return errors.New("只有所有者可以删除数据库")
+	}
+	database, err := s.getActiveDatabase(dbID)
+	if err != nil {
+		return errors.New("数据库不存在")
+	}
 
 	// 2. 软删除数据库
-	if err := s.db.Delete(&models.Database{}, dbID).Error; err != nil {
-		return fmt.Errorf("删除数据库失败: %w", err)
+	now := time.Now()
+	result := s.db.Model(&models.Database{}).
+		Where("id = ? AND deleted_at IS NULL", dbID).
+		Updates(map[string]interface{}{
+			"deleted_at": now,
+			"name":       buildDeletedDatabaseName(database.Name, dbID),
+			"updated_at": now,
+		})
+	if result.Error != nil {
+		return fmt.Errorf("删除数据库失败: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("数据库不存在")
 	}
 
 	return nil
@@ -304,8 +385,7 @@ func (s *DatabaseService) DeleteDatabase(dbID, userID string) error {
 // ShareDatabase 分享数据库给其他用户
 func (s *DatabaseService) ShareDatabase(dbID string, req ShareDBRequest, operatorID string) error {
 	// 1. 检查操作者权限
-	var operatorAccess models.DatabaseAccess
-	err := s.db.Where("database_id = ? AND user_id = ?", dbID, operatorID).First(&operatorAccess).Error
+	operatorAccess, err := s.getActiveDatabaseAccess(dbID, operatorID)
 	if err != nil {
 		return errors.New("无权访问该数据库")
 	}
@@ -313,6 +393,9 @@ func (s *DatabaseService) ShareDatabase(dbID string, req ShareDBRequest, operato
 	// 2. 检查权限（只有owner和admin可以分享）
 	if operatorAccess.Role != "owner" && operatorAccess.Role != "admin" {
 		return errors.New("只有所有者和管理员可以分享数据库")
+	}
+	if !isValidDatabaseShareRole(req.Role) {
+		return errors.New("无效的数据库角色")
 	}
 
 	// 3. 检查被分享用户是否存在
@@ -322,12 +405,7 @@ func (s *DatabaseService) ShareDatabase(dbID string, req ShareDBRequest, operato
 		return errors.New("用户不存在")
 	}
 
-	// 4. 权限验证：owner只能分享给owner，admin可以分享给admin/editor/viewer
-	if operatorAccess.Role == "owner" && req.Role != "owner" {
-		return errors.New("所有者只能将数据库分享给其他所有者")
-	}
-
-	// 5. 添加权限（幂等并发安全）
+	// 4. 添加权限（幂等并发安全）
 	access := models.DatabaseAccess{
 		UserID:     req.UserID,
 		DatabaseID: dbID,
@@ -347,8 +425,7 @@ func (s *DatabaseService) ShareDatabase(dbID string, req ShareDBRequest, operato
 // ListDatabaseUsers 获取数据库用户列表
 func (s *DatabaseService) ListDatabaseUsers(dbID, userID string) ([]interface{}, error) {
 	// 1. 检查用户是否有权限访问该数据库
-	var access models.DatabaseAccess
-	err := s.db.Where("database_id = ? AND user_id = ?", dbID, userID).First(&access).Error
+	_, err := s.getActiveDatabaseAccess(dbID, userID)
 	if err != nil {
 		return nil, errors.New("无权访问该数据库")
 	}
@@ -391,8 +468,7 @@ func (s *DatabaseService) ListDatabaseUsers(dbID, userID string) ([]interface{},
 // RemoveDatabaseUser 移除数据库用户
 func (s *DatabaseService) RemoveDatabaseUser(dbID, removeUserID, operatorID string) error {
 	// 1. 检查操作者权限
-	var operatorAccess models.DatabaseAccess
-	err := s.db.Where("database_id = ? AND user_id = ?", dbID, operatorID).First(&operatorAccess).Error
+	operatorAccess, err := s.getActiveDatabaseAccess(dbID, operatorID)
 	if err != nil {
 		return errors.New("无权访问该数据库")
 	}
@@ -422,12 +498,17 @@ func (s *DatabaseService) RemoveDatabaseUser(dbID, removeUserID, operatorID stri
 }
 
 // UpdateDatabaseUserRole 更新数据库用户角色
-func (s *DatabaseService) UpdateDatabaseUserRole(dbID, updateUserID string, req ShareDBRequest, operatorID string) error {
+func (s *DatabaseService) UpdateDatabaseUserRole(dbID, updateUserID string, req UpdateDBUserRoleRequest, operatorID string) error {
 	// 1. 检查操作者权限（只有owner可以修改角色）
-	var operatorAccess models.DatabaseAccess
-	err := s.db.Where("database_id = ? AND user_id = ? AND role = ?", dbID, operatorID, "owner").First(&operatorAccess).Error
+	operatorAccess, err := s.getActiveDatabaseAccess(dbID, operatorID)
 	if err != nil {
 		return errors.New("只有数据库所有者可以修改用户角色")
+	}
+	if operatorAccess.Role != "owner" {
+		return errors.New("只有数据库所有者可以修改用户角色")
+	}
+	if !isValidDatabaseShareRole(req.Role) {
+		return errors.New("无效的数据库角色")
 	}
 
 	// 2. 获取目标用户权限

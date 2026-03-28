@@ -25,6 +25,8 @@ func CreateField(c *gin.Context) {
 		return
 	}
 
+	publishFieldChanged([]string{userID}, "created", field)
+
 	types.Success(c, gin.H{
 		"id":         field.ID,
 		"table_id":   field.TableID,
@@ -85,6 +87,8 @@ func UpdateField(c *gin.Context) {
 		types.Error(c, 403, err.Error())
 		return
 	}
+
+	publishFieldChanged([]string{userID}, "updated", field)
 
 	types.Success(c, gin.H{
 		"id":         field.ID,

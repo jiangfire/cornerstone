@@ -8,6 +8,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/backend/internal/config"
 	"github.com/jiangfire/cornerstone/backend/internal/models"
+	"github.com/jiangfire/cornerstone/backend/internal/services"
 	pkgdb "github.com/jiangfire/cornerstone/backend/pkg/db"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
@@ -56,6 +57,7 @@ func (cb *circuitBreaker) markFailure() {
 var (
 	viewRefreshBreaker  = newCircuitBreaker(3, 2*time.Minute)
 	tokenCleanupBreaker = newCircuitBreaker(3, 2*time.Minute)
+	outboxDispatchBreaker = newCircuitBreaker(3, 2*time.Minute)
 )
 
 // InitDB 初始化数据库连接（包装pkg/db中的函数）
@@ -104,6 +106,15 @@ func Migrate() error {
 		&models.ActivityLog{},
 		&models.AppSettings{},
 
+		// 治理域模型
+		&models.GovernanceTask{},
+		&models.GovernanceReview{},
+		&models.GovernanceEvidence{},
+		&models.GovernanceExternalLink{},
+		&models.GovernanceComment{},
+		&models.IntegrationInboundEvent{},
+		&models.GovernanceOutboxEvent{},
+
 		// 安全相关
 		&models.TokenBlacklist{},
 	); err != nil {
@@ -119,12 +130,15 @@ func Migrate() error {
 
 	logger.Info("复合索引创建完成")
 
-	// 创建物化视图（权限缓存）
-	if err := createMaterializedViews(database); err != nil {
-		return fmt.Errorf("创建物化视图失败: %w", err)
+	// 创建物化视图（权限缓存）- 仅 PostgreSQL 支持
+	if !isSQLite(database) {
+		if err := createMaterializedViews(database); err != nil {
+			return fmt.Errorf("创建物化视图失败: %w", err)
+		}
+		logger.Info("物化视图创建完成")
+	} else {
+		logger.Info("SQLite 不支持物化视图，跳过")
 	}
-
-	logger.Info("物化视图创建完成")
 
 	// 创建token_blacklist表的特殊索引
 	if err := createTokenBlacklistIndexes(database); err != nil {
@@ -134,13 +148,17 @@ func Migrate() error {
 	logger.Info("Token blacklist索引创建完成")
 
 	// 初始化默认系统设置（单例）
+	dbType := "postgresql"
+	if isSQLite(database) {
+		dbType = "sqlite"
+	}
 	if err := database.FirstOrCreate(&models.AppSettings{ID: 1}, &models.AppSettings{
 		ID:                1,
 		SystemName:        "Cornerstone",
 		SystemDescription: "数据管理平台",
 		AllowRegistration: true,
 		MaxFileSize:       50,
-		DBType:            "postgresql",
+		DBType:            dbType,
 		DBPoolSize:        10,
 		DBTimeout:         30,
 		PluginTimeout:     300,
@@ -154,11 +172,24 @@ func Migrate() error {
 	return nil
 }
 
+// IsSQLite 检查当前数据库是否为 SQLite
+func IsSQLite() bool {
+	return isSQLite(pkgdb.DB())
+}
+
+// isSQLite 检查是否为 SQLite 数据库
+func isSQLite(db *gorm.DB) bool {
+	return db.Dialector.Name() == "sqlite"
+}
+
 // createIndexes 创建复合索引以提升查询性能
 func createIndexes(db *gorm.DB) error {
-	// records表的JSONB GIN索引
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_records_data ON records USING GIN(data)").Error; err != nil {
-		return err
+	// records表的JSON索引（PostgreSQL使用GIN，SQLite不支持GIN）
+	if !isSQLite(db) {
+		// PostgreSQL: 使用 GIN 索引
+		if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_records_data ON records USING GIN(data)").Error; err != nil {
+			return err
+		}
 	}
 
 	// records表的外键索引（数据查询优化）
@@ -197,6 +228,67 @@ func createIndexes(db *gorm.DB) error {
 	}
 
 	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_plugin_executions_table_trigger ON plugin_executions(table_id, trigger)").Error; err != nil {
+		return err
+	}
+
+	// governance_tasks 查询索引
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_tasks_creator_assignee ON governance_tasks(created_by, assignee_id)").Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_tasks_status_priority ON governance_tasks(status, priority)").Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_tasks_resource ON governance_tasks(source_system, resource_type, resource_id)").Error; err != nil {
+		return err
+	}
+
+	// governance_reviews 查询索引
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_reviews_task_status ON governance_reviews(task_id, status)").Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_reviews_reviewer ON governance_reviews(reviewer_id, status)").Error; err != nil {
+		return err
+	}
+
+	// governance_evidences / comments / links 索引
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_evidences_task_created ON governance_evidences(task_id, created_at DESC)").Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_comments_task_created ON governance_comments(task_id, created_at DESC)").Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_external_links_task ON governance_external_links(task_id)").Error; err != nil {
+		return err
+	}
+
+	// integration_inbound_events 索引
+	if err := db.Exec("DROP INDEX IF EXISTS idx_integration_inbound_events_event_id").Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS uk_integration_event_source ON integration_inbound_events(source_system, event_id)").Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_integration_events_source_status ON integration_inbound_events(source_system, status)").Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_integration_events_type_resource ON integration_inbound_events(event_type, resource_type, resource_id)").Error; err != nil {
+		return err
+	}
+
+	// governance_outbox_events 索引
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_outbox_status_next_attempt ON governance_outbox_events(status, next_attempt_at)").Error; err != nil {
+		return err
+	}
+
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_outbox_review_status ON governance_outbox_events(review_id, status)").Error; err != nil {
 		return err
 	}
 
@@ -262,6 +354,11 @@ func RefreshMaterializedViews() error {
 	database := pkgdb.DB()
 	logger := zap.L()
 
+	// SQLite 不支持物化视图
+	if isSQLite(database) {
+		return nil
+	}
+
 	logger.Info("开始刷新物化视图...")
 
 	if err := database.Exec("REFRESH MATERIALIZED VIEW CONCURRENTLY user_database_permissions").Error; err != nil {
@@ -290,30 +387,33 @@ func CleanupExpiredTokens() error {
 }
 
 // SetupPeriodicTasks 设置定时任务并返回用于等待退出的 WaitGroup
-func SetupPeriodicTasks(ctx context.Context) *sync.WaitGroup {
+func SetupPeriodicTasks(ctx context.Context, cfg config.IntegrationsConfig) *sync.WaitGroup {
 	wg := &sync.WaitGroup{}
 
-	// 每5分钟刷新一次物化视图
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
+	// SQLite 不支持物化视图，跳过刷新任务
+	if !isSQLite(pkgdb.DB()) {
+		// 每5分钟刷新一次物化视图
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
 
-		ticker := time.NewTicker(5 * time.Minute)
-		defer ticker.Stop()
+			ticker := time.NewTicker(5 * time.Minute)
+			defer ticker.Stop()
 
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				if err := runProtectedTask("刷新物化视图", viewRefreshBreaker, RefreshMaterializedViews); err != nil {
-					zap.L().Error("定时刷新物化视图失败", zap.Error(err))
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if err := runProtectedTask("刷新物化视图", viewRefreshBreaker, RefreshMaterializedViews); err != nil {
+						zap.L().Error("定时刷新物化视图失败", zap.Error(err))
+					}
 				}
 			}
-		}
-	}()
+		}()
+	}
 
-	// 每小时清理一次过期token
+	// 每小时清理一次过期token（所有数据库类型都支持）
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -332,6 +432,35 @@ func SetupPeriodicTasks(ctx context.Context) *sync.WaitGroup {
 			}
 		}
 	}()
+
+	if cfg.OutboxWorkerEnabled {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			interval := time.Duration(cfg.OutboxRetryInterval) * time.Second
+			if interval <= 0 {
+				interval = 1 * time.Minute
+			}
+
+			ticker := time.NewTicker(interval)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-ticker.C:
+					if err := runProtectedTask("处理治理回写任务", outboxDispatchBreaker, func() error {
+						service := services.NewGovernanceService(pkgdb.DB())
+						return service.ProcessPendingOutbox(20)
+					}); err != nil {
+						zap.L().Error("定时处理治理回写任务失败", zap.Error(err))
+					}
+				}
+			}
+		}()
+	}
 
 	return wg
 }

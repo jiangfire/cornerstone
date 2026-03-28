@@ -3,6 +3,7 @@ package services
 import (
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
@@ -34,12 +35,56 @@ type UpdateOrgRequest struct {
 // AddMemberRequest 添加成员请求
 type AddMemberRequest struct {
 	UserID string `json:"user_id" binding:"required"`
-	Role   string `json:"role" binding:"required,oneof=owner admin member"`
+	Role   string `json:"role" binding:"required,oneof=admin member"`
 }
 
 // UpdateMemberRequest 更新成员角色请求
 type UpdateMemberRequest struct {
-	Role string `json:"role" binding:"required,oneof=owner admin member"`
+	Role string `json:"role" binding:"required,oneof=admin member"`
+}
+
+var organizationMemberRoles = map[string]struct{}{
+	"admin":  {},
+	"member": {},
+}
+
+func isValidOrganizationMemberRole(role string) bool {
+	_, ok := organizationMemberRoles[role]
+	return ok
+}
+
+func buildDeletedOrganizationName(name, orgID string) string {
+	suffix := "__deleted__" + orgID
+	maxPrefixLen := 255 - len(suffix)
+	if maxPrefixLen < 0 {
+		maxPrefixLen = 0
+	}
+	if len(name) > maxPrefixLen {
+		name = name[:maxPrefixLen]
+	}
+	return name + suffix
+}
+
+func (s *OrganizationService) getActiveOrganization(orgID string) (*models.Organization, error) {
+	var org models.Organization
+	err := s.db.Where("id = ? AND deleted_at IS NULL", orgID).First(&org).Error
+	if err != nil {
+		return nil, err
+	}
+	return &org, nil
+}
+
+func (s *OrganizationService) getActiveOrganizationMember(orgID, userID string) (*models.OrganizationMember, error) {
+	var member models.OrganizationMember
+	err := s.db.Table("organization_members AS om").
+		Select("om.*").
+		Joins("INNER JOIN organizations o ON o.id = om.organization_id").
+		Where("om.organization_id = ? AND om.user_id = ? AND o.deleted_at IS NULL", orgID, userID).
+		First(&member).Error
+	if err != nil {
+		return nil, err
+	}
+	return &member, nil
 }
 
 // OrgResponse 组织响应（包含用户角色信息）
@@ -57,7 +102,7 @@ type OrgResponse struct {
 func (s *OrganizationService) CreateOrganization(req CreateOrgRequest, ownerID string) (*models.Organization, error) {
 	// 1. 检查组织名称是否已被该用户创建
 	var existingOrg models.Organization
-	err := s.db.Where("name = ? AND owner_id = ?", req.Name, ownerID).First(&existingOrg).Error
+	err := s.db.Where("name = ? AND owner_id = ? AND deleted_at IS NULL", req.Name, ownerID).First(&existingOrg).Error
 	if err == nil {
 		return nil, errors.New("您已创建过同名组织")
 	}
@@ -116,7 +161,7 @@ func (s *OrganizationService) ListOrganizations(userID string) ([]OrgResponse, e
 			o.updated_at
 		FROM organizations o
 		INNER JOIN organization_members om ON o.id = om.organization_id
-		WHERE om.user_id = ?
+		WHERE om.user_id = ? AND o.deleted_at IS NULL
 		ORDER BY o.created_at DESC
 	`, userID).Scan(&results).Error
 
@@ -144,8 +189,7 @@ func (s *OrganizationService) ListOrganizations(userID string) ([]OrgResponse, e
 // GetOrganization 获取组织详情
 func (s *OrganizationService) GetOrganization(orgID, userID string) (*OrgResponse, error) {
 	// 检查用户是否是该组织成员
-	var member models.OrganizationMember
-	err := s.db.Where("organization_id = ? AND user_id = ?", orgID, userID).First(&member).Error
+	member, err := s.getActiveOrganizationMember(orgID, userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("无权访问该组织")
@@ -154,8 +198,7 @@ func (s *OrganizationService) GetOrganization(orgID, userID string) (*OrgRespons
 	}
 
 	// 获取组织信息
-	var org models.Organization
-	err = s.db.Where("id = ?", orgID).First(&org).Error
+	org, err := s.getActiveOrganization(orgID)
 	if err != nil {
 		return nil, fmt.Errorf("组织不存在: %w", err)
 	}
@@ -174,8 +217,7 @@ func (s *OrganizationService) GetOrganization(orgID, userID string) (*OrgRespons
 // UpdateOrganization 更新组织信息
 func (s *OrganizationService) UpdateOrganization(orgID string, req UpdateOrgRequest, userID string) (*models.Organization, error) {
 	// 1. 检查用户是否是组织所有者或管理员
-	var member models.OrganizationMember
-	err := s.db.Where("organization_id = ? AND user_id = ?", orgID, userID).First(&member).Error
+	member, err := s.getActiveOrganizationMember(orgID, userID)
 	if err != nil {
 		return nil, errors.New("无权访问该组织")
 	}
@@ -185,34 +227,59 @@ func (s *OrganizationService) UpdateOrganization(orgID string, req UpdateOrgRequ
 	}
 
 	// 2. 更新组织信息
-	var org models.Organization
-	err = s.db.Where("id = ?", orgID).First(&org).Error
+	org, err := s.getActiveOrganization(orgID)
 	if err != nil {
 		return nil, fmt.Errorf("组织不存在: %w", err)
+	}
+
+	var duplicate models.Organization
+	err = s.db.Where("name = ? AND owner_id = ? AND id <> ? AND deleted_at IS NULL", req.Name, org.OwnerID, orgID).First(&duplicate).Error
+	if err == nil {
+		return nil, errors.New("您已创建过同名组织")
+	}
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("数据库查询失败: %w", err)
 	}
 
 	org.Name = req.Name
 	org.Description = req.Description
 
-	if err := s.db.Save(&org).Error; err != nil {
+	if err := s.db.Save(org).Error; err != nil {
 		return nil, fmt.Errorf("更新组织失败: %w", err)
 	}
 
-	return &org, nil
+	return org, nil
 }
 
 // DeleteOrganization 删除组织（软删除）
 func (s *OrganizationService) DeleteOrganization(orgID, userID string) error {
 	// 1. 检查用户是否是组织所有者
-	var member models.OrganizationMember
-	err := s.db.Where("organization_id = ? AND user_id = ? AND role = ?", orgID, userID, "owner").First(&member).Error
+	member, err := s.getActiveOrganizationMember(orgID, userID)
 	if err != nil {
 		return errors.New("只有组织所有者可以删除组织")
 	}
+	if member.Role != "owner" {
+		return errors.New("只有组织所有者可以删除组织")
+	}
+	org, err := s.getActiveOrganization(orgID)
+	if err != nil {
+		return errors.New("组织不存在")
+	}
 
 	// 2. 软删除组织
-	if err := s.db.Delete(&models.Organization{}, orgID).Error; err != nil {
-		return fmt.Errorf("删除组织失败: %w", err)
+	now := time.Now()
+	result := s.db.Model(&models.Organization{}).
+		Where("id = ? AND deleted_at IS NULL", orgID).
+		Updates(map[string]interface{}{
+			"deleted_at": now,
+			"name":       buildDeletedOrganizationName(org.Name, orgID),
+			"updated_at": now,
+		})
+	if result.Error != nil {
+		return fmt.Errorf("删除组织失败: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("组织不存在")
 	}
 
 	return nil
@@ -221,14 +288,16 @@ func (s *OrganizationService) DeleteOrganization(orgID, userID string) error {
 // AddMember 添加组织成员
 func (s *OrganizationService) AddMember(orgID string, req AddMemberRequest, operatorID string) error {
 	// 1. 检查操作者权限
-	var operator models.OrganizationMember
-	err := s.db.Where("organization_id = ? AND user_id = ?", orgID, operatorID).First(&operator).Error
+	operator, err := s.getActiveOrganizationMember(orgID, operatorID)
 	if err != nil {
 		return errors.New("无权访问该组织")
 	}
 
 	if operator.Role != "owner" && operator.Role != "admin" {
 		return errors.New("只有组织所有者和管理员可以添加成员")
+	}
+	if !isValidOrganizationMemberRole(req.Role) {
+		return errors.New("无效的组织角色")
 	}
 
 	// 2. 检查被添加用户是否存在
@@ -258,8 +327,7 @@ func (s *OrganizationService) AddMember(orgID string, req AddMemberRequest, oper
 // ListMembers 获取组织成员列表
 func (s *OrganizationService) ListMembers(orgID, userID string) ([]interface{}, error) {
 	// 1. 检查用户是否是组织成员
-	var member models.OrganizationMember
-	err := s.db.Where("organization_id = ? AND user_id = ?", orgID, userID).First(&member).Error
+	_, err := s.getActiveOrganizationMember(orgID, userID)
 	if err != nil {
 		return nil, errors.New("无权访问该组织")
 	}
@@ -306,8 +374,7 @@ func (s *OrganizationService) ListMembers(orgID, userID string) ([]interface{}, 
 // RemoveMember 移除组织成员
 func (s *OrganizationService) RemoveMember(orgID, memberID, operatorID string) error {
 	// 1. 检查操作者权限
-	var operator models.OrganizationMember
-	err := s.db.Where("organization_id = ? AND user_id = ?", orgID, operatorID).First(&operator).Error
+	operator, err := s.getActiveOrganizationMember(orgID, operatorID)
 	if err != nil {
 		return errors.New("无权访问该组织")
 	}
@@ -339,10 +406,15 @@ func (s *OrganizationService) RemoveMember(orgID, memberID, operatorID string) e
 // UpdateMemberRole 更新成员角色
 func (s *OrganizationService) UpdateMemberRole(orgID, memberID string, req UpdateMemberRequest, operatorID string) error {
 	// 1. 检查操作者权限（只有所有者可以修改角色）
-	var operator models.OrganizationMember
-	err := s.db.Where("organization_id = ? AND user_id = ? AND role = ?", orgID, operatorID, "owner").First(&operator).Error
+	operator, err := s.getActiveOrganizationMember(orgID, operatorID)
 	if err != nil {
 		return errors.New("只有组织所有者可以修改成员角色")
+	}
+	if operator.Role != "owner" {
+		return errors.New("只有组织所有者可以修改成员角色")
+	}
+	if !isValidOrganizationMemberRole(req.Role) {
+		return errors.New("无效的组织角色")
 	}
 
 	// 2. 获取目标成员

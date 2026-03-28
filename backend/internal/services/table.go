@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
@@ -43,10 +44,35 @@ type TableResponse struct {
 	UpdatedAt   string `json:"updated_at"`
 }
 
+func buildDeletedTableName(name, tableID string) string {
+	suffix := "__deleted__" + tableID
+	maxPrefixLen := 255 - len(suffix)
+	if maxPrefixLen < 0 {
+		maxPrefixLen = 0
+	}
+	if len(name) > maxPrefixLen {
+		name = name[:maxPrefixLen]
+	}
+	return name + suffix
+}
+
+func (s *TableService) getActiveTable(tableID string) (*models.Table, error) {
+	var table models.Table
+	err := s.db.Where("id = ? AND deleted_at IS NULL", tableID).First(&table).Error
+	if err != nil {
+		return nil, err
+	}
+	return &table, nil
+}
+
 // checkDatabaseAccess 检查用户是否有数据库访问权限
 func (s *TableService) checkDatabaseAccess(dbID, userID string, requiredRoles []string) error {
 	var access models.DatabaseAccess
-	err := s.db.Where("database_id = ? AND user_id = ?", dbID, userID).First(&access).Error
+	err := s.db.Table("database_access AS da").
+		Select("da.*").
+		Joins("INNER JOIN databases d ON d.id = da.database_id").
+		Where("da.database_id = ? AND da.user_id = ? AND d.deleted_at IS NULL", dbID, userID).
+		First(&access).Error
 	if err != nil {
 		return errors.New("无权访问该数据库")
 	}
@@ -130,7 +156,7 @@ func (s *TableService) CreateTable(req CreateTableRequest, userID string) (*mode
 
 	// 3. 检查是否已存在同名表
 	var existingTable models.Table
-	err := s.db.Where("database_id = ? AND name = ?", req.DatabaseID, req.Name).First(&existingTable).Error
+	err := s.db.Where("database_id = ? AND name = ? AND deleted_at IS NULL", req.DatabaseID, req.Name).First(&existingTable).Error
 	if err == nil {
 		return nil, errors.New("该数据库中已存在同名表")
 	}
@@ -185,8 +211,7 @@ func (s *TableService) ListTables(dbID, userID string) ([]TableResponse, error) 
 // GetTable 获取表详情
 func (s *TableService) GetTable(tableID, userID string) (*TableResponse, error) {
 	// 1. 获取表信息
-	var table models.Table
-	err := s.db.Where("id = ?", tableID).First(&table).Error
+	table, err := s.getActiveTable(tableID)
 	if err != nil {
 		return nil, fmt.Errorf("表不存在: %w", err)
 	}
@@ -209,8 +234,7 @@ func (s *TableService) GetTable(tableID, userID string) (*TableResponse, error) 
 // UpdateTable 更新表信息
 func (s *TableService) UpdateTable(tableID string, req UpdateTableRequest, userID string) (*models.Table, error) {
 	// 1. 获取表信息
-	var table models.Table
-	err := s.db.Where("id = ?", tableID).First(&table).Error
+	table, err := s.getActiveTable(tableID)
 	if err != nil {
 		return nil, fmt.Errorf("表不存在: %w", err)
 	}
@@ -233,7 +257,7 @@ func (s *TableService) UpdateTable(tableID string, req UpdateTableRequest, userI
 
 	// 4. 检查是否已存在同名表（排除当前表）
 	var existingTable models.Table
-	err = s.db.Where("database_id = ? AND name = ? AND id != ?", table.DatabaseID, req.Name, tableID).First(&existingTable).Error
+	err = s.db.Where("database_id = ? AND name = ? AND id != ? AND deleted_at IS NULL", table.DatabaseID, req.Name, tableID).First(&existingTable).Error
 	if err == nil {
 		return nil, errors.New("该数据库中已存在同名表")
 	}
@@ -245,18 +269,17 @@ func (s *TableService) UpdateTable(tableID string, req UpdateTableRequest, userI
 	table.Name = req.Name
 	table.Description = req.Description
 
-	if err := s.db.Save(&table).Error; err != nil {
+	if err := s.db.Save(table).Error; err != nil {
 		return nil, fmt.Errorf("更新表失败: %w", err)
 	}
 
-	return &table, nil
+	return table, nil
 }
 
 // DeleteTable 删除表（软删除）
 func (s *TableService) DeleteTable(tableID, userID string) error {
 	// 1. 获取表信息
-	var table models.Table
-	err := s.db.Where("id = ?", tableID).First(&table).Error
+	table, err := s.getActiveTable(tableID)
 	if err != nil {
 		return fmt.Errorf("表不存在: %w", err)
 	}
@@ -267,8 +290,19 @@ func (s *TableService) DeleteTable(tableID, userID string) error {
 	}
 
 	// 3. 软删除表
-	if err := s.db.Delete(&table).Error; err != nil {
-		return fmt.Errorf("删除表失败: %w", err)
+	now := time.Now()
+	result := s.db.Model(&models.Table{}).
+		Where("id = ? AND deleted_at IS NULL", tableID).
+		Updates(map[string]interface{}{
+			"deleted_at": now,
+			"name":       buildDeletedTableName(table.Name, tableID),
+			"updated_at": now,
+		})
+	if result.Error != nil {
+		return fmt.Errorf("删除表失败: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("表不存在: %w", gorm.ErrRecordNotFound)
 	}
 
 	return nil

@@ -66,13 +66,17 @@ type QueryResponse struct {
 // checkTableAccess 检查表访问权限
 func (s *RecordService) checkTableAccess(tableID, userID string, requiredRoles []string) error {
 	var table models.Table
-	err := s.db.Where("id = ?", tableID).First(&table).Error
+	err := s.db.Where("id = ? AND deleted_at IS NULL", tableID).First(&table).Error
 	if err != nil {
 		return errors.New("表不存在")
 	}
 
 	var access models.DatabaseAccess
-	err = s.db.Where("database_id = ? AND user_id = ?", table.DatabaseID, userID).First(&access).Error
+	err = s.db.Table("database_access AS da").
+		Select("da.*").
+		Joins("INNER JOIN databases d ON d.id = da.database_id").
+		Where("da.database_id = ? AND da.user_id = ? AND d.deleted_at IS NULL", table.DatabaseID, userID).
+		First(&access).Error
 	if err != nil {
 		return errors.New("无权访问该数据库")
 	}
@@ -199,7 +203,7 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 			return errors.New("期望字符串类型（日期格式）")
 		}
 
-	case "single_select":
+	case "select", "single_select":
 		if _, ok := value.(string); !ok {
 			return errors.New("期望字符串类型")
 		}
@@ -222,7 +226,7 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 			}
 		}
 
-	case "multi_select":
+	case "multiselect", "multi_select":
 		if _, ok := value.([]interface{}); !ok {
 			return errors.New("期望数组类型")
 		}
@@ -519,7 +523,7 @@ func (s *RecordService) ExportRecords(tableID, userID, format, filter string) ([
 func (s *RecordService) GetRecord(recordID, userID string) (*RecordResponse, error) {
 	// 1. 获取记录
 	var record models.Record
-	err := s.db.Where("id = ?", recordID).First(&record).Error
+	err := s.db.Where("id = ? AND deleted_at IS NULL", recordID).First(&record).Error
 	if err != nil {
 		return nil, fmt.Errorf("记录不存在: %w", err)
 	}
@@ -614,7 +618,7 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 func (s *RecordService) DeleteRecord(recordID, userID string) error {
 	// 1. 获取记录
 	var record models.Record
-	err := s.db.Where("id = ?", recordID).First(&record).Error
+	err := s.db.Where("id = ? AND deleted_at IS NULL", recordID).First(&record).Error
 	if err != nil {
 		return fmt.Errorf("记录不存在: %w", err)
 	}
@@ -625,8 +629,20 @@ func (s *RecordService) DeleteRecord(recordID, userID string) error {
 	}
 
 	// 3. 软删除记录
-	if err := s.db.Delete(&record).Error; err != nil {
-		return fmt.Errorf("删除记录失败: %w", err)
+	now := time.Now()
+	result := s.db.Model(&models.Record{}).
+		Where("id = ? AND deleted_at IS NULL", recordID).
+		Updates(map[string]interface{}{
+			"deleted_at": now,
+			"updated_at": now,
+			"updated_by": userID,
+			"version":    gorm.Expr("version + 1"),
+		})
+	if result.Error != nil {
+		return fmt.Errorf("删除记录失败: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("记录不存在: %w", gorm.ErrRecordNotFound)
 	}
 
 	payload := map[string]interface{}{
