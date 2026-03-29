@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -265,6 +266,18 @@ func buildPluginCommand(language, scriptPath string) (string, []string, error) {
 	}
 }
 
+var windowsDrivePathPattern = regexp.MustCompile(`^[A-Za-z]:`)
+
+func isUnsafeAbsolutePluginPath(path string) bool {
+	if filepath.IsAbs(path) {
+		return true
+	}
+	if windowsDrivePathPattern.MatchString(path) {
+		return true
+	}
+	return strings.HasPrefix(path, `\\`) || strings.HasPrefix(path, "//")
+}
+
 func resolveScriptPath(workDir, entryFile string) (string, error) {
 	cleanEntry := filepath.Clean(strings.TrimSpace(entryFile))
 	if cleanEntry == "" || cleanEntry == "." {
@@ -273,7 +286,7 @@ func resolveScriptPath(workDir, entryFile string) (string, error) {
 	if strings.Contains(cleanEntry, "..") {
 		return "", errors.New("插件入口文件路径非法")
 	}
-	if filepath.IsAbs(cleanEntry) {
+	if isUnsafeAbsolutePluginPath(cleanEntry) {
 		return "", errors.New("插件入口文件不能是绝对路径")
 	}
 	return filepath.Join(workDir, cleanEntry), nil

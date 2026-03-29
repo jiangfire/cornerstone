@@ -130,6 +130,18 @@ func TestResolveScriptPathRejectsUnsafeEntryFileVariants(t *testing.T) {
 			entryFile: "C:\\temp\\escape.sh",
 			wantErr:   "绝对路径",
 		},
+		{
+			name:      "drive relative",
+			workDir:   "./plugins",
+			entryFile: "C:temp\\escape.sh",
+			wantErr:   "绝对路径",
+		},
+		{
+			name:      "unc",
+			workDir:   "./plugins",
+			entryFile: "\\\\server\\share\\escape.sh",
+			wantErr:   "绝对路径",
+		},
 	}
 
 	for _, tc := range testCases {
