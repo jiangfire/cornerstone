@@ -48,6 +48,8 @@ func setupQueryHandlerTest(t *testing.T) (*gin.Engine, models.User) {
 		&models.ActivityLog{},
 		&models.File{},
 		&models.Plugin{},
+		&models.PluginBinding{},
+		&models.PluginExecution{},
 	))
 
 	user := models.User{
@@ -1284,6 +1286,146 @@ func TestQueryHandlerQueryPluginsFiltersToCreator(t *testing.T) {
 	require.Len(t, rows, 1)
 	require.Equal(t, "plg_self", rows[0].(map[string]interface{})["id"])
 	require.Equal(t, user.ID, rows[0].(map[string]interface{})["created_by"])
+}
+
+func TestQueryHandlerQueryPluginBindingsFiltersToOwnedPlugins(t *testing.T) {
+	router, user := setupQueryHandlerTest(t)
+	otherUser := createTestUser(t, "query_binding_other")
+
+	require.NoError(t, pkgdb.DB().Create(&models.DatabaseAccess{
+		UserID:     user.ID,
+		DatabaseID: "db_allowed",
+		Role:       "viewer",
+	}).Error)
+	require.NoError(t, pkgdb.DB().Create(&models.Table{
+		ID:         "tbl_allowed",
+		DatabaseID: "db_allowed",
+		Name:       "AllowedTable",
+	}).Error)
+	require.NoError(t, pkgdb.DB().Create(&models.Plugin{
+		ID:        "plg_owned",
+		Name:      "OwnedPlugin",
+		Language:  "bash",
+		EntryFile: "main.sh",
+		CreatedBy: user.ID,
+	}).Error)
+	require.NoError(t, pkgdb.DB().Create(&models.Plugin{
+		ID:        "plg_other",
+		Name:      "OtherPlugin",
+		Language:  "bash",
+		EntryFile: "main.sh",
+		CreatedBy: otherUser.ID,
+	}).Error)
+	require.NoError(t, pkgdb.DB().Create(&models.PluginBinding{
+		ID:       "pbd_owned",
+		PluginID: "plg_owned",
+		TableID:  "tbl_allowed",
+		Trigger:  "manual",
+	}).Error)
+	require.NoError(t, pkgdb.DB().Create(&models.PluginBinding{
+		ID:       "pbd_other",
+		PluginID: "plg_other",
+		TableID:  "tbl_allowed",
+		Trigger:  "manual",
+	}).Error)
+
+	q := map[string]interface{}{
+		"from":   "plugin_bindings",
+		"select": []string{"id", "plugin_id", "table_id"},
+		"page":   1,
+		"size":   20,
+	}
+	qb, err := json.Marshal(q)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/query?q="+url.QueryEscape(string(qb)), nil)
+	req.Header.Set("Authorization", authHeaderForQueryUser(t, user))
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	data := body["data"].(map[string]interface{})
+	rows := data["data"].([]interface{})
+	require.Len(t, rows, 1)
+	require.Equal(t, "pbd_owned", rows[0].(map[string]interface{})["id"])
+	require.EqualValues(t, 1, data["total"])
+}
+
+func TestQueryHandlerQueryPluginExecutionsFiltersToOwnedPlugins(t *testing.T) {
+	router, user := setupQueryHandlerTest(t)
+	otherUser := createTestUser(t, "query_execution_other")
+
+	require.NoError(t, pkgdb.DB().Create(&models.DatabaseAccess{
+		UserID:     user.ID,
+		DatabaseID: "db_allowed",
+		Role:       "viewer",
+	}).Error)
+	require.NoError(t, pkgdb.DB().Create(&models.Table{
+		ID:         "tbl_allowed",
+		DatabaseID: "db_allowed",
+		Name:       "AllowedTable",
+	}).Error)
+	require.NoError(t, pkgdb.DB().Create(&models.Plugin{
+		ID:        "plg_owned",
+		Name:      "OwnedPlugin",
+		Language:  "bash",
+		EntryFile: "main.sh",
+		CreatedBy: user.ID,
+	}).Error)
+	require.NoError(t, pkgdb.DB().Create(&models.Plugin{
+		ID:        "plg_other",
+		Name:      "OtherPlugin",
+		Language:  "bash",
+		EntryFile: "main.sh",
+		CreatedBy: otherUser.ID,
+	}).Error)
+	require.NoError(t, pkgdb.DB().Create(&models.PluginExecution{
+		ID:         "pex_owned",
+		PluginID:   "plg_owned",
+		TableID:    "tbl_allowed",
+		Trigger:    "manual",
+		Status:     "success",
+		CreatedBy:  user.ID,
+		DurationMS: 10,
+	}).Error)
+	require.NoError(t, pkgdb.DB().Create(&models.PluginExecution{
+		ID:         "pex_other",
+		PluginID:   "plg_other",
+		TableID:    "tbl_allowed",
+		Trigger:    "manual",
+		Status:     "success",
+		CreatedBy:  otherUser.ID,
+		DurationMS: 12,
+	}).Error)
+
+	q := map[string]interface{}{
+		"from":   "plugin_executions",
+		"select": []string{"id", "plugin_id", "table_id", "status"},
+		"page":   1,
+		"size":   20,
+	}
+	qb, err := json.Marshal(q)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/query?q="+url.QueryEscape(string(qb)), nil)
+	req.Header.Set("Authorization", authHeaderForQueryUser(t, user))
+
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	require.Equal(t, http.StatusOK, w.Code)
+
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+	data := body["data"].(map[string]interface{})
+	rows := data["data"].([]interface{})
+	require.Len(t, rows, 1)
+	require.Equal(t, "pex_owned", rows[0].(map[string]interface{})["id"])
+	require.EqualValues(t, 1, data["total"])
 }
 
 func TestQueryHandlerQueryOrganizationMembersFiltersByAccessibleOrganizations(t *testing.T) {

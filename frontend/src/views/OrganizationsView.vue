@@ -63,7 +63,6 @@
               @change="(val: string) => handleRoleChange(row, val)"
               style="width: 100%"
             >
-              <el-option label="Owner" value="owner" />
               <el-option label="Admin" value="admin" />
               <el-option label="Member" value="member" />
             </el-select>
@@ -145,7 +144,6 @@
         </el-form-item>
         <el-form-item label="角色" prop="role">
           <el-select v-model="addMemberForm.role" placeholder="选择角色" style="width: 100%">
-            <el-option label="Owner" value="owner" />
             <el-option label="Admin" value="admin" />
             <el-option label="Member" value="member" />
           </el-select>

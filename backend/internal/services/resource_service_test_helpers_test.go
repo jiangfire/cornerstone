@@ -32,10 +32,12 @@ func setupResourceTestDB(t *testing.T) *gorm.DB {
 		&models.Field{},
 		&models.Record{},
 		&models.FieldPermission{},
+		&models.File{},
 		&models.ActivityLog{},
 		&models.Plugin{},
 		&models.PluginBinding{},
 		&models.PluginExecution{},
+		&models.AppSettings{},
 	))
 
 	return db

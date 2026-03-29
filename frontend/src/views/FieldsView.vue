@@ -35,7 +35,11 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="options" label="配置选项" min-width="200" show-overflow-tooltip />
+        <el-table-column label="配置选项" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">
+            {{ formatFieldOptions(row.config) || '-' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="created_at" label="创建时间" width="180">
           <template #default="{ row }">
             {{ formatDate(row.created_at) }}
@@ -122,7 +126,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { tableAPI, fieldAPI } from '@/services/api'
+import { tableAPI, fieldAPI, databaseAPI } from '@/services/api'
 import { formatDate } from '@/utils/format'
 import { usePermissionStore } from '@/stores/permissions'
 
@@ -131,7 +135,10 @@ interface Field {
   name: string
   type: string
   required: boolean
-  options?: string
+  table_id?: string
+  config?: {
+    options?: string[]
+  }
   created_at: string
 }
 
@@ -199,6 +206,23 @@ const goToPermissions = () => {
   router.push(`/tables/${tableId}/field-permissions`)
 }
 
+const buildFieldConfig = (type: string, optionsText: string) => {
+  if (type !== 'select' && type !== 'multiselect') {
+    return {}
+  }
+
+  return {
+    options: optionsText
+      .split(',')
+      .map((option) => option.trim())
+      .filter(Boolean),
+  }
+}
+
+const formatFieldOptions = (config?: { options?: string[] }) => {
+  return config?.options?.join(', ') || ''
+}
+
 const getFieldTypeLabel = (type: string) => {
   const typeMap: Record<string, string> = {
     string: '字符串',
@@ -248,6 +272,12 @@ const loadTableInfo = async () => {
     const response = await tableAPI.get(tableId)
     if (response.success && response.data) {
       tableName.value = response.data.name || ''
+      if (response.data.database_id) {
+        const dbResponse = await databaseAPI.getDetail(response.data.database_id)
+        if (dbResponse.success && dbResponse.data?.role) {
+          permissionStore.setCurrentRole(dbResponse.data.role)
+        }
+      }
     }
   } catch (error) {
     console.error('Failed to load table info:', error)
@@ -276,7 +306,7 @@ const handleEdit = (row: Field) => {
     name: row.name,
     type: row.type,
     required: row.required,
-    options: row.options || '',
+    options: formatFieldOptions(row.config),
     id: row.id,
   }
   dialogVisible.value = true
@@ -320,7 +350,7 @@ const handleSubmit = async () => {
         name: form.value.name,
         type: form.value.type,
         required: form.value.required,
-        options: form.value.options,
+        config: buildFieldConfig(form.value.type, form.value.options),
       })
       if (response.success) {
         ElMessage.success('更新成功')
@@ -333,7 +363,7 @@ const handleSubmit = async () => {
         name: form.value.name,
         type: form.value.type,
         required: form.value.required,
-        options: form.value.options,
+        config: buildFieldConfig(form.value.type, form.value.options),
       })
       if (response.success) {
         ElMessage.success('添加成功')

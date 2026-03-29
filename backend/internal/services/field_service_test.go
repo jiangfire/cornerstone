@@ -135,3 +135,34 @@ func TestFieldService_SetFieldPermissionRejectsDeletedField(t *testing.T) {
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "字段不存在")
 }
+
+func TestFieldService_SetFieldPermissionPersistsExplicitFalseValues(t *testing.T) {
+	db := setupResourceTestDB(t)
+	service := NewFieldService(db)
+
+	owner := createResourceUser(t, db, "field_owner_permission_false")
+	viewer := createResourceUser(t, db, "field_viewer_permission_false")
+	database := createResourceDatabase(t, db, owner.ID, "FieldPermissionFalseDB")
+	grantResourceDatabaseAccess(t, db, database.ID, viewer.ID, "viewer")
+
+	table := createResourceTable(t, db, database.ID, "Orders")
+	field := createResourceField(t, db, table.ID, "secret", "string", false, "")
+
+	require.NoError(t, service.SetFieldPermission(table.ID, FieldPermissionRequest{
+		FieldID:   field.ID,
+		Role:      "viewer",
+		CanRead:   false,
+		CanWrite:  false,
+		CanDelete: false,
+	}, owner.ID))
+
+	err := service.CheckFieldPermission(viewer.ID, field.ID, "read")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "无读取权限")
+
+	var permission models.FieldPermission
+	require.NoError(t, db.Where("field_id = ? AND role = ?", field.ID, "viewer").First(&permission).Error)
+	require.False(t, permission.CanRead)
+	require.False(t, permission.CanWrite)
+	require.False(t, permission.CanDelete)
+}

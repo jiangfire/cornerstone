@@ -23,6 +23,8 @@
             <el-button size="small" type="info" @click="handleViewBindings(row)"
               >查看绑定</el-button
             >
+            <el-button size="small" type="success" @click="handleRunPlugin(row)">手动执行</el-button>
+            <el-button size="small" @click="handleViewExecutions(row)">执行记录</el-button>
             <el-button size="small" type="primary" @click="handleBind(row)">绑定</el-button>
             <el-button size="small" type="danger" @click="handleDelete(row)">删除</el-button>
           </template>
@@ -37,7 +39,7 @@
           <el-input v-model="form.name" placeholder="请输入插件名称" />
         </el-form-item>
         <el-form-item label="描述">
-          <el-input v-model="form.description" type="textarea" rows="3" />
+          <el-input v-model="form.description" type="textarea" :rows="3" />
         </el-form-item>
         <el-form-item label="语言" v-if="!isEdit">
           <el-select v-model="form.language" placeholder="请选择语言">
@@ -122,6 +124,64 @@
       <el-empty v-if="bindingsList.length === 0" description="暂无绑定" />
     </el-dialog>
 
+    <el-dialog v-model="executeDialogVisible" title="手动执行插件" width="560px">
+      <el-form :model="executeForm" label-width="100px">
+        <el-form-item label="绑定关系">
+          <el-select
+            v-model="executeForm.bindingKey"
+            placeholder="请选择要执行的绑定"
+            style="width: 100%"
+          >
+            <el-option
+              v-for="binding in manualBindings"
+              :key="`${binding.table_id}:${binding.trigger}`"
+              :label="`${binding.database_name} / ${binding.table_name} / ${getTriggerLabel(binding.trigger)}`"
+              :value="`${binding.table_id}:${binding.trigger}`"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="记录 ID">
+          <el-input v-model="executeForm.recordId" placeholder="可选，关联记录 ID" />
+        </el-form-item>
+        <el-form-item label="Payload">
+          <el-input
+            v-model="executeForm.payload"
+            type="textarea"
+            :rows="6"
+            placeholder='可选，JSON 对象，例如：{"source":"manual"}'
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="executeDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="executing" @click="handleExecuteSubmit">执行</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog v-model="executionsDialogVisible" title="插件执行记录" width="860px">
+      <el-table :data="executionsList" style="width: 100%" v-loading="executionsLoading">
+        <el-table-column prop="status" label="状态" width="120">
+          <template #default="{ row }">
+            <el-tag :type="getExecutionStatusType(row.status)">{{ row.status }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="trigger" label="触发器" width="120">
+          <template #default="{ row }">
+            {{ getTriggerLabel(row.trigger) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="table_id" label="表 ID" min-width="140" />
+        <el-table-column prop="record_id" label="记录 ID" min-width="140" />
+        <el-table-column prop="duration_ms" label="耗时(ms)" width="110" />
+        <el-table-column prop="created_at" label="执行时间" width="180">
+          <template #default="{ row }">
+            {{ formatDate(row.created_at) }}
+          </template>
+        </el-table-column>
+      </el-table>
+      <el-empty v-if="executionsList.length === 0" description="暂无执行记录" />
+    </el-dialog>
+
     <!-- 配置编辑器对话框 -->
     <el-dialog v-model="configDialogVisible" title="配置插件参数" width="700px">
       <el-button @click="addConfigItem" style="margin-bottom: 15px">+ 添加参数</el-button>
@@ -203,12 +263,15 @@ const tables = ref<Table[]>([])
 const dialogVisible = ref(false)
 const bindDialogVisible = ref(false)
 const bindingsDialogVisible = ref(false)
+const executeDialogVisible = ref(false)
+const executionsDialogVisible = ref(false)
 const configDialogVisible = ref(false)
 const isEdit = ref(false)
 const currentPlugin = ref<Plugin | null>(null)
 const bindingsList = ref<
   Array<{
     id: string
+    table_id: string
     table_name: string
     database_name: string
     trigger: string
@@ -216,6 +279,9 @@ const bindingsList = ref<
   }>
 >([])
 const loadingBindings = ref(false)
+const executionsLoading = ref(false)
+const executing = ref(false)
+const executionsList = ref<Array<Record<string, unknown>>>([])
 const configItems = ref<Array<{ name: string; type: string; default: string; required: boolean }>>(
   [],
 )
@@ -234,6 +300,21 @@ const bindForm = ref({
   table_id: '',
   trigger: 'manual',
 })
+
+const executeForm = ref({
+  bindingKey: '',
+  recordId: '',
+  payload: '',
+})
+
+const manualBindings = ref<
+  Array<{
+    table_id: string
+    table_name: string
+    database_name: string
+    trigger: string
+  }>
+>([])
 
 const loadTables = async () => {
   loadingTables.value = true
@@ -418,6 +499,82 @@ const loadBindings = async (pluginId: string) => {
   }
 }
 
+const handleRunPlugin = async (plugin: Plugin) => {
+  currentPlugin.value = plugin
+  try {
+    const response = await pluginAPI.getBindings(plugin.id)
+    manualBindings.value = (response.data || []).filter(
+      (binding: { trigger: string }) => binding.trigger === 'manual',
+    )
+    if (manualBindings.value.length === 0) {
+      ElMessage.warning('请先为该插件绑定一个 manual 触发器')
+      return
+    }
+
+    const firstBinding = manualBindings.value[0]
+    if (!firstBinding) {
+      ElMessage.warning('请先为该插件绑定一个 manual 触发器')
+      return
+    }
+    executeForm.value = {
+      bindingKey: `${firstBinding.table_id}:${firstBinding.trigger}`,
+      recordId: '',
+      payload: '',
+    }
+    executeDialogVisible.value = true
+  } catch {
+    ElMessage.error('加载可执行绑定失败')
+  }
+}
+
+const handleExecuteSubmit = async () => {
+  if (!currentPlugin.value || !executeForm.value.bindingKey) {
+    ElMessage.warning('请选择要执行的绑定')
+    return
+  }
+
+  const [tableId, trigger] = executeForm.value.bindingKey.split(':')
+  let payload: Record<string, unknown> = {}
+  if (executeForm.value.payload.trim()) {
+    try {
+      payload = JSON.parse(executeForm.value.payload)
+    } catch {
+      ElMessage.error('Payload 必须是合法 JSON')
+      return
+    }
+  }
+
+  executing.value = true
+  try {
+    await pluginAPI.execute(currentPlugin.value.id, {
+      table_id: tableId,
+      trigger,
+      record_id: executeForm.value.recordId || '',
+      payload,
+    })
+    ElMessage.success('插件执行成功')
+    executeDialogVisible.value = false
+  } catch {
+    ElMessage.error('插件执行失败')
+  } finally {
+    executing.value = false
+  }
+}
+
+const handleViewExecutions = async (plugin: Plugin) => {
+  currentPlugin.value = plugin
+  executionsDialogVisible.value = true
+  executionsLoading.value = true
+  try {
+    const response = await pluginAPI.listExecutions(plugin.id)
+    executionsList.value = response.data || []
+  } catch {
+    ElMessage.error('加载执行记录失败')
+  } finally {
+    executionsLoading.value = false
+  }
+}
+
 // 解绑插件
 const handleUnbind = async (binding: { id: string; table_name: string; table_id: string }) => {
   if (!currentPlugin.value) return
@@ -455,6 +612,16 @@ const getTriggerType = (trigger: string) => {
     manual: 'info',
   }
   return types[trigger] || ''
+}
+
+const getExecutionStatusType = (status: string) => {
+  const types: Record<string, string> = {
+    success: 'success',
+    running: 'primary',
+    failed: 'danger',
+    timeout: 'warning',
+  }
+  return types[status] || 'info'
 }
 
 // 解析配置 JSON

@@ -10,6 +10,18 @@ import (
 
 // GetSettings 获取系统设置
 func GetSettings(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	authService := services.NewAuthService(db.DB())
+	isAdmin, err := authService.IsSystemAdmin(userID)
+	if err != nil {
+		types.Error(c, 403, err.Error())
+		return
+	}
+	if !isAdmin {
+		types.Error(c, 403, "只有系统管理员可以查看系统设置")
+		return
+	}
+
 	settingsService := services.NewSettingsService(db.DB())
 	settings, err := settingsService.GetSettings()
 	if err != nil {
@@ -23,6 +35,16 @@ func GetSettings(c *gin.Context) {
 // UpdateSettings 更新系统设置
 func UpdateSettings(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+	authService := services.NewAuthService(db.DB())
+	isAdmin, err := authService.IsSystemAdmin(userID)
+	if err != nil {
+		types.Error(c, 403, err.Error())
+		return
+	}
+	if !isAdmin {
+		types.Error(c, 403, "只有系统管理员可以修改系统设置")
+		return
+	}
 
 	var req services.UpdateSettingsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

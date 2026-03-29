@@ -46,12 +46,13 @@ func ListPlugins(c *gin.Context) {
 
 // GetPlugin 获取插件详情
 func GetPlugin(c *gin.Context) {
+	userID := middleware.GetUserID(c)
 	pluginID := c.Param("id")
 
 	pluginService := services.NewPluginService(db.DB())
-	plugin, err := pluginService.GetPlugin(pluginID)
+	plugin, err := pluginService.GetPlugin(pluginID, userID)
 	if err != nil {
-		types.Error(c, 404, err.Error())
+		types.Error(c, 403, err.Error())
 		return
 	}
 
@@ -60,6 +61,7 @@ func GetPlugin(c *gin.Context) {
 
 // UpdatePlugin 更新插件
 func UpdatePlugin(c *gin.Context) {
+	userID := middleware.GetUserID(c)
 	pluginID := c.Param("id")
 
 	var req services.UpdatePluginRequest
@@ -69,8 +71,8 @@ func UpdatePlugin(c *gin.Context) {
 	}
 
 	pluginService := services.NewPluginService(db.DB())
-	if err := pluginService.UpdatePlugin(pluginID, req); err != nil {
-		types.Error(c, 400, err.Error())
+	if err := pluginService.UpdatePlugin(pluginID, req, userID); err != nil {
+		types.Error(c, 403, err.Error())
 		return
 	}
 
@@ -79,11 +81,12 @@ func UpdatePlugin(c *gin.Context) {
 
 // DeletePlugin 删除插件
 func DeletePlugin(c *gin.Context) {
+	userID := middleware.GetUserID(c)
 	pluginID := c.Param("id")
 
 	pluginService := services.NewPluginService(db.DB())
-	if err := pluginService.DeletePlugin(pluginID); err != nil {
-		types.Error(c, 400, err.Error())
+	if err := pluginService.DeletePlugin(pluginID, userID); err != nil {
+		types.Error(c, 403, err.Error())
 		return
 	}
 
@@ -92,6 +95,7 @@ func DeletePlugin(c *gin.Context) {
 
 // BindPlugin 绑定插件
 func BindPlugin(c *gin.Context) {
+	userID := middleware.GetUserID(c)
 	pluginID := c.Param("id")
 
 	var req struct {
@@ -105,8 +109,8 @@ func BindPlugin(c *gin.Context) {
 	}
 
 	pluginService := services.NewPluginService(db.DB())
-	if err := pluginService.BindPlugin(pluginID, req.TableID, req.Trigger); err != nil {
-		types.Error(c, 400, err.Error())
+	if err := pluginService.BindPlugin(pluginID, req.TableID, req.Trigger, userID); err != nil {
+		types.Error(c, 403, err.Error())
 		return
 	}
 
@@ -115,6 +119,7 @@ func BindPlugin(c *gin.Context) {
 
 // UnbindPlugin 解绑插件
 func UnbindPlugin(c *gin.Context) {
+	userID := middleware.GetUserID(c)
 	pluginID := c.Param("id")
 
 	var req struct {
@@ -127,8 +132,8 @@ func UnbindPlugin(c *gin.Context) {
 	}
 
 	pluginService := services.NewPluginService(db.DB())
-	if err := pluginService.UnbindPlugin(pluginID, req.TableID); err != nil {
-		types.Error(c, 400, err.Error())
+	if err := pluginService.UnbindPlugin(pluginID, req.TableID, userID); err != nil {
+		types.Error(c, 403, err.Error())
 		return
 	}
 
@@ -137,12 +142,13 @@ func UnbindPlugin(c *gin.Context) {
 
 // ListPluginBindings 列出插件的所有绑定
 func ListPluginBindings(c *gin.Context) {
+	userID := middleware.GetUserID(c)
 	pluginID := c.Param("id")
 
 	pluginService := services.NewPluginService(db.DB())
-	bindings, err := pluginService.ListBindings(pluginID)
+	bindings, err := pluginService.ListBindings(pluginID, userID)
 	if err != nil {
-		types.Error(c, 500, err.Error())
+		types.Error(c, 403, err.Error())
 		return
 	}
 

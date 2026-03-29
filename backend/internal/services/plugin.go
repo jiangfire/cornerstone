@@ -90,26 +90,27 @@ func (s *PluginService) ListPlugins(userID string) ([]models.Plugin, error) {
 	return plugins, nil
 }
 
-// GetPlugin 获取插件详情
-func (s *PluginService) GetPlugin(pluginID string) (*models.Plugin, error) {
+func (s *PluginService) getOwnedPlugin(pluginID, userID string) (*models.Plugin, error) {
 	var plugin models.Plugin
-	if err := s.db.Where("id = ?", pluginID).First(&plugin).Error; err != nil {
+	if err := s.db.Where("id = ? AND created_by = ?", pluginID, userID).First(&plugin).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("插件不存在")
+			return nil, errors.New("插件不存在或无权限")
 		}
 		return nil, fmt.Errorf("查询插件失败: %w", err)
 	}
 	return &plugin, nil
 }
 
+// GetPlugin 获取插件详情
+func (s *PluginService) GetPlugin(pluginID, userID string) (*models.Plugin, error) {
+	return s.getOwnedPlugin(pluginID, userID)
+}
+
 // UpdatePlugin 更新插件
-func (s *PluginService) UpdatePlugin(pluginID string, req UpdatePluginRequest) error {
-	var plugin models.Plugin
-	if err := s.db.Where("id = ?", pluginID).First(&plugin).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("插件不存在")
-		}
-		return fmt.Errorf("查询插件失败: %w", err)
+func (s *PluginService) UpdatePlugin(pluginID string, req UpdatePluginRequest, userID string) error {
+	plugin, err := s.getOwnedPlugin(pluginID, userID)
+	if err != nil {
+		return err
 	}
 
 	plugin.Name = req.Name
@@ -126,8 +127,12 @@ func (s *PluginService) UpdatePlugin(pluginID string, req UpdatePluginRequest) e
 }
 
 // DeletePlugin 删除插件
-func (s *PluginService) DeletePlugin(pluginID string) error {
-	result := s.db.Where("id = ?", pluginID).Delete(&models.Plugin{})
+func (s *PluginService) DeletePlugin(pluginID, userID string) error {
+	if _, err := s.getOwnedPlugin(pluginID, userID); err != nil {
+		return err
+	}
+
+	result := s.db.Where("id = ? AND created_by = ?", pluginID, userID).Delete(&models.Plugin{})
 	if result.Error != nil {
 		return fmt.Errorf("删除插件失败: %w", result.Error)
 	}
@@ -138,17 +143,13 @@ func (s *PluginService) DeletePlugin(pluginID string) error {
 }
 
 // BindPlugin 绑定插件到表
-func (s *PluginService) BindPlugin(pluginID, tableID, trigger string) error {
-	// 验证插件是否存在
-	var plugin models.Plugin
-	if err := s.db.Where("id = ?", pluginID).First(&plugin).Error; err != nil {
-		return errors.New("插件不存在")
+func (s *PluginService) BindPlugin(pluginID, tableID, trigger, userID string) error {
+	if _, err := s.getOwnedPlugin(pluginID, userID); err != nil {
+		return err
 	}
 
-	// 验证表是否存在
-	var table models.Table
-	if err := s.db.Where("id = ?", tableID).First(&table).Error; err != nil {
-		return errors.New("表不存在")
+	if err := NewRecordService(s.db).checkTableAccess(tableID, userID, []string{"owner", "admin", "editor"}); err != nil {
+		return err
 	}
 
 	// 创建绑定（幂等并发安全）
@@ -169,7 +170,14 @@ func (s *PluginService) BindPlugin(pluginID, tableID, trigger string) error {
 }
 
 // UnbindPlugin 解绑插件
-func (s *PluginService) UnbindPlugin(pluginID, tableID string) error {
+func (s *PluginService) UnbindPlugin(pluginID, tableID, userID string) error {
+	if _, err := s.getOwnedPlugin(pluginID, userID); err != nil {
+		return err
+	}
+	if err := NewRecordService(s.db).checkTableAccess(tableID, userID, []string{"owner", "admin", "editor"}); err != nil {
+		return err
+	}
+
 	result := s.db.Where("plugin_id = ? AND table_id = ?", pluginID, tableID).Delete(&models.PluginBinding{})
 	if result.Error != nil {
 		return fmt.Errorf("解绑插件失败: %w", result.Error)
@@ -192,7 +200,11 @@ type BindingDetail struct {
 }
 
 // ListBindings 列出插件的所有绑定
-func (s *PluginService) ListBindings(pluginID string) ([]BindingDetail, error) {
+func (s *PluginService) ListBindings(pluginID, userID string) ([]BindingDetail, error) {
+	if _, err := s.getOwnedPlugin(pluginID, userID); err != nil {
+		return nil, err
+	}
+
 	var details []BindingDetail
 	err := s.db.Table("plugin_bindings pb").
 		Select(`
@@ -399,12 +411,12 @@ func (s *PluginService) TriggerByTable(tableID, trigger, recordID, actorID strin
 
 // ExecutePlugin 手动执行插件
 func (s *PluginService) ExecutePlugin(pluginID, userID string, req ExecutePluginRequest) (*models.PluginExecution, error) {
-	var plugin models.Plugin
-	if err := s.db.Where("id = ? AND created_by = ?", pluginID, userID).First(&plugin).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("插件不存在或无权执行")
-		}
-		return nil, fmt.Errorf("查询插件失败: %w", err)
+	plugin, err := s.getOwnedPlugin(pluginID, userID)
+	if err != nil {
+		return nil, err
+	}
+	if err := NewRecordService(s.db).checkTableAccess(req.TableID, userID, []string{"owner", "admin", "editor", "viewer"}); err != nil {
+		return nil, err
 	}
 
 	var binding models.PluginBinding
@@ -416,7 +428,7 @@ func (s *PluginService) ExecutePlugin(pluginID, userID string, req ExecutePlugin
 		return nil, fmt.Errorf("查询插件绑定失败: %w", err)
 	}
 
-	return s.executePlugin(plugin, req.TableID, req.RecordID, req.Trigger, req.Payload, userID)
+	return s.executePlugin(*plugin, req.TableID, req.RecordID, req.Trigger, req.Payload, userID)
 }
 
 // ListExecutions 查询插件执行记录
@@ -425,12 +437,8 @@ func (s *PluginService) ListExecutions(pluginID, userID string, limit int) ([]mo
 		limit = 50
 	}
 
-	var plugin models.Plugin
-	if err := s.db.Where("id = ? AND created_by = ?", pluginID, userID).First(&plugin).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("插件不存在或无权限")
-		}
-		return nil, fmt.Errorf("查询插件失败: %w", err)
+	if _, err := s.getOwnedPlugin(pluginID, userID); err != nil {
+		return nil, err
 	}
 
 	var executions []models.PluginExecution

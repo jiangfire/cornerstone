@@ -254,3 +254,49 @@ func TestDatabaseService_ListDatabasesExcludesDeletedAndOrdersNewestFirst(t *tes
 	require.Equal(t, newest.ID, listed[0].ID)
 	require.Equal(t, oldest.ID, listed[1].ID)
 }
+
+func TestDatabaseService_ListUsersAndRemoveUserRespectRoleBoundaries(t *testing.T) {
+	db := setupDatabaseTestDB(t)
+	service := NewDatabaseService(db)
+
+	owner := createDatabaseTestUser(t, db, "owner_members")
+	admin := createDatabaseTestUser(t, db, "admin_members")
+	editor := createDatabaseTestUser(t, db, "editor_members")
+	viewer := createDatabaseTestUser(t, db, "viewer_members")
+	outsider := createDatabaseTestUser(t, db, "outsider_members")
+
+	database := createOwnedDatabase(t, service, owner.ID, "Members DB")
+	require.NoError(t, service.ShareDatabase(database.ID, ShareDBRequest{UserID: admin.ID, Role: "admin"}, owner.ID))
+	require.NoError(t, service.ShareDatabase(database.ID, ShareDBRequest{UserID: editor.ID, Role: "editor"}, owner.ID))
+	require.NoError(t, service.ShareDatabase(database.ID, ShareDBRequest{UserID: viewer.ID, Role: "viewer"}, owner.ID))
+
+	listedByViewer, err := service.ListDatabaseUsers(database.ID, viewer.ID)
+	require.NoError(t, err)
+	require.Len(t, listedByViewer, 4)
+
+	_, err = service.ListDatabaseUsers(database.ID, outsider.ID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "无权访问该数据库")
+
+	err = service.RemoveDatabaseUser(database.ID, owner.ID, admin.ID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "不能移除数据库所有者")
+
+	err = service.RemoveDatabaseUser(database.ID, editor.ID, viewer.ID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "只有所有者和管理员可以移除用户")
+
+	err = service.RemoveDatabaseUser(database.ID, editor.ID, admin.ID)
+	require.NoError(t, err)
+
+	var editorAccess models.DatabaseAccess
+	err = db.Where("database_id = ? AND user_id = ?", database.ID, editor.ID).First(&editorAccess).Error
+	require.Error(t, err)
+
+	err = service.RemoveDatabaseUser(database.ID, viewer.ID, owner.ID)
+	require.NoError(t, err)
+
+	var viewerAccess models.DatabaseAccess
+	err = db.Where("database_id = ? AND user_id = ?", database.ID, viewer.ID).First(&viewerAccess).Error
+	require.Error(t, err)
+}

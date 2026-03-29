@@ -93,6 +93,7 @@ export const userAPI = {
       username: string
       email: string
       role?: string
+      is_system_admin?: boolean
       phone?: string
       bio?: string
       avatar?: string
@@ -129,11 +130,29 @@ export const databaseAPI = {
   create(data: Record<string, unknown>) {
     return request.post('/databases', data)
   },
+  update(id: string, data: Record<string, unknown>) {
+    return request.put(`/databases/${id}`, data)
+  },
+  delete(id: string) {
+    return request.delete(`/databases/${id}`)
+  },
   getDetail(id: string) {
     return request.get<{ name: string; role: string }>(`/databases/${id}`)
   },
   getTables(databaseId: string) {
     return request.get<{ tables: any[] }>(`/databases/${databaseId}/tables`)
+  },
+  share(id: string, data: { user_id: string; role: 'admin' | 'editor' | 'viewer' }) {
+    return request.post(`/databases/${id}/share`, data)
+  },
+  listUsers(id: string) {
+    return request.get<{ users: any[] }>(`/databases/${id}/users`)
+  },
+  updateUserRole(id: string, userId: string, role: 'admin' | 'editor' | 'viewer') {
+    return request.put(`/databases/${id}/users/${userId}/role`, { role })
+  },
+  removeUser(id: string, userId: string) {
+    return request.delete(`/databases/${id}/users/${userId}`)
   },
 }
 
@@ -199,6 +218,9 @@ export const fileAPI = {
   download(fileId: string): string {
     return `${API_CONFIG.baseURL}/files/${fileId}/download`
   },
+  downloadBlob(fileId: string) {
+    return api.get<Blob, Blob>(`/files/${fileId}/download`, { responseType: 'blob' })
+  },
   delete(fileId: string) {
     return request.delete(`/files/${fileId}`)
   },
@@ -237,6 +259,9 @@ export const pluginAPI = {
   list() {
     return request.get<any[]>('/plugins')
   },
+  get(id: string) {
+    return request.get<any>(`/plugins/${id}`)
+  },
   create(data: Record<string, unknown>) {
     return request.post('/plugins', data)
   },
@@ -254,6 +279,12 @@ export const pluginAPI = {
   },
   unbind(pluginId: string, data: Record<string, unknown>) {
     return request.delete(`/plugins/${pluginId}/unbind`, data)
+  },
+  execute(pluginId: string, data: Record<string, unknown>) {
+    return request.post(`/plugins/${pluginId}/execute`, data)
+  },
+  listExecutions(pluginId: string, limit = 50) {
+    return request.get<any[]>(`/plugins/${pluginId}/executions`, { limit })
   },
 }
 

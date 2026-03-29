@@ -10,16 +10,17 @@ import (
 
 // User 用户表 (usr_前缀)
 type User struct {
-	ID        string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	Username  string     `gorm:"type:varchar(100);uniqueIndex;not null" json:"username"`
-	Email     string     `gorm:"type:varchar(255);uniqueIndex;not null" json:"email"`
-	Phone     string     `gorm:"type:varchar(50)" json:"phone,omitempty"`
-	Bio       string     `gorm:"type:text" json:"bio,omitempty"`
-	Avatar    string     `gorm:"type:text" json:"avatar,omitempty"`
-	Password  string     `gorm:"type:varchar(255);not null" json:"-"` // 密码哈希，不序列化
-	CreatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	ID            string     `gorm:"type:varchar(50);primaryKey" json:"id"`
+	Username      string     `gorm:"type:varchar(100);uniqueIndex;not null" json:"username"`
+	Email         string     `gorm:"type:varchar(255);uniqueIndex;not null" json:"email"`
+	Phone         string     `gorm:"type:varchar(50)" json:"phone,omitempty"`
+	Bio           string     `gorm:"type:text" json:"bio,omitempty"`
+	Avatar        string     `gorm:"type:text" json:"avatar,omitempty"`
+	Password      string     `gorm:"type:varchar(255);not null" json:"-"` // 密码哈希，不序列化
+	IsSystemAdmin bool       `gorm:"type:boolean;not null;default:false" json:"is_system_admin"`
+	CreatedAt     time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt     time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	DeletedAt     *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
 }
 
 // TableName 表名前缀

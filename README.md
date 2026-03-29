@@ -149,7 +149,8 @@ pnpm run build:embed
 - 权限控制：owner/admin/editor/viewer + 字段级权限
 - 批量处理：批量记录创建
 - 文件系统：上传、下载、删除、关联记录
-- 插件系统：创建、绑定、触发配置
+- 插件系统：创建、绑定、手动执行、执行记录
+- 系统设置：注册开关、附件大小上限、插件运行参数
 - 统计分析：概览统计、近期活动
 - 治理任务中心：任务、审核、证据、评论、外部资源链接与回写触发
 - HTTP MCP：通过 `/mcp` 按当前 JWT 用户上下文查询、创建数据库，并通过 SSE 接收数据库、表、字段、治理任务/审核等变更通知
@@ -163,6 +164,7 @@ pnpm run build:embed
 - API 文档：`docs/API.md`
 - HTTP MCP 文档：`docs/MCP.md`
 - 项目现状：`docs/PROJECT-STATUS.md`
+- 权限真值：`docs/PERMISSION-SYSTEM.md`
 
 ---
 

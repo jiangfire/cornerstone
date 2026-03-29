@@ -49,7 +49,7 @@ func validateFieldName(name string) error {
 
 // validateFieldType 验证字段类型
 func validateFieldType(fieldType string) error {
-	validTypes := []string{"string", "number", "boolean", "date", "datetime", "select", "multiselect", "single_select", "multi_select"}
+	validTypes := []string{"string", "text", "number", "boolean", "date", "datetime", "select", "multiselect", "single_select", "multi_select"}
 	for _, validType := range validTypes {
 		if fieldType == validType {
 			return nil
@@ -142,7 +142,7 @@ type FieldConfig struct {
 type CreateFieldRequest struct {
 	TableID  string      `json:"table_id" binding:"required"`
 	Name     string      `json:"name" binding:"required,min=1,max=255"`
-	Type     string      `json:"type" binding:"required,oneof=string number boolean date datetime select multiselect single_select multi_select"`
+	Type     string      `json:"type" binding:"required,oneof=string text number boolean date datetime select multiselect single_select multi_select"`
 	Required bool        `json:"required"`
 	Options  string      `json:"options"` // 下拉选项，逗号分隔
 	Config   FieldConfig `json:"config"`
@@ -151,8 +151,9 @@ type CreateFieldRequest struct {
 // UpdateFieldRequest 更新字段请求
 type UpdateFieldRequest struct {
 	Name     string      `json:"name" binding:"required,min=1,max=255"`
-	Type     string      `json:"type" binding:"required,oneof=string number boolean date datetime select multiselect single_select multi_select"`
+	Type     string      `json:"type" binding:"required,oneof=string text number boolean date datetime select multiselect single_select multi_select"`
 	Required bool        `json:"required"`
+	Options  string      `json:"options"`
 	Config   FieldConfig `json:"config"`
 }
 
@@ -163,6 +164,7 @@ type FieldResponse struct {
 	Name      string      `json:"name"`
 	Type      string      `json:"type"`
 	Required  bool        `json:"required"`
+	Options   string      `json:"options,omitempty"`
 	Config    FieldConfig `json:"config"`
 	CreatedAt string      `json:"created_at"`
 	UpdatedAt string      `json:"updated_at"`
@@ -246,7 +248,7 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 	}
 
 	// 2. 如果前端提供了options字符串，转换为Config
-	if req.Options != "" && (req.Type == "select" || req.Type == "multiselect") {
+	if req.Options != "" && (req.Type == "select" || req.Type == "multiselect" || req.Type == "single_select" || req.Type == "multi_select") {
 		// 将逗号分隔的字符串转换为字符串数组
 		optionsList := strings.Split(req.Options, ",")
 		var cleanedOptions []string
@@ -323,26 +325,33 @@ func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, erro
 
 	// 3. 转换为响应格式
 	result := make([]FieldResponse, len(fields))
-	for i, f := range fields {
+	index := 0
+	for _, f := range fields {
+		if err := s.CheckFieldPermission(userID, f.ID, "read"); err != nil {
+			continue
+		}
+
 		var config FieldConfig
 		if f.Options != "" {
 			_ = json.Unmarshal([]byte(f.Options), &config)
 			// 配置已安全存储在数据库中，解析失败不影响核心功能
 		}
 
-		result[i] = FieldResponse{
+		result[index] = FieldResponse{
 			ID:        f.ID,
 			TableID:   f.TableID,
 			Name:      f.Name,
 			Type:      f.Type,
 			Required:  f.Required,
+			Options:   strings.Join(config.Options, ", "),
 			Config:    config,
 			CreatedAt: f.CreatedAt.Format("2006-01-02 15:04:05"),
 			UpdatedAt: f.UpdatedAt.Format("2006-01-02 15:04:05"),
 		}
+		index++
 	}
 
-	return result, nil
+	return result[:index], nil
 }
 
 // GetField 获取字段详情
@@ -355,6 +364,9 @@ func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) 
 
 	// 2. 检查表访问权限
 	if err := s.checkTableAccess(field.TableID, userID, []string{"owner", "admin", "editor", "viewer"}); err != nil {
+		return nil, err
+	}
+	if err := s.CheckFieldPermission(userID, field.ID, "read"); err != nil {
 		return nil, err
 	}
 
@@ -371,6 +383,7 @@ func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) 
 		Name:      field.Name,
 		Type:      field.Type,
 		Required:  field.Required,
+		Options:   strings.Join(config.Options, ", "),
 		Config:    config,
 		CreatedAt: field.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt: field.UpdatedAt.Format("2006-01-02 15:04:05"),
@@ -391,6 +404,18 @@ func (s *FieldService) UpdateField(fieldID string, req UpdateFieldRequest, userI
 	}
 
 	// 3. 输入验证和清理
+	if req.Options != "" && (req.Type == "select" || req.Type == "multiselect" || req.Type == "single_select" || req.Type == "multi_select") {
+		optionsList := strings.Split(req.Options, ",")
+		var cleanedOptions []string
+		for _, opt := range optionsList {
+			opt = strings.TrimSpace(opt)
+			if opt != "" {
+				cleanedOptions = append(cleanedOptions, opt)
+			}
+		}
+		req.Config.Options = cleanedOptions
+	}
+
 	req.Name = sanitizeFieldName(req.Name)
 	req.Config = sanitizeFieldConfig(req.Config)
 
@@ -496,6 +521,34 @@ func logPermissionActivity(tx *gorm.DB, userID, tableID, fieldID, role string, c
 	}).Error
 }
 
+func upsertFieldPermission(tx *gorm.DB, tableID string, req FieldPermissionRequest) error {
+	now := time.Now()
+
+	return tx.Model(&models.FieldPermission{}).Clauses(clause.OnConflict{
+		Columns: []clause.Column{
+			{Name: "table_id"},
+			{Name: "field_id"},
+			{Name: "role"},
+		},
+		DoUpdates: clause.Assignments(map[string]interface{}{
+			"can_read":   req.CanRead,
+			"can_write":  req.CanWrite,
+			"can_delete": req.CanDelete,
+			"updated_at": now,
+		}),
+	}).Create(map[string]interface{}{
+		"id":         models.GenerateID("flp"),
+		"table_id":   tableID,
+		"field_id":   req.FieldID,
+		"role":       req.Role,
+		"can_read":   req.CanRead,
+		"can_write":  req.CanWrite,
+		"can_delete": req.CanDelete,
+		"created_at": now,
+		"updated_at": now,
+	}).Error
+}
+
 // getUserRole 获取用户在表所属数据库中的角色
 func (s *FieldService) getUserRole(tableID, userID string) (string, error) {
 	table, err := s.getActiveTable(tableID)
@@ -509,6 +562,14 @@ func (s *FieldService) getUserRole(tableID, userID string) (string, error) {
 	}
 
 	return access.Role, nil
+}
+
+func isMissingTableError(err error) bool {
+	if err == nil {
+		return false
+	}
+	message := strings.ToLower(err.Error())
+	return strings.Contains(message, "no such table") || strings.Contains(message, "does not exist")
 }
 
 // CheckFieldPermission 检查用户对特定字段的权限
@@ -530,7 +591,7 @@ func (s *FieldService) CheckFieldPermission(userID, fieldID, action string) erro
 	err = s.db.Where("field_id = ? AND role = ?", fieldID, role).First(&permission).Error
 
 	// 如果没有配置字段级权限，使用表级默认权限
-	if errors.Is(err, gorm.ErrRecordNotFound) {
+	if errors.Is(err, gorm.ErrRecordNotFound) || isMissingTableError(err) {
 		// owner 和 admin 默认有所有权限
 		// editor 默认有读和写权限
 		// viewer 默认只有读权限
@@ -607,22 +668,7 @@ func (s *FieldService) SetFieldPermission(tableID string, req FieldPermissionReq
 	}
 
 	// 3. 原子 upsert 权限配置
-	permission := models.FieldPermission{
-		TableID:   tableID,
-		FieldID:   req.FieldID,
-		Role:      req.Role,
-		CanRead:   req.CanRead,
-		CanWrite:  req.CanWrite,
-		CanDelete: req.CanDelete,
-	}
-	if err := s.db.Clauses(clause.OnConflict{
-		Columns: []clause.Column{
-			{Name: "table_id"},
-			{Name: "field_id"},
-			{Name: "role"},
-		},
-		DoUpdates: clause.AssignmentColumns([]string{"can_read", "can_write", "can_delete", "updated_at"}),
-	}).Create(&permission).Error; err != nil {
+	if err := upsertFieldPermission(s.db, tableID, req); err != nil {
 		return fmt.Errorf("设置权限配置失败: %w", err)
 	}
 
@@ -650,22 +696,7 @@ func (s *FieldService) BatchSetFieldPermissions(tableID string, req BatchFieldPe
 				return fmt.Errorf("字段 %s 不存在", permReq.FieldID)
 			}
 
-			permission := models.FieldPermission{
-				TableID:   tableID,
-				FieldID:   permReq.FieldID,
-				Role:      permReq.Role,
-				CanRead:   permReq.CanRead,
-				CanWrite:  permReq.CanWrite,
-				CanDelete: permReq.CanDelete,
-			}
-			if err := tx.Clauses(clause.OnConflict{
-				Columns: []clause.Column{
-					{Name: "table_id"},
-					{Name: "field_id"},
-					{Name: "role"},
-				},
-				DoUpdates: clause.AssignmentColumns([]string{"can_read", "can_write", "can_delete", "updated_at"}),
-			}).Create(&permission).Error; err != nil {
+			if err := upsertFieldPermission(tx, tableID, permReq); err != nil {
 				return fmt.Errorf("设置权限配置失败: %w", err)
 			}
 

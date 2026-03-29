@@ -171,7 +171,7 @@
             style="width: 100%"
           >
             <el-option
-              v-for="option in getFieldOptions(field.options)"
+              v-for="option in getFieldOptions(field.config)"
               :key="option"
               :label="option"
               :value="option"
@@ -187,7 +187,7 @@
             multiple
           >
             <el-option
-              v-for="option in getFieldOptions(field.options)"
+              v-for="option in getFieldOptions(field.config)"
               :key="option"
               :label="option"
               :value="option"
@@ -211,7 +211,7 @@
             <el-icon><Upload /></el-icon> 选择文件
           </el-button>
           <template #tip>
-            <div class="el-upload__tip">支持上传图片、文档、压缩包等文件，单文件不超过50MB</div>
+            <div class="el-upload__tip">支持上传图片、文档、压缩包等文件，大小限制以系统设置为准</div>
           </template>
         </el-upload>
 
@@ -263,8 +263,9 @@
     </el-dialog>
 
     <!-- 文件预览对话框 -->
-    <el-dialog v-model="previewDialogVisible" title="文件预览" width="800px">
-      <div v-if="previewFile" class="file-preview">
+    <el-dialog v-model="previewDialogVisible" title="文件预览" width="800px" @closed="clearPreviewFile">
+      <div v-loading="previewLoading" class="file-preview">
+        <div v-if="previewFile">
         <img v-if="previewFile.isImage" :src="previewFile.url" style="max-width: 100%" />
         <div v-else-if="previewFile.isPdf">
           <iframe :src="previewFile.url" style="width: 100%; height: 600px"></iframe>
@@ -277,6 +278,7 @@
               >
             </template>
           </el-result>
+        </div>
         </div>
       </div>
     </el-dialog>
@@ -297,7 +299,9 @@ interface Field {
   name: string
   type: string
   required: boolean
-  options?: string
+  config?: {
+    options?: string[]
+  }
   created_at: string
 }
 
@@ -345,6 +349,7 @@ const attachedFiles = ref<
 const uploadProgress = ref(0)
 const loadingFiles = ref(false)
 const previewDialogVisible = ref(false)
+const previewLoading = ref(false)
 const previewFile = ref<{ id: string; url: string; isImage: boolean; isPdf: boolean } | null>(null)
 const isEdit = computed(() => isEditMode.value)
 
@@ -390,9 +395,8 @@ const getFieldWidth = (type: string) => {
   return widthMap[type] || 150
 }
 
-const getFieldOptions = (optionsStr: string | undefined) => {
-  if (!optionsStr) return []
-  return optionsStr.split(',').map((opt) => opt.trim())
+const getFieldOptions = (config?: { options?: string[] }) => {
+  return config?.options || []
 }
 
 const loadFields = async () => {
@@ -587,18 +591,23 @@ const loadAttachedFiles = async (recordId: string) => {
 }
 
 // 文件上传前校验
-const beforeUpload = (file: { size: number }) => {
-  const isLt50M = file.size / 1024 / 1024 < 50
-  if (!isLt50M) {
-    ElMessage.error('文件大小不能超过50MB')
-    return false
-  }
+const beforeUpload = () => {
   return true
 }
 
 // 处理文件超出限制
 const handleExceed = () => {
   ElMessage.warning('最多只能上传5个文件')
+}
+
+const getErrorMessage = (error: unknown, fallback: string) => {
+  if (typeof error === 'object' && error !== null) {
+    const maybeResponse = (error as { response?: { data?: { message?: string } } }).response
+    if (maybeResponse?.data?.message) {
+      return maybeResponse.data.message
+    }
+  }
+  return fallback
 }
 
 // 处理文件选择（带进度）
@@ -627,30 +636,61 @@ const handleFileSelect = async (file: { raw: File }) => {
     loadAttachedFiles(currentRecordId.value)
     fileList.value = []
     uploadProgress.value = 0
-  } catch {
-    ElMessage.error('文件上传失败')
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '文件上传失败'))
     uploadProgress.value = 0
   }
 }
 
 // 预览文件
-const handlePreviewFile = (file: { id: string; file_name: string }) => {
+const clearPreviewFile = () => {
+  if (previewFile.value?.url) {
+    window.URL.revokeObjectURL(previewFile.value.url)
+  }
+  previewFile.value = null
+  previewLoading.value = false
+}
+
+const handlePreviewFile = async (file: { id: string; file_name: string }) => {
   const extension = file.file_name.split('.').pop()?.toLowerCase()
   const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']
 
-  previewFile.value = {
-    id: file.id,
-    url: fileAPI.download(file.id),
-    isImage: imageExtensions.includes(extension || ''),
-    isPdf: extension === 'pdf',
-  }
+  clearPreviewFile()
+  previewLoading.value = true
   previewDialogVisible.value = true
+
+  try {
+    const blob = await fileAPI.downloadBlob(file.id)
+    const objectUrl = window.URL.createObjectURL(blob)
+    previewFile.value = {
+      id: file.id,
+      url: objectUrl,
+      isImage: imageExtensions.includes(extension || ''),
+      isPdf: extension === 'pdf',
+    }
+  } catch (error) {
+    previewDialogVisible.value = false
+    ElMessage.error(getErrorMessage(error, '文件预览失败'))
+  } finally {
+    previewLoading.value = false
+  }
 }
 
 // 下载文件
-const handleDownloadFile = (file: { id: string }) => {
-  const url = fileAPI.download(file.id)
-  window.open(url, '_blank')
+const handleDownloadFile = async (file: { id: string; file_name?: string }) => {
+  try {
+    const blob = await fileAPI.downloadBlob(file.id)
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = file.file_name || `file-${file.id}`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+  } catch (error) {
+    ElMessage.error(getErrorMessage(error, '文件下载失败'))
+  }
 }
 
 // 删除文件

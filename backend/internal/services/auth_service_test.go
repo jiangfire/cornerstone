@@ -6,6 +6,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
@@ -15,11 +16,17 @@ func setupAuthTestDB(t *testing.T) *gorm.DB {
 	// 设置测试环境变量
 	_ = os.Setenv("JWT_SECRET", "test-secret-key-for-testing-only")
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	dbFile := t.TempDir() + "\\auth-service-test.db"
+	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
 	assert.NoError(t, err)
+	sqlDB, err := db.DB()
+	assert.NoError(t, err)
+	t.Cleanup(func() {
+		_ = sqlDB.Close()
+	})
 
 	// 自动迁移
-	err = db.AutoMigrate(&models.User{}, &models.TokenBlacklist{})
+	err = db.AutoMigrate(&models.User{}, &models.TokenBlacklist{}, &models.AppSettings{})
 	assert.NoError(t, err)
 
 	return db
@@ -177,4 +184,49 @@ func TestAuthService_Login(t *testing.T) {
 		_, err := service.Login(loginReq)
 		assert.Error(t, err)
 	})
+}
+
+func TestAuthService_FirstUserBecomesSystemAdminAndRespectsRegistrationSetting(t *testing.T) {
+	db := setupAuthTestDB(t)
+	service := NewAuthService(db)
+
+	firstResp, err := service.Register(RegisterRequest{
+		Username: "adminuser",
+		Email:    "admin@example.com",
+		Password: "Pass123",
+	})
+	require.NoError(t, err)
+	require.True(t, firstResp.User.IsSystemAdmin)
+
+	isAdmin, err := service.IsSystemAdmin(firstResp.User.ID)
+	require.NoError(t, err)
+	require.True(t, isAdmin)
+
+	err = db.FirstOrCreate(&models.AppSettings{ID: 1}, &models.AppSettings{
+		ID:                1,
+		SystemName:        "Cornerstone",
+		SystemDescription: "test",
+		AllowRegistration: true,
+		MaxFileSize:       50,
+		DBType:            "sqlite",
+		DBPoolSize:        10,
+		DBTimeout:         30,
+		PluginTimeout:     300,
+		PluginWorkDir:     "./plugins",
+		PluginAutoUpdate:  false,
+		UpdatedBy:         firstResp.User.ID,
+	}).Error
+	require.NoError(t, err)
+	err = db.Model(&models.AppSettings{}).
+		Where("id = ?", 1).
+		Update("allow_registration", false).Error
+	require.NoError(t, err)
+
+	_, err = service.Register(RegisterRequest{
+		Username: "blockeduser",
+		Email:    "blocked@example.com",
+		Password: "Pass123",
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "系统已关闭注册")
 }

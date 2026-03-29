@@ -65,6 +65,48 @@ type DeleteAccountRequest struct {
 	Password string `json:"password" binding:"required"`
 }
 
+func resolveUserTokenRole(user models.User) string {
+	if user.IsSystemAdmin {
+		return "admin"
+	}
+	return "user"
+}
+
+func (s *AuthService) hasAnyUsers(tx *gorm.DB) (bool, error) {
+	queryDB := s.db
+	if tx != nil {
+		queryDB = tx
+	}
+
+	var user models.User
+	if err := queryDB.Select("id").Order("created_at ASC").First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, nil
+		}
+		return false, fmt.Errorf("检查用户数量失败: %w", err)
+	}
+	return true, nil
+}
+
+func (s *AuthService) ensureRegistrationAllowed() error {
+	hasUsers, err := s.hasAnyUsers(nil)
+	if err != nil {
+		return err
+	}
+	if !hasUsers {
+		return nil
+	}
+
+	settings, err := NewSettingsService(s.db).GetSettings()
+	if err != nil {
+		return fmt.Errorf("读取系统设置失败: %w", err)
+	}
+	if !settings.AllowRegistration {
+		return errors.New("系统已关闭注册")
+	}
+	return nil
+}
+
 // validateUsername 验证用户名格式
 func validateUsername(username string) error {
 	// 去除首尾空格
@@ -138,6 +180,10 @@ func sanitizeInput(input string) string {
 
 // Register 用户注册
 func (s *AuthService) Register(req RegisterRequest) (*AuthResponse, error) {
+	if err := s.ensureRegistrationAllowed(); err != nil {
+		return nil, err
+	}
+
 	// 1. 输入验证和清理
 	req.Username = sanitizeInput(req.Username)
 	req.Email = sanitizeInput(req.Email)
@@ -179,19 +225,32 @@ func (s *AuthService) Register(req RegisterRequest) (*AuthResponse, error) {
 		return nil, fmt.Errorf("密码加密失败: %w", err)
 	}
 
-	// 5. 创建用户
+	// 5. 创建用户，并将首个用户提升为系统管理员
 	user := models.User{
 		Username: req.Username,
 		Email:    req.Email,
 		Password: hashedPassword,
 	}
 
-	if err := s.db.Create(&user).Error; err != nil {
-		return nil, fmt.Errorf("创建用户失败: %w", err)
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		hasUsers, err := s.hasAnyUsers(tx)
+		if err != nil {
+			return err
+		}
+		if !hasUsers {
+			user.IsSystemAdmin = true
+		}
+
+		if err := tx.Create(&user).Error; err != nil {
+			return fmt.Errorf("创建用户失败: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	// 6. 生成JWT Token
-	token, err := utils.GenerateToken(user.ID, user.Username, "user")
+	token, err := utils.GenerateToken(user.ID, user.Username, resolveUserTokenRole(user))
 	if err != nil {
 		return nil, fmt.Errorf("生成Token失败: %w", err)
 	}
@@ -239,7 +298,7 @@ func (s *AuthService) Login(req LoginRequest) (*AuthResponse, error) {
 	}
 
 	// 4. 生成JWT Token
-	token, err := utils.GenerateToken(user.ID, user.Username, "user")
+	token, err := utils.GenerateToken(user.ID, user.Username, resolveUserTokenRole(user))
 	if err != nil {
 		return nil, fmt.Errorf("生成Token失败: %w", err)
 	}
@@ -268,6 +327,20 @@ func (s *AuthService) GetUserByID(userID string) (*models.User, error) {
 	user.Password = ""
 
 	return &user, nil
+}
+
+// IsSystemAdmin 检查用户是否为系统管理员
+func (s *AuthService) IsSystemAdmin(userID string) (bool, error) {
+	var user models.User
+	if err := s.db.Select("id, is_system_admin").
+		Where("id = ? AND deleted_at IS NULL", userID).
+		First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return false, errors.New("用户不存在")
+		}
+		return false, fmt.Errorf("查询用户失败: %w", err)
+	}
+	return user.IsSystemAdmin, nil
 }
 
 // UpdateProfile 更新个人资料

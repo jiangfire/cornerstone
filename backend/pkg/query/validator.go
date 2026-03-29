@@ -448,7 +448,7 @@ func (v *Validator) AutoFilterByPermission(req *QueryRequest, userID string) err
 			return errors.New("您没有访问任何数据库的权限")
 		}
 		appendInCondition(req.Where, qualifyBaseField(req.From, "database_id"), dbIDs)
-	case "fields", "plugin_bindings", "plugin_executions":
+	case "fields":
 		tableIDs, err := v.getAccessibleTableIDs(userID)
 		if err != nil {
 			return err
@@ -457,6 +457,29 @@ func (v *Validator) AutoFilterByPermission(req *QueryRequest, userID string) err
 			return errors.New("您没有访问任何表的权限")
 		}
 		appendInCondition(req.Where, qualifyBaseField(req.From, "table_id"), tableIDs)
+	case "plugin_bindings", "plugin_executions":
+		tableIDs, err := v.getAccessibleTableIDs(userID)
+		if err != nil {
+			return err
+		}
+		if len(tableIDs) == 0 {
+			return errors.New("您没有访问任何表的权限")
+		}
+		appendInCondition(req.Where, qualifyBaseField(req.From, "table_id"), tableIDs)
+
+		pluginIDs, err := v.getOwnedPluginIDs(userID)
+		if err != nil {
+			return err
+		}
+		if len(pluginIDs) == 0 {
+			req.Where.And = append([]Condition{{
+				Field: qualifyBaseField(req.From, "plugin_id"),
+				Op:    "eq",
+				Value: "__no_owned_plugin__",
+			}}, req.Where.And...)
+			return nil
+		}
+		appendInCondition(req.Where, qualifyBaseField(req.From, "plugin_id"), pluginIDs)
 	case "files":
 		recordIDs, err := v.getAccessibleRecordIDs(userID)
 		if err != nil {
@@ -523,6 +546,20 @@ func (v *Validator) AutoFilterByPermission(req *QueryRequest, userID string) err
 	}
 
 	return nil
+}
+
+func (v *Validator) getOwnedPluginIDs(userID string) ([]string, error) {
+	var plugins []models.Plugin
+	if err := v.db.Where("created_by = ?", userID).Find(&plugins).Error; err != nil {
+		return nil, err
+	}
+
+	pluginIDs := make([]string, 0, len(plugins))
+	for _, plugin := range plugins {
+		pluginIDs = append(pluginIDs, plugin.ID)
+	}
+
+	return pluginIDs, nil
 }
 
 // getAccessibleTableIDs 获取用户可访问的表 ID 列表

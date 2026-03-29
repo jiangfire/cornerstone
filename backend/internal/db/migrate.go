@@ -55,8 +55,8 @@ func (cb *circuitBreaker) markFailure() {
 }
 
 var (
-	viewRefreshBreaker  = newCircuitBreaker(3, 2*time.Minute)
-	tokenCleanupBreaker = newCircuitBreaker(3, 2*time.Minute)
+	viewRefreshBreaker    = newCircuitBreaker(3, 2*time.Minute)
+	tokenCleanupBreaker   = newCircuitBreaker(3, 2*time.Minute)
 	outboxDispatchBreaker = newCircuitBreaker(3, 2*time.Minute)
 )
 
@@ -166,6 +166,30 @@ func Migrate() error {
 		PluginAutoUpdate:  false,
 	}).Error; err != nil {
 		return fmt.Errorf("初始化系统设置失败: %w", err)
+	}
+
+	// 确保至少存在一个系统管理员，避免系统设置无法维护
+	var adminCount int64
+	if err := database.Model(&models.User{}).
+		Where("is_system_admin = ? AND deleted_at IS NULL", true).
+		Count(&adminCount).Error; err != nil {
+		return fmt.Errorf("检查系统管理员失败: %w", err)
+	}
+	if adminCount == 0 {
+		var firstUser models.User
+		err := database.Where("deleted_at IS NULL").
+			Order("created_at ASC").
+			First(&firstUser).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return fmt.Errorf("查询首个用户失败: %w", err)
+		}
+		if err == nil {
+			if err := database.Model(&models.User{}).
+				Where("id = ?", firstUser.ID).
+				Update("is_system_admin", true).Error; err != nil {
+				return fmt.Errorf("初始化系统管理员失败: %w", err)
+			}
+		}
 	}
 
 	logger.Info("数据库迁移完成 ✅")

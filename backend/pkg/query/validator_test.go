@@ -20,6 +20,9 @@ func setupValidatorTestDB(t *testing.T) *gorm.DB {
 		&models.Table{},
 		&models.Record{},
 		&models.File{},
+		&models.Plugin{},
+		&models.PluginBinding{},
+		&models.PluginExecution{},
 		&models.Organization{},
 		&models.OrganizationMember{},
 	))
@@ -554,6 +557,82 @@ func TestValidator_AutoFilterByPermissionForPluginsPreservesExistingWhere(t *tes
 	require.Len(t, req.Where.And, 2)
 	require.Equal(t, "plugins.created_by", req.Where.And[0].Field)
 	require.Equal(t, "name", req.Where.And[1].Field)
+}
+
+func TestValidator_AutoFilterByPermissionForPluginBindingsUsesOwnedPluginsAndAccessibleTables(t *testing.T) {
+	db := setupValidatorTestDB(t)
+	validator := NewValidator(db)
+
+	require.NoError(t, db.Create(&models.DatabaseAccess{
+		UserID:     "usr_plugin_owner",
+		DatabaseID: "db_allowed",
+		Role:       "viewer",
+	}).Error)
+	require.NoError(t, db.Create(&models.Table{
+		ID:         "tbl_allowed",
+		DatabaseID: "db_allowed",
+		Name:       "AllowedTable",
+	}).Error)
+	require.NoError(t, db.Create(&models.Plugin{
+		ID:        "plg_owned",
+		Name:      "OwnedPlugin",
+		Language:  "bash",
+		EntryFile: "main.sh",
+		CreatedBy: "usr_plugin_owner",
+	}).Error)
+	require.NoError(t, db.Create(&models.Plugin{
+		ID:        "plg_other",
+		Name:      "OtherPlugin",
+		Language:  "bash",
+		EntryFile: "main.sh",
+		CreatedBy: "usr_other",
+	}).Error)
+
+	req := &QueryRequest{
+		From:   "plugin_bindings",
+		Select: []string{"id", "plugin_id", "table_id"},
+		Page:   1,
+		Size:   20,
+	}
+
+	require.NoError(t, validator.AutoFilterByPermission(req, "usr_plugin_owner"))
+	require.NotNil(t, req.Where)
+	require.Len(t, req.Where.And, 2)
+	require.Equal(t, "plugin_bindings.plugin_id", req.Where.And[0].Field)
+	require.Equal(t, "in", req.Where.And[0].Op)
+	require.ElementsMatch(t, []interface{}{"plg_owned"}, req.Where.And[0].Value)
+	require.Equal(t, "plugin_bindings.table_id", req.Where.And[1].Field)
+}
+
+func TestValidator_AutoFilterByPermissionForPluginExecutionsWithoutOwnedPluginsUsesImpossibleCondition(t *testing.T) {
+	db := setupValidatorTestDB(t)
+	validator := NewValidator(db)
+
+	require.NoError(t, db.Create(&models.DatabaseAccess{
+		UserID:     "usr_plugin_viewer",
+		DatabaseID: "db_allowed",
+		Role:       "viewer",
+	}).Error)
+	require.NoError(t, db.Create(&models.Table{
+		ID:         "tbl_allowed",
+		DatabaseID: "db_allowed",
+		Name:       "AllowedTable",
+	}).Error)
+
+	req := &QueryRequest{
+		From:   "plugin_executions",
+		Select: []string{"id", "plugin_id", "table_id"},
+		Page:   1,
+		Size:   20,
+	}
+
+	require.NoError(t, validator.AutoFilterByPermission(req, "usr_plugin_viewer"))
+	require.NotNil(t, req.Where)
+	require.Len(t, req.Where.And, 2)
+	require.Equal(t, "plugin_executions.plugin_id", req.Where.And[0].Field)
+	require.Equal(t, "eq", req.Where.And[0].Op)
+	require.Equal(t, "__no_owned_plugin__", req.Where.And[0].Value)
+	require.Equal(t, "plugin_executions.table_id", req.Where.And[1].Field)
 }
 
 func TestValidator_AutoFilterByPermissionForActivityLogsMergesExistingWhere(t *testing.T) {

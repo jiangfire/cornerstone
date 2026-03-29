@@ -8,6 +8,7 @@ export interface User {
   username: string
   email?: string
   role?: string
+  is_system_admin?: boolean
   phone?: string
   bio?: string
   avatar?: string

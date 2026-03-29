@@ -1,6 +1,6 @@
 # Cornerstone API 文档
 
-**最后校对**: 2026-03-28  
+**最后校对**: 2026-03-29  
 **基准代码**: `backend/cmd/server/main.go`、`backend/internal/handlers/*`、`backend/pkg/query/*`  
 **基础地址**: `http://localhost:8080`  
 **路由真值**: 以 [backend/cmd/server/main.go](../backend/cmd/server/main.go) 为准
@@ -36,10 +36,15 @@ Authorization: Bearer <jwt-token>
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| `POST` | `/api/auth/register` | 注册 |
+| `POST` | `/api/auth/register` | 注册；首个用户会自动成为系统管理员，后续注册受 `app_settings.allow_registration` 控制 |
 | `POST` | `/api/auth/login` | 登录 |
 | `POST` | `/api/auth/logout` | 登出并拉黑当前 token |
-| `GET` | `/api/users/me` | 获取当前用户 |
+| `GET` | `/api/users/me` | 获取当前用户；响应包含 `is_system_admin` |
+
+补充说明：
+
+- `/api/auth/register` 在系统已有用户后，会读取系统设置；当 `allow_registration=false` 时拒绝注册。
+- `/api/settings` 不是“只要已登录就能访问”，当前代码要求系统管理员权限。
 
 ### 2.2 集成令牌认证
 
@@ -114,10 +119,10 @@ Content-Type: application/json
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| `POST` | `/api/auth/register` | 注册 |
+| `POST` | `/api/auth/register` | 注册；首个用户自动成为系统管理员，后续注册受系统设置控制 |
 | `POST` | `/api/auth/login` | 登录 |
 | `POST` | `/api/auth/logout` | 登出 |
-| `GET` | `/api/users/me` | 当前用户资料 |
+| `GET` | `/api/users/me` | 当前用户资料，包含 `is_system_admin` |
 | `PUT` | `/api/users/me` | 更新个人资料 |
 | `PUT` | `/api/users/me/password` | 修改密码 |
 | `DELETE` | `/api/users/me` | 注销账号 |
@@ -170,36 +175,42 @@ Content-Type: application/json
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | `POST` | `/api/records` | 创建记录 |
-| `GET` | `/api/records` | 记录列表 |
-| `GET` | `/api/records/export` | 导出记录 |
-| `GET` | `/api/records/:id` | 记录详情 |
-| `PUT` | `/api/records/:id` | 更新记录 |
+| `GET` | `/api/records` | 记录列表；响应会按字段级读权限过滤不可见字段 |
+| `GET` | `/api/records/export` | 导出记录；CSV/JSON 均按字段级读权限过滤 |
+| `GET` | `/api/records/:id` | 记录详情；响应会按字段级读权限过滤不可见字段 |
+| `PUT` | `/api/records/:id` | 更新记录；仅允许写入有字段级写权限的字段，且以 merge 方式更新已存数据 |
 | `DELETE` | `/api/records/:id` | 删除记录 |
 | `POST` | `/api/records/batch` | 批量创建记录 |
-| `POST` | `/api/files/upload` | 上传附件 |
-| `GET` | `/api/files/:id` | 获取文件元数据 |
-| `GET` | `/api/files/:id/download` | 下载文件 |
-| `DELETE` | `/api/files/:id` | 删除文件 |
-| `GET` | `/api/records/:id/files` | 记录附件列表 |
+| `POST` | `/api/files/upload` | 上传附件；要求目标记录具备写权限，大小上限读取 `app_settings.max_file_size` |
+| `GET` | `/api/files/:id` | 获取文件元数据；要求目标记录具备读权限 |
+| `GET` | `/api/files/:id/download` | 下载文件；要求目标记录具备读权限 |
+| `DELETE` | `/api/files/:id` | 删除文件；要求目标记录具备写权限 |
+| `GET` | `/api/records/:id/files` | 记录附件列表；要求目标记录具备读权限 |
 
 ### 4.6 插件、统计、系统设置
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | `POST` | `/api/plugins` | 创建插件 |
-| `GET` | `/api/plugins` | 插件列表 |
-| `GET` | `/api/plugins/:id` | 插件详情 |
-| `PUT` | `/api/plugins/:id` | 更新插件 |
-| `DELETE` | `/api/plugins/:id` | 删除插件 |
-| `POST` | `/api/plugins/:id/bind` | 绑定插件到表 |
-| `DELETE` | `/api/plugins/:id/unbind` | 解绑插件 |
-| `GET` | `/api/plugins/:id/bindings` | 插件绑定列表 |
-| `POST` | `/api/plugins/:id/execute` | 手动执行插件 |
-| `GET` | `/api/plugins/:id/executions` | 插件执行记录 |
+| `GET` | `/api/plugins` | 插件列表；仅返回当前用户创建的插件 |
+| `GET` | `/api/plugins/:id` | 插件详情；仅插件创建者可访问 |
+| `PUT` | `/api/plugins/:id` | 更新插件；仅插件创建者可操作 |
+| `DELETE` | `/api/plugins/:id` | 删除插件；仅插件创建者可操作 |
+| `POST` | `/api/plugins/:id/bind` | 绑定插件到表；要求插件归属当前用户且对目标表有 `owner/admin/editor` 权限 |
+| `DELETE` | `/api/plugins/:id/unbind` | 解绑插件；要求插件归属当前用户且对目标表有 `owner/admin/editor` 权限 |
+| `GET` | `/api/plugins/:id/bindings` | 插件绑定列表；仅插件创建者可查看 |
+| `POST` | `/api/plugins/:id/execute` | 手动执行插件；要求插件归属当前用户且对目标表有访问权限 |
+| `GET` | `/api/plugins/:id/executions` | 插件执行记录；仅插件创建者可查看 |
 | `GET` | `/api/stats/summary` | 统计汇总 |
 | `GET` | `/api/stats/activities` | 最近活动 |
-| `GET` | `/api/settings` | 读取系统设置 |
-| `PUT` | `/api/settings` | 更新系统设置 |
+| `GET` | `/api/settings` | 读取系统设置；仅系统管理员可访问 |
+| `PUT` | `/api/settings` | 更新系统设置；仅系统管理员可访问 |
+
+关键约束：
+
+- 插件的“可见性/可管理性”当前按 `created_by` 收口，不是数据库成员共享模型。
+- 浏览器若直接打开 `/api/files/:id/download` 裸 URL，不会自动附带 `Authorization` 头；下载和预览应通过能显式带 JWT 的请求完成。
+- 插件运行目录、超时、注册开关、上传大小上限等系统级配置都通过 `/api/settings` 维护，且只允许系统管理员读写。
 
 ### 4.7 Query DSL（查询 DSL，面向受控查询的 JSON 查询语言）
 

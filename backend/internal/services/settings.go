@@ -6,7 +6,6 @@ import (
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 // SettingsService 系统设置服务
@@ -89,10 +88,7 @@ func (s *SettingsService) UpdateSettings(req UpdateSettingsRequest, userID strin
 	current.PluginAutoUpdate = req.PluginAutoUpdate
 	current.UpdatedBy = userID
 
-	if err := s.db.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "id"}},
-		UpdateAll: true,
-	}).Create(current).Error; err != nil {
+	if err := s.db.Save(current).Error; err != nil {
 		return nil, fmt.Errorf("更新系统设置失败: %w", err)
 	}
 

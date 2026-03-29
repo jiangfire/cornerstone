@@ -41,12 +41,13 @@ func UploadFile(c *gin.Context) {
 
 // GetFile 获取文件信息
 func GetFile(c *gin.Context) {
+	userID := middleware.GetUserID(c)
 	fileID := c.Param("id")
 
 	fileService := services.NewFileService(db.DB())
-	file, err := fileService.GetFile(fileID)
+	file, err := fileService.GetFile(fileID, userID)
 	if err != nil {
-		types.Error(c, 404, err.Error())
+		types.Error(c, 403, err.Error())
 		return
 	}
 
@@ -55,12 +56,13 @@ func GetFile(c *gin.Context) {
 
 // DownloadFile 下载文件
 func DownloadFile(c *gin.Context) {
+	userID := middleware.GetUserID(c)
 	fileID := c.Param("id")
 
 	fileService := services.NewFileService(db.DB())
-	file, err := fileService.GetFile(fileID)
+	file, err := fileService.GetFile(fileID, userID)
 	if err != nil {
-		types.Error(c, 404, err.Error())
+		types.Error(c, 403, err.Error())
 		return
 	}
 
@@ -69,11 +71,12 @@ func DownloadFile(c *gin.Context) {
 
 // DeleteFile 删除文件
 func DeleteFile(c *gin.Context) {
+	userID := middleware.GetUserID(c)
 	fileID := c.Param("id")
 
 	fileService := services.NewFileService(db.DB())
-	if err := fileService.DeleteFile(fileID); err != nil {
-		types.Error(c, 500, err.Error())
+	if err := fileService.DeleteFile(fileID, userID); err != nil {
+		types.Error(c, 403, err.Error())
 		return
 	}
 
@@ -82,12 +85,13 @@ func DeleteFile(c *gin.Context) {
 
 // ListRecordFiles 列出记录的所有文件
 func ListRecordFiles(c *gin.Context) {
+	userID := middleware.GetUserID(c)
 	recordID := c.Param("id")
 
 	fileService := services.NewFileService(db.DB())
-	files, err := fileService.ListRecordFiles(recordID)
+	files, err := fileService.ListRecordFiles(recordID, userID)
 	if err != nil {
-		types.Error(c, 500, err.Error())
+		types.Error(c, 403, err.Error())
 		return
 	}
 
