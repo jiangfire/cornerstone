@@ -10,7 +10,7 @@ import (
 )
 
 func setupIntegrationEventTestDB(t *testing.T) *gorm.DB {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), newServiceTestGormConfig())
 	require.NoError(t, err)
 
 	err = db.AutoMigrate(

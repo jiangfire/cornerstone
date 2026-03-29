@@ -1,7 +1,6 @@
 package services
 
 import (
-	"os"
 	"testing"
 	"time"
 
@@ -14,9 +13,9 @@ import (
 func setupOrgTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	_ = os.Setenv("JWT_SECRET", "test-secret-key-for-testing-only")
+	t.Setenv("JWT_SECRET", "test-secret-key-for-testing-only")
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), newServiceTestGormConfig())
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&models.User{}, &models.Organization{}, &models.OrganizationMember{}))
 

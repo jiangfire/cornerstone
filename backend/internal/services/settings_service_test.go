@@ -12,7 +12,7 @@ import (
 func setupSettingsServiceTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), newServiceTestGormConfig())
 	require.NoError(t, err)
 	require.NoError(t, db.AutoMigrate(&models.AppSettings{}))
 	return db

@@ -1,7 +1,6 @@
 package services
 
 import (
-	"os"
 	"testing"
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
@@ -14,10 +13,10 @@ import (
 // setupTestDB 创建测试数据库
 func setupAuthTestDB(t *testing.T) *gorm.DB {
 	// 设置测试环境变量
-	_ = os.Setenv("JWT_SECRET", "test-secret-key-for-testing-only")
+	t.Setenv("JWT_SECRET", "test-secret-key-for-testing-only")
 
 	dbFile := t.TempDir() + "\\auth-service-test.db"
-	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(dbFile), newServiceTestGormConfig())
 	assert.NoError(t, err)
 	sqlDB, err := db.DB()
 	assert.NoError(t, err)

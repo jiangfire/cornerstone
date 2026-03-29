@@ -1,7 +1,6 @@
 package services
 
 import (
-	"os"
 	"testing"
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
@@ -13,10 +12,10 @@ import (
 func setupResourceTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
-	_ = os.Setenv("JWT_SECRET", "test-secret-key-for-resource-services")
+	t.Setenv("JWT_SECRET", "test-secret-key-for-resource-services")
 
 	dbFile := t.TempDir() + "\\resource-service-test.db"
-	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(dbFile), newServiceTestGormConfig())
 	require.NoError(t, err)
 	sqlDB, err := db.DB()
 	require.NoError(t, err)

@@ -16,7 +16,7 @@ func TestSQLiteConnection(t *testing.T) {
 	_ = os.Remove(dbFile)
 	defer func() { _ = os.Remove(dbFile) }()
 
-	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(dbFile), newServiceTestGormConfig())
 	if err != nil {
 		t.Fatalf("failed to connect to test database: %v", err)
 	}

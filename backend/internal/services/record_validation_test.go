@@ -21,7 +21,7 @@ func setupTestDB() *gorm.DB {
 	// Clean up any existing test database
 	_ = os.Remove(dbFile)
 
-	db, err := gorm.Open(sqlite.Open(dbFile), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(dbFile), newServiceTestGormConfig())
 	if err != nil {
 		panic(fmt.Sprintf("failed to connect to test database: %v", err))
 	}
@@ -34,6 +34,11 @@ func setupTestDB() *gorm.DB {
 		&models.Table{},
 		&models.Field{},
 		&models.Record{},
+		&models.FieldPermission{},
+		&models.Plugin{},
+		&models.PluginBinding{},
+		&models.PluginExecution{},
+		&models.AppSettings{},
 	)
 	if err != nil {
 		panic(fmt.Sprintf("failed to migrate models: %v", err))

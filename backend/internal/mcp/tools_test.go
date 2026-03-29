@@ -14,7 +14,7 @@ import (
 func setupToolServiceTest(t *testing.T) (*ToolService, *gorm.DB, models.User) {
 	t.Helper()
 
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), newMCPTestGormConfig())
 	require.NoError(t, err)
 
 	require.NoError(t, db.AutoMigrate(

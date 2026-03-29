@@ -13,7 +13,7 @@ import (
 )
 
 func setupMCPTestServer(t *testing.T) (*Server, *gorm.DB, models.User) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), newMCPTestGormConfig())
 	require.NoError(t, err)
 
 	require.NoError(t, db.AutoMigrate(
@@ -146,7 +146,7 @@ func TestServerToolsCallQueryDataExpandsAllowedFields(t *testing.T) {
 }
 
 func TestToolServiceCreateDatabasePublishesNotification(t *testing.T) {
-	db, err := gorm.Open(sqlite.Open(":memory:"), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(":memory:"), newMCPTestGormConfig())
 	require.NoError(t, err)
 
 	require.NoError(t, db.AutoMigrate(
