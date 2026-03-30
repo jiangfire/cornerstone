@@ -101,4 +101,4 @@ jobs:
       - name: Verify embedded build compiles
         run: |
           cd backend
-          CGO_ENABLED=0 go build -o /dev/null ./cmd/server
+          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.Version=ci" -o /dev/null ./cmd/server
