@@ -123,9 +123,8 @@ jobs:
 
           ## Docker
 
-          Docker images are available at:
-          - Backend: \`ghcr.io/${{ github.repository }}/backend:${{ github.ref_name }}\`
-          - Frontend: \`ghcr.io/${{ github.repository }}/frontend:${{ github.ref_name }}\`
+          Docker image is available at:
+          - \`ghcr.io/${{ github.repository }}:${{ github.ref_name }}\`
 
           **Full Changelog**: https://github.com/${{ github.repository }}/compare/...
           EOF

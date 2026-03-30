@@ -76,7 +76,7 @@ docker compose up -d --build
 
 ### 3) 访问服务
 
-- 前端：`http://localhost:3000`
+- 应用首页：`http://localhost:8080`
 - 后端 API：`http://localhost:8080/api`
 - 健康检查：`http://localhost:8080/health`
 
@@ -129,6 +129,18 @@ pnpm run build:embed
 ```
 
 这会先构建 `frontend/dist`，再同步到 `backend/internal/frontend/dist`。
+
+### 单 Docker 镜像说明
+
+发布产物默认只提供一个 Docker 镜像：
+
+- `ghcr.io/jiangfire/cornerstone:<tag>`
+
+该镜像同时包含：
+
+- Go 后端 API
+- 已嵌入的前端静态资源
+- 单容器对外提供 `http://localhost:8080`
 
 ### Windows 双击启动
 

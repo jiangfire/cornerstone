@@ -1,17 +1,31 @@
-# Build stage
+# Frontend build stage
+FROM node:20-alpine AS frontend-builder
+
+RUN corepack enable && corepack prepare pnpm@10.28.0 --activate
+
+WORKDIR /app/frontend
+
+COPY frontend/package.json frontend/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
+
+COPY frontend/ ./
+RUN pnpm run build-only
+
+# Backend build stage
 FROM golang:1.25.4-alpine AS builder
 
 # Install build dependencies
 RUN apk add --no-cache git ca-certificates tzdata
 
-WORKDIR /app
+WORKDIR /app/backend
 
 # Copy go mod files
-COPY go.mod go.sum ./
+COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 
 # Copy source code
-COPY . .
+COPY backend/ ./
+COPY --from=frontend-builder /app/frontend/dist ./internal/frontend/dist
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
@@ -33,10 +47,10 @@ RUN addgroup -g 1000 app && \
 WORKDIR /app
 
 # Copy binary from builder
-COPY --from=builder /app/cornerstone .
+COPY --from=builder /app/backend/cornerstone .
 
 # Copy config example (optional)
-COPY --from=builder /app/.env.example .env.example
+COPY --from=builder /app/backend/.env.example .env.example
 
 # Change ownership
 RUN chown -R app:app /app

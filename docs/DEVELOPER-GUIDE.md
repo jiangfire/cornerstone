@@ -372,8 +372,10 @@ services:
     ports:
       - "5432:5432"
 
-  backend:
-    build: ./backend
+  app:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
     environment:
       DATABASE_URL: postgres://user:password@postgres:5432/cornerstone?sslmode=disable
       JWT_SECRET: ${JWT_SECRET}
@@ -391,6 +393,11 @@ volumes:
 ```bash
 docker-compose up -d
 ```
+
+说明：
+- 单 Docker 镜像同时提供前端页面和后端 API
+- 浏览器访问 `http://localhost:8080`
+- API 入口仍为 `http://localhost:8080/api`
 
 ### 生产环境检查清单
 
