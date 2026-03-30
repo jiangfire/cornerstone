@@ -30,19 +30,19 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Enable pnpm via Corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@9 --activate
 
       - name: Build frontend
         run: |
@@ -51,22 +51,19 @@ jobs:
           pnpm run build:embed
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.25.4'
           cache-dependency-path: backend/go.sum
 
       - name: Build binary
-        env:
-          GOOS: ${{ matrix.goos }}
-          GOARCH: ${{ matrix.goarch }}
-          CGO_ENABLED: 0
         run: |
           cd backend
-          go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" -trimpath -o cornerstone-${{ matrix.suffix }} ./cmd/server
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 \
+            go build -ldflags="-s -w -X main.Version=${{ github.ref_name }}" -trimpath -o cornerstone-${{ matrix.suffix }} ./cmd/server
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: cornerstone-${{ matrix.suffix }}
           path: backend/cornerstone-${{ matrix.suffix }}
@@ -80,10 +77,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: artifacts
 
@@ -135,13 +132,15 @@ jobs:
           EOF
 
       - name: Create Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            release/*.tar.gz
-            release/*.zip
-          body_path: RELEASE_NOTES.md
-          draft: false
-          prerelease: ${{ contains(github.ref_name, 'beta') || contains(github.ref_name, 'alpha') }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          prerelease_flag=""
+          if [[ "${{ github.ref_name }}" == *beta* || "${{ github.ref_name }}" == *alpha* ]]; then
+            prerelease_flag="--prerelease"
+          fi
+          gh release create "${{ github.ref_name }}" release/*.tar.gz release/*.zip \
+            --title "${{ github.ref_name }}" \
+            --notes-file RELEASE_NOTES.md \
+            --verify-tag \
+            ${prerelease_flag}

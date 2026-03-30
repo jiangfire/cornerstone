@@ -16,10 +16,10 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.25.4'
           cache-dependency-path: backend/go.sum
@@ -34,7 +34,7 @@ jobs:
         run: go tool cover -html=coverage.out -o coverage.html
 
       - name: Upload coverage
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: backend-coverage
           path: backend/coverage.html
@@ -48,19 +48,19 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
+        uses: actions/checkout@v6
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
           node-version: '20'
           cache: 'pnpm'
           cache-dependency-path: frontend/pnpm-lock.yaml
+
+      - name: Enable pnpm via Corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@9 --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -72,7 +72,7 @@ jobs:
         run: pnpm run build
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: frontend-dist
           path: frontend/dist
@@ -84,16 +84,16 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download frontend dist
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: frontend-dist
           path: backend/internal/frontend/dist
 
       - name: Set up Go
-        uses: actions/setup-go@v5
+        uses: actions/setup-go@v6
         with:
           go-version: '1.25.4'
           cache-dependency-path: backend/go.sum
@@ -101,4 +101,4 @@ jobs:
       - name: Verify embedded build compiles
         run: |
           cd backend
-          go build -o /dev/null ./cmd/server
+          CGO_ENABLED=0 go build -o /dev/null ./cmd/server
