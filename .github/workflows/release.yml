@@ -41,7 +41,7 @@ jobs:
       - name: Enable pnpm via Corepack
         run: |
           corepack enable
-          corepack prepare pnpm@9 --activate
+          corepack prepare pnpm@10.28.0 --activate
 
       - name: Build frontend
         run: |
