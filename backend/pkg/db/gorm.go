@@ -3,10 +3,10 @@ package db
 import (
 	"time"
 
+	"github.com/glebarez/sqlite"
 	"github.com/jiangfire/cornerstone/backend/internal/config"
 	"go.uber.org/zap"
 	"gorm.io/driver/postgres"
-	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 )
 
