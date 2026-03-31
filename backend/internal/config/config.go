@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -188,8 +189,18 @@ func (c *Config) validateDatabase() error {
 		}
 	case "sqlite":
 		if strings.TrimSpace(c.Database.URL) == "" {
-			// SQLite 默认使用本地文件
-			c.Database.URL = "cornerstone.db"
+			// SQLite 默认使用本地文件（使用绝对路径避免 Windows 路径问题）
+			// 使用 file:// 前缀和绝对路径确保跨平台兼容
+			if absPath, err := os.Getwd(); err == nil {
+				c.Database.URL = "file://" + filepath.Join(absPath, "cornerstone.db")
+			} else {
+				c.Database.URL = "corneystone.db"
+			}
+		} else if !strings.HasPrefix(c.Database.URL, "file://") && !filepath.IsAbs(c.Database.URL) {
+			// 如果不是绝对路径且没有 file:// 前缀，转换为绝对路径
+			if absPath, err := os.Getwd(); err == nil {
+				c.Database.URL = "file://" + filepath.Join(absPath, c.Database.URL)
+			}
 		}
 	default:
 		return fmt.Errorf("不支持的数据库类型: %s，支持 postgres 或 sqlite", c.Database.Type)
