@@ -22,7 +22,9 @@ func TestConfigValidateAppliesSafeDefaults(t *testing.T) {
 
 	err := cfg.Validate()
 	require.NoError(t, err)
-	require.Equal(t, "cornerstone.db", cfg.Database.URL)
+	// SQLite URL 现在使用绝对路径和 file:// 前缀
+	require.Contains(t, cfg.Database.URL, "cornerstone.db")
+	require.True(t, cfg.Database.URL == "cornerstone.db" || cfg.Database.URL[:7] == "file://")
 	require.Equal(t, "cornerstone-default-secret-key-change-in-production", cfg.JWT.Secret)
 	require.Equal(t, 5, cfg.Integrations.OutboundTimeoutSec)
 	require.Equal(t, 5, cfg.Integrations.OutboxMaxRetries)
