@@ -150,3 +150,4 @@ script/
 .playwright-mcp
 .claude
 CLAUDE.md
+.omc/

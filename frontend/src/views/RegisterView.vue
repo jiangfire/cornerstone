@@ -56,13 +56,7 @@
 
       <el-form-item>
         <div class="form-options">
-          <el-checkbox v-model="form.agree">
-            我已阅读并同意
-            <el-link type="primary" :underline="false">服务条款</el-link>
-            和
-            <el-link type="primary" :underline="false">隐私政策</el-link>
-          </el-checkbox>
-          <el-link type="primary" @click="$router.push('/login')"> 已有账号？立即登录 </el-link>
+          <el-link type="primary" @click="$router.push('/login')">已有账号？立即登录</el-link>
         </div>
       </el-form-item>
 
@@ -97,7 +91,6 @@ const form = reactive({
   email: '',
   password: '',
   confirmPassword: '',
-  agree: false,
 })
 
 const validatePass = (rule: unknown, value: string, callback: (error?: Error) => void) => {
@@ -137,18 +130,6 @@ const rules: FormRules = {
     { min: 6, max: 20, message: '密码长度应在 6-20 个字符之间', trigger: 'blur' },
   ],
   confirmPassword: [{ required: true, validator: validatePass2, trigger: 'blur' }],
-  agree: [
-    {
-      validator: (_rule: unknown, value: boolean, callback: (error?: Error) => void) => {
-        if (!value) {
-          callback(new Error('请同意服务条款和隐私政策'))
-        } else {
-          callback()
-        }
-      },
-      trigger: 'change',
-    },
-  ],
 }
 
 const handleSubmit = async () => {
