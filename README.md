@@ -175,8 +175,8 @@ pnpm run build:embed
 - 兼容路径：`/api/v1`
 - API 文档：`docs/API.md`
 - HTTP MCP 文档：`docs/MCP.md`
-- 项目现状：`docs/PROJECT-STATUS.md`
-- 权限真值：`docs/PERMISSION-SYSTEM.md`
+- 数据治理路线图：`docs/DATA-GOVERNANCE-ROADMAP.md`
+- 权限系统：`docs/API.md`（权限接口）、`docs/QUERY-DSL-GUIDE.md`（Query DSL）
 
 ---
 
