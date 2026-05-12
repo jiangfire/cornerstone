@@ -1,6 +1,8 @@
 package config
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -71,6 +73,8 @@ type IntegrationsConfig struct {
 	OutboxRetryInterval int
 	OutboxWorkerEnabled bool
 	FuckCMDBUIBaseURL   string
+	LLMGovernorURL      string
+	LLMGovernorToken    string `json:"-"`
 }
 
 // MCPConfig HTTP MCP / SSE 配置
@@ -92,7 +96,7 @@ func Load() (*Config, error) {
 	config := &Config{
 		Database: DatabaseConfig{
 			Type:        getEnv("DB_TYPE", "sqlite"),
-			URL:         getEnv("DATABASE_URL", "./cornerstone.db"),
+			URL:         getEnv("DATABASE_URL", ":memory:"),
 			MaxOpen:     getEnvAsInt("DB_MAX_OPEN", 10),
 			MaxIdle:     getEnvAsInt("DB_MAX_IDLE", 5),
 			MaxLifetime: getEnvAsInt("DB_MAX_LIFETIME", 3600),
@@ -122,6 +126,8 @@ func Load() (*Config, error) {
 			OutboxRetryInterval: getEnvAsInt("GOVERNANCE_OUTBOX_RETRY_INTERVAL_SEC", 60),
 			OutboxWorkerEnabled: getEnvAsBool("GOVERNANCE_OUTBOX_WORKER_ENABLED", true),
 			FuckCMDBUIBaseURL:   getEnv("FUCKCMDB_UI_BASE_URL", ""),
+			LLMGovernorURL:      getEnv("LLM_GOVERNOR_URL", ""),
+			LLMGovernorToken:    getEnv("LLM_GOVERNOR_TOKEN", ""),
 		},
 		MCP: MCPConfig{
 			SSEKeepaliveSec: getEnvAsInt("MCP_SSE_KEEPALIVE_SEC", 25),
@@ -151,10 +157,19 @@ func (c *Config) Validate() error {
 		return err
 	}
 
-	// JWT Secret 检查 - 如果是默认值，生成一个随机的
-	if strings.TrimSpace(c.JWT.Secret) == "" || c.JWT.Secret == "your-secret-key-here" || c.JWT.Secret == "change-this-secret-key" {
-		// 在实际环境中应该警告用户，但这里我们允许使用默认值以便快速启动
-		c.JWT.Secret = "cornerstone-default-secret-key-change-in-production"
+	// JWT Secret 检查：release 模式必须显式配置强随机密钥；
+	// 开发模式下若未配置则生成一次性临时密钥，并向 stderr 发出警告。
+	if isWeakJWTSecret(c.JWT.Secret) {
+		if c.IsProduction() {
+			return fmt.Errorf("JWT_SECRET 未配置或仍为默认占位值，release 模式必须显式设置强随机密钥（建议 ≥32 字节）")
+		}
+		generated, err := generateSecureRandomString(48)
+		if err != nil {
+			return fmt.Errorf("生成临时 JWT_SECRET 失败: %w", err)
+		}
+		c.JWT.Secret = generated
+		fmt.Fprintln(os.Stderr, "[WARN] JWT_SECRET 未配置或仍为默认占位值，已生成一次性临时密钥用于开发调试；")
+		fmt.Fprintln(os.Stderr, "       重启后所有已签发 token 将失效。生产环境必须显式配置 JWT_SECRET。")
 	}
 	if strings.TrimSpace(c.Server.Port) == "" {
 		return fmt.Errorf("PORT 不能为空")
@@ -188,18 +203,20 @@ func (c *Config) validateDatabase() error {
 			return fmt.Errorf("DATABASE_URL 不能为空")
 		}
 	case "sqlite":
-		if strings.TrimSpace(c.Database.URL) == "" {
-			// SQLite 默认使用本地文件（使用绝对路径避免 Windows 路径问题）
-			// 使用 file:// 前缀和绝对路径确保跨平台兼容
+		url := strings.TrimSpace(c.Database.URL)
+		// 处理内存数据库
+		if url == "" || url == ":memory:" {
+			c.Database.URL = ":memory:"
+			return nil
+		}
+		// 处理文件数据库 - 如果已经配置了，不做修改
+		if strings.HasPrefix(url, "file://") {
+			return nil
+		}
+		// 如果不是绝对路径，转换为绝对路径
+		if !filepath.IsAbs(url) {
 			if absPath, err := os.Getwd(); err == nil {
-				c.Database.URL = "file://" + filepath.Join(absPath, "cornerstone.db")
-			} else {
-				c.Database.URL = "corneystone.db"
-			}
-		} else if !strings.HasPrefix(c.Database.URL, "file://") && !filepath.IsAbs(c.Database.URL) {
-			// 如果不是绝对路径且没有 file:// 前缀，转换为绝对路径
-			if absPath, err := os.Getwd(); err == nil {
-				c.Database.URL = "file://" + filepath.Join(absPath, c.Database.URL)
+				c.Database.URL = filepath.Join(absPath, url)
 			}
 		}
 	default:
@@ -264,4 +281,65 @@ func (c *Config) GetDatabaseURL() string {
 // GetServerAddr 获取服务器监听地址
 func (c *Config) GetServerAddr() string {
 	return ":" + c.Server.Port
+}
+
+// GetIntegrationURL 获取指定系统的集成 URL
+func (c *Config) GetIntegrationURL(system string) string {
+	return parseIntegrationValue(c.Integrations.BaseURLs, system)
+}
+
+// GetIntegrationToken 获取指定系统的集成 Token
+func (c *Config) GetIntegrationToken(system string) string {
+	return parseIntegrationValue(c.Integrations.OutboundTokens, system)
+}
+
+// parseIntegrationValue 从 "key=value,key2=value2" 格式中提取指定 key 的值
+func parseIntegrationValue(input, key string) string {
+	if input == "" {
+		return ""
+	}
+
+	pairs := strings.Split(input, ",")
+	for _, pair := range pairs {
+		kv := strings.SplitN(strings.TrimSpace(pair), "=", 2)
+		if len(kv) == 2 && strings.TrimSpace(kv[0]) == key {
+			return strings.TrimSpace(kv[1])
+		}
+	}
+
+	return ""
+}
+
+// 已知的 JWT_SECRET 默认/占位值，运行时若命中则视为未配置。
+var weakJWTSecrets = map[string]struct{}{
+	"":                                                   {},
+	"change-this-secret-key":                             {},
+	"your-secret-key-here":                               {},
+	"dev-secret-key-change-in-production":                {},
+	"cornerstone-default-secret-key-change-in-production": {},
+}
+
+// isWeakJWTSecret 判断 JWT secret 是否为空、占位值或长度过短。
+func isWeakJWTSecret(secret string) bool {
+	trimmed := strings.TrimSpace(secret)
+	if _, ok := weakJWTSecrets[trimmed]; ok {
+		return true
+	}
+	if len(trimmed) < 32 {
+		return true
+	}
+	return false
+}
+
+// generateSecureRandomString 使用 crypto/rand 生成 base64url 编码的随机串。
+// byteLen 指定原始随机字节数（输出长度约为 ⌈byteLen*4/3⌉）。
+func generateSecureRandomString(byteLen int) (string, error) {
+	if byteLen <= 0 {
+		byteLen = 32
+	}
+	buf := make([]byte, byteLen)
+	if _, err := rand.Read(buf); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(buf), nil
 }
