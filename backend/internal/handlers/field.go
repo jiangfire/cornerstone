@@ -28,12 +28,13 @@ func CreateField(c *gin.Context) {
 	publishFieldChanged([]string{userID}, "created", field)
 
 	types.Success(c, gin.H{
-		"id":         field.ID,
-		"table_id":   field.TableID,
-		"name":       field.Name,
-		"type":       field.Type,
-		"required":   field.Required,
-		"created_at": field.CreatedAt,
+		"id":          field.ID,
+		"table_id":    field.TableID,
+		"name":        field.Name,
+		"type":        field.Type,
+		"description": field.Description,
+		"required":    field.Required,
+		"created_at":  field.CreatedAt,
 	})
 }
 
@@ -50,8 +51,8 @@ func ListFields(c *gin.Context) {
 	}
 
 	types.Success(c, gin.H{
-		"fields": fields,
-		"total":  len(fields),
+		"items": fields,
+		"total": len(fields),
 	})
 }
 
@@ -91,11 +92,12 @@ func UpdateField(c *gin.Context) {
 	publishFieldChanged([]string{userID}, "updated", field)
 
 	types.Success(c, gin.H{
-		"id":         field.ID,
-		"name":       field.Name,
-		"type":       field.Type,
-		"required":   field.Required,
-		"updated_at": field.UpdatedAt,
+		"id":          field.ID,
+		"name":        field.Name,
+		"type":        field.Type,
+		"description": field.Description,
+		"required":    field.Required,
+		"updated_at":  field.UpdatedAt,
 	})
 }
 

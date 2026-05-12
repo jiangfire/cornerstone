@@ -47,15 +47,55 @@ func validateFieldName(name string) error {
 	return nil
 }
 
+func normalizeFieldType(fieldType string) string {
+	switch fieldType {
+	case "single_select":
+		return "select"
+	case "multiselect", "multi_select":
+		return "list"
+	default:
+		return fieldType
+	}
+}
+
+func isSelectFieldType(fieldType string) bool {
+	return normalizeFieldType(fieldType) == "select"
+}
+
+func isListFieldType(fieldType string) bool {
+	return normalizeFieldType(fieldType) == "list"
+}
+
+func isDeprecatedFieldType(fieldType string) bool {
+	normalizedType := normalizeFieldType(fieldType)
+	return normalizedType == "select" || normalizedType == "list"
+}
+
+func isAttachmentFieldType(fieldType string) bool {
+	return normalizeFieldType(fieldType) == "attachment"
+}
+
+func supportsFieldOptions(fieldType string) bool {
+	normalizedType := normalizeFieldType(fieldType)
+	return normalizedType == "select" || normalizedType == "list"
+}
+
 // validateFieldType 验证字段类型
 func validateFieldType(fieldType string) error {
-	validTypes := []string{"string", "text", "number", "boolean", "date", "datetime", "select", "multiselect", "single_select", "multi_select"}
+	validTypes := []string{"string", "text", "number", "boolean", "date", "datetime", "attachment", "select", "list", "multiselect", "single_select", "multi_select"}
 	for _, validType := range validTypes {
 		if fieldType == validType {
 			return nil
 		}
 	}
 	return fmt.Errorf("无效的字段类型: %s", fieldType)
+}
+
+func validateMutableFieldType(fieldType string) error {
+	if isDeprecatedFieldType(fieldType) {
+		return fmt.Errorf("字段类型 %s 已废弃，不能再创建或更新；请改用 string 或 text", fieldType)
+	}
+	return nil
 }
 
 // validateFieldConfig 验证字段配置
@@ -88,6 +128,20 @@ func validateFieldConfig(config FieldConfig) error {
 		if err != nil {
 			return fmt.Errorf("无效的正则表达式: %w", err)
 		}
+	}
+
+	if len(config.AllowedTypes) > 50 {
+		return errors.New("允许的文件类型数量不能超过50个")
+	}
+
+	for _, allowedType := range config.AllowedTypes {
+		if len(allowedType) > 100 {
+			return errors.New("文件类型规则长度不能超过100个字符")
+		}
+	}
+
+	if config.MaxFileSizeMB < 0 {
+		return errors.New("附件大小限制不能小于0")
 	}
 
 	return nil
@@ -124,50 +178,77 @@ func sanitizeFieldConfig(config FieldConfig) FieldConfig {
 	// 清理正则表达式
 	config.Validation = strings.TrimSpace(config.Validation)
 
+	cleanedAllowedTypes := make([]string, 0, len(config.AllowedTypes))
+	for _, allowedType := range config.AllowedTypes {
+		cleanedType := strings.TrimSpace(allowedType)
+		if cleanedType != "" {
+			cleanedAllowedTypes = append(cleanedAllowedTypes, cleanedType)
+		}
+	}
+	config.AllowedTypes = cleanedAllowedTypes
+
 	return config
+}
+
+func sanitizeFieldDescription(description string) string {
+	return strings.TrimSpace(description)
+}
+
+func validateFieldDescription(description string) error {
+	if len(description) > 1000 {
+		return errors.New("字段备注长度不能超过1000个字符")
+	}
+	return nil
 }
 
 // FieldConfig 字段配置
 type FieldConfig struct {
-	Options    []string `json:"options,omitempty"`    // 单选/多选选项
-	Required   bool     `json:"required,omitempty"`   // 是否必填
-	Min        *float64 `json:"min,omitempty"`        // 最小值
-	Max        *float64 `json:"max,omitempty"`        // 最大值
-	Format     string   `json:"format,omitempty"`     // 日期格式等
-	MaxLength  *int     `json:"max_length,omitempty"` // 最大长度
-	Validation string   `json:"validation,omitempty"` // 正则验证
+	Options       []string `json:"options,omitempty"`          // 单选候选项 / 列表建议项
+	Required      bool     `json:"required,omitempty"`         // 是否必填
+	Min           *float64 `json:"min,omitempty"`              // 最小值
+	Max           *float64 `json:"max,omitempty"`              // 最大值
+	Format        string   `json:"format,omitempty"`           // 日期格式等
+	MaxLength     *int     `json:"max_length,omitempty"`       // 最大长度
+	Validation    string   `json:"validation,omitempty"`       // 正则验证
+	AllowedTypes  []string `json:"allowed_types,omitempty"`    // 允许的附件类型，如 image/*、.pdf
+	MaxFileSizeMB int      `json:"max_file_size_mb,omitempty"` // 附件大小上限（MB）
+	Multiple      bool     `json:"multiple,omitempty"`         // 是否允许多个附件
 }
 
 // CreateFieldRequest 创建字段请求
 type CreateFieldRequest struct {
-	TableID  string      `json:"table_id" binding:"required"`
-	Name     string      `json:"name" binding:"required,min=1,max=255"`
-	Type     string      `json:"type" binding:"required,oneof=string text number boolean date datetime select multiselect single_select multi_select"`
-	Required bool        `json:"required"`
-	Options  string      `json:"options"` // 下拉选项，逗号分隔
-	Config   FieldConfig `json:"config"`
+	TableID     string      `json:"table_id" binding:"required"`
+	Name        string      `json:"name" binding:"required,min=1,max=255"`
+	Type        string      `json:"type" binding:"required,oneof=string text number boolean date datetime attachment"`
+	Description string      `json:"description" binding:"max=1000"`
+	Required    bool        `json:"required"`
+	Options     string      `json:"options"` // 下拉选项，逗号分隔
+	Config      FieldConfig `json:"config"`
 }
 
 // UpdateFieldRequest 更新字段请求
 type UpdateFieldRequest struct {
-	Name     string      `json:"name" binding:"required,min=1,max=255"`
-	Type     string      `json:"type" binding:"required,oneof=string text number boolean date datetime select multiselect single_select multi_select"`
-	Required bool        `json:"required"`
-	Options  string      `json:"options"`
-	Config   FieldConfig `json:"config"`
+	Name        string      `json:"name" binding:"required,min=1,max=255"`
+	Type        string      `json:"type" binding:"required,oneof=string text number boolean date datetime attachment"`
+	Description string      `json:"description" binding:"max=1000"`
+	Required    bool        `json:"required"`
+	Options     string      `json:"options"`
+	Config      FieldConfig `json:"config"`
 }
 
 // FieldResponse 字段响应
 type FieldResponse struct {
-	ID        string      `json:"id"`
-	TableID   string      `json:"table_id"`
-	Name      string      `json:"name"`
-	Type      string      `json:"type"`
-	Required  bool        `json:"required"`
-	Options   string      `json:"options,omitempty"`
-	Config    FieldConfig `json:"config"`
-	CreatedAt string      `json:"created_at"`
-	UpdatedAt string      `json:"updated_at"`
+	ID          string      `json:"id"`
+	TableID     string      `json:"table_id"`
+	Name        string      `json:"name"`
+	Type        string      `json:"type"`
+	Description string      `json:"description"`
+	Deprecated  bool        `json:"deprecated"`
+	Required    bool        `json:"required"`
+	Options     string      `json:"options,omitempty"`
+	Config      FieldConfig `json:"config"`
+	CreatedAt   string      `json:"created_at"`
+	UpdatedAt   string      `json:"updated_at"`
 }
 
 func buildDeletedFieldName(name, fieldID string) string {
@@ -248,7 +329,7 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 	}
 
 	// 2. 如果前端提供了options字符串，转换为Config
-	if req.Options != "" && (req.Type == "select" || req.Type == "multiselect" || req.Type == "single_select" || req.Type == "multi_select") {
+	if req.Options != "" && supportsFieldOptions(req.Type) {
 		// 将逗号分隔的字符串转换为字符串数组
 		optionsList := strings.Split(req.Options, ",")
 		var cleanedOptions []string
@@ -263,6 +344,7 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 
 	// 3. 输入验证和清理
 	req.Name = sanitizeFieldName(req.Name)
+	req.Description = sanitizeFieldDescription(req.Description)
 	req.Config = sanitizeFieldConfig(req.Config)
 
 	if err := validateFieldName(req.Name); err != nil {
@@ -271,6 +353,14 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 
 	if err := validateFieldType(req.Type); err != nil {
 		return nil, fmt.Errorf("字段类型验证失败: %w", err)
+	}
+	if err := validateMutableFieldType(req.Type); err != nil {
+		return nil, fmt.Errorf("字段类型验证失败: %w", err)
+	}
+	req.Type = normalizeFieldType(req.Type)
+
+	if err := validateFieldDescription(req.Description); err != nil {
+		return nil, fmt.Errorf("字段备注验证失败: %w", err)
 	}
 
 	if err := validateFieldConfig(req.Config); err != nil {
@@ -295,11 +385,12 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 
 	// 6. 创建字段
 	field := models.Field{
-		TableID:  req.TableID,
-		Name:     req.Name,
-		Type:     req.Type,
-		Required: req.Required,
-		Options:  string(configJSON),
+		TableID:     req.TableID,
+		Name:        req.Name,
+		Type:        req.Type,
+		Description: req.Description,
+		Required:    req.Required,
+		Options:     string(configJSON),
 	}
 
 	if err := s.db.Create(&field).Error; err != nil {
@@ -338,15 +429,17 @@ func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, erro
 		}
 
 		result[index] = FieldResponse{
-			ID:        f.ID,
-			TableID:   f.TableID,
-			Name:      f.Name,
-			Type:      f.Type,
-			Required:  f.Required,
-			Options:   strings.Join(config.Options, ", "),
-			Config:    config,
-			CreatedAt: f.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedAt: f.UpdatedAt.Format("2006-01-02 15:04:05"),
+			ID:          f.ID,
+			TableID:     f.TableID,
+			Name:        f.Name,
+			Type:        normalizeFieldType(f.Type),
+			Description: f.Description,
+			Deprecated:  isDeprecatedFieldType(f.Type),
+			Required:    f.Required,
+			Options:     strings.Join(config.Options, ", "),
+			Config:      config,
+			CreatedAt:   f.CreatedAt.Format("2006-01-02 15:04:05"),
+			UpdatedAt:   f.UpdatedAt.Format("2006-01-02 15:04:05"),
 		}
 		index++
 	}
@@ -378,15 +471,17 @@ func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) 
 	}
 
 	return &FieldResponse{
-		ID:        field.ID,
-		TableID:   field.TableID,
-		Name:      field.Name,
-		Type:      field.Type,
-		Required:  field.Required,
-		Options:   strings.Join(config.Options, ", "),
-		Config:    config,
-		CreatedAt: field.CreatedAt.Format("2006-01-02 15:04:05"),
-		UpdatedAt: field.UpdatedAt.Format("2006-01-02 15:04:05"),
+		ID:          field.ID,
+		TableID:     field.TableID,
+		Name:        field.Name,
+		Type:        normalizeFieldType(field.Type),
+		Description: field.Description,
+		Deprecated:  isDeprecatedFieldType(field.Type),
+		Required:    field.Required,
+		Options:     strings.Join(config.Options, ", "),
+		Config:      config,
+		CreatedAt:   field.CreatedAt.Format("2006-01-02 15:04:05"),
+		UpdatedAt:   field.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
 }
 
@@ -404,7 +499,7 @@ func (s *FieldService) UpdateField(fieldID string, req UpdateFieldRequest, userI
 	}
 
 	// 3. 输入验证和清理
-	if req.Options != "" && (req.Type == "select" || req.Type == "multiselect" || req.Type == "single_select" || req.Type == "multi_select") {
+	if req.Options != "" && supportsFieldOptions(req.Type) {
 		optionsList := strings.Split(req.Options, ",")
 		var cleanedOptions []string
 		for _, opt := range optionsList {
@@ -417,6 +512,7 @@ func (s *FieldService) UpdateField(fieldID string, req UpdateFieldRequest, userI
 	}
 
 	req.Name = sanitizeFieldName(req.Name)
+	req.Description = sanitizeFieldDescription(req.Description)
 	req.Config = sanitizeFieldConfig(req.Config)
 
 	if err := validateFieldName(req.Name); err != nil {
@@ -425,6 +521,14 @@ func (s *FieldService) UpdateField(fieldID string, req UpdateFieldRequest, userI
 
 	if err := validateFieldType(req.Type); err != nil {
 		return nil, fmt.Errorf("字段类型验证失败: %w", err)
+	}
+	if err := validateMutableFieldType(req.Type); err != nil {
+		return nil, fmt.Errorf("字段类型验证失败: %w", err)
+	}
+	req.Type = normalizeFieldType(req.Type)
+
+	if err := validateFieldDescription(req.Description); err != nil {
+		return nil, fmt.Errorf("字段备注验证失败: %w", err)
 	}
 
 	if err := validateFieldConfig(req.Config); err != nil {
@@ -450,6 +554,7 @@ func (s *FieldService) UpdateField(fieldID string, req UpdateFieldRequest, userI
 	// 6. 更新字段信息
 	field.Name = req.Name
 	field.Type = req.Type
+	field.Description = req.Description
 	field.Required = req.Required
 	field.Options = string(configJSON)
 
