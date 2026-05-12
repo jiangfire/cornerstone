@@ -2,7 +2,9 @@ package db
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
+	"math/big"
 	"sync"
 	"time"
 
@@ -11,6 +13,7 @@ import (
 	"github.com/jiangfire/cornerstone/backend/internal/services"
 	pkgdb "github.com/jiangfire/cornerstone/backend/pkg/db"
 	"go.uber.org/zap"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -123,6 +126,18 @@ func Migrate() error {
 
 	logger.Info("基础表结构迁移完成")
 
+	if !database.Migrator().HasColumn(&models.Field{}, "description") {
+		if err := database.Migrator().AddColumn(&models.Field{}, "description"); err != nil {
+			return fmt.Errorf("添加字段备注列失败: %w", err)
+		}
+	}
+
+	if !database.Migrator().HasColumn(&models.File{}, "field_id") {
+		if err := database.Migrator().AddColumn(&models.File{}, "field_id"); err != nil {
+			return fmt.Errorf("添加文件字段关联列失败: %w", err)
+		}
+	}
+
 	// 创建复合索引
 	if err := createIndexes(database); err != nil {
 		return fmt.Errorf("创建索引失败: %w", err)
@@ -192,8 +207,83 @@ func Migrate() error {
 		}
 	}
 
+	// 创建默认管理员用户
+	if err := createDefaultAdminUser(database); err != nil {
+		return fmt.Errorf("创建默认管理员失败: %w", err)
+	}
+
 	logger.Info("数据库迁移完成 ✅")
 	return nil
+}
+
+// createDefaultAdminUser 创建默认管理员用户
+func createDefaultAdminUser(database *gorm.DB) error {
+	var count int64
+	if err := database.Model(&models.User{}).Where("deleted_at IS NULL").Count(&count).Error; err != nil {
+		return fmt.Errorf("检查用户数量失败: %w", err)
+	}
+
+	// 如果已有用户，跳过创建
+	if count > 0 {
+		return nil
+	}
+
+	// 生成随机密码（crypto/rand）
+	randomPassword, err := generateRandomPassword(16)
+	if err != nil {
+		return fmt.Errorf("生成随机密码失败: %w", err)
+	}
+
+	// 哈希密码
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(randomPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("密码哈希失败: %w", err)
+	}
+
+	// 创建默认管理员
+	admin := models.User{
+		ID:            "usr_admin",
+		Username:      "admin",
+		Email:         "admin@cornerstone.local",
+		Password:      string(hashedPassword),
+		IsSystemAdmin: true,
+	}
+
+	if err := database.Create(&admin).Error; err != nil {
+		return fmt.Errorf("创建管理员用户失败: %w", err)
+	}
+
+	// 在控制台显示默认管理员凭据
+	zap.L().Info("============================================")
+	zap.L().Info("🔐 默认管理员账户已创建")
+	zap.L().Info("============================================")
+	zap.L().Info("用户名: admin")
+	zap.L().Info("密码:   " + randomPassword)
+	zap.L().Info("邮箱:   admin@cornerstone.local")
+	zap.L().Info("============================================")
+	zap.L().Warn("⚠️  请在首次登录后立即修改密码！")
+	zap.L().Info("============================================")
+
+	return nil
+}
+
+// generateRandomPassword 使用 crypto/rand 生成密码，长度至少为 12。
+// 不再使用基于 time.Now() 的伪随机方案，确保密码不可预测。
+func generateRandomPassword(length int) (string, error) {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+	if length < 12 {
+		length = 12
+	}
+	max := big.NewInt(int64(len(charset)))
+	b := make([]byte, length)
+	for i := range b {
+		n, err := rand.Int(rand.Reader, max)
+		if err != nil {
+			return "", fmt.Errorf("crypto/rand: %w", err)
+		}
+		b[i] = charset[n.Int64()]
+	}
+	return string(b), nil
 }
 
 // IsSQLite 检查当前数据库是否为 SQLite
@@ -233,6 +323,9 @@ func createIndexes(db *gorm.DB) error {
 
 	// files表的外键索引
 	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_files_record_id ON files(record_id)").Error; err != nil {
+		return err
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_files_field_id ON files(field_id)").Error; err != nil {
 		return err
 	}
 
