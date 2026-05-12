@@ -12,9 +12,10 @@ import (
 func UploadFile(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	recordID := c.PostForm("record_id")
+	fieldID := c.PostForm("field_id")
 
-	if recordID == "" {
-		types.Error(c, 400, "记录ID不能为空")
+	if recordID == "" && fieldID == "" {
+		types.Error(c, 400, "记录ID或字段ID不能为空")
 		return
 	}
 
@@ -26,13 +27,14 @@ func UploadFile(c *gin.Context) {
 
 	req := services.UploadFileRequest{
 		RecordID: recordID,
+		FieldID:  fieldID,
 		File:     file,
 	}
 
 	fileService := services.NewFileService(db.DB())
 	uploadedFile, err := fileService.UploadFile(req, userID)
 	if err != nil {
-		types.Error(c, 500, err.Error())
+		types.Error(c, 400, err.Error())
 		return
 	}
 
@@ -66,7 +68,14 @@ func DownloadFile(c *gin.Context) {
 		return
 	}
 
-	c.FileAttachment(file.StorageURL, file.FileName)
+	// 防御性检查：DB 中存储的 StorageURL 必须落在合法上传目录下，
+	// 防止数据被篡改时直接读取任意文件。
+	safePath, err := services.ResolveSecureStoragePath(file.StorageURL)
+	if err != nil {
+		types.Error(c, 403, "文件路径不合法")
+		return
+	}
+	c.FileAttachment(safePath, file.FileName)
 }
 
 // DeleteFile 删除文件
@@ -95,5 +104,5 @@ func ListRecordFiles(c *gin.Context) {
 		return
 	}
 
-	types.Success(c, files)
+	types.Success(c, gin.H{"items": files})
 }
