@@ -131,3 +131,49 @@ func TestFileService_RejectsPathTraversalFilename(t *testing.T) {
 	require.NoError(t, db.Model(&models.File{}).Count(&count).Error)
 	require.Zero(t, count)
 }
+
+func TestFileService_DeleteAttachmentFileRemovesRecordReference(t *testing.T) {
+	db := setupResourceTestDB(t)
+	fileService := NewFileService(db)
+	fieldService := NewFieldService(db)
+	recordService := NewRecordService(db)
+
+	owner := createResourceUser(t, db, "file_owner_attachment_cleanup")
+	database := createResourceDatabase(t, db, owner.ID, "FileAttachmentCleanupDB")
+	table := createResourceTable(t, db, database.ID, "Files")
+	createResourceField(t, db, table.ID, "title", "string", true, "")
+
+	attachmentField, err := fieldService.CreateField(CreateFieldRequest{
+		TableID: table.ID,
+		Name:    "attachments",
+		Type:    "attachment",
+		Config: FieldConfig{
+			AllowedTypes: []string{".txt"},
+			Multiple:     true,
+		},
+	}, owner.ID)
+	require.NoError(t, err)
+
+	uploadedFile, err := fileService.UploadFile(UploadFileRequest{
+		FieldID: attachmentField.ID,
+		File:    createTestFileHeader(t, "file", "cleanup.txt", []byte("payload")),
+	}, owner.ID)
+	require.NoError(t, err)
+
+	record, err := recordService.CreateRecord(CreateRecordRequest{
+		TableID: table.ID,
+		Data: map[string]interface{}{
+			"title":       "with-attachment",
+			"attachments": []interface{}{uploadedFile.ID},
+		},
+	}, owner.ID)
+	require.NoError(t, err)
+
+	require.NoError(t, fileService.DeleteFile(uploadedFile.ID, owner.ID))
+
+	recordDetail, err := recordService.GetRecord(record.ID, owner.ID)
+	require.NoError(t, err)
+	payload, ok := recordDetail.Data.(map[string]interface{})
+	require.True(t, ok)
+	require.Equal(t, []interface{}{}, payload["attachments"])
+}

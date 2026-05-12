@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/glebarez/sqlite"
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"github.com/stretchr/testify/assert"
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -211,7 +211,7 @@ func TestRecordValidation_MaxLength(t *testing.T) {
 	assert.Contains(t, err.Error(), "长度不能超过", "Error should mention max length")
 }
 
-// TestRecordValidation_SelectOptions tests single and multi-select validation
+// TestRecordValidation_SelectOptions tests select and list validation
 func TestRecordValidation_SelectOptions(t *testing.T) {
 	db := setupTestDB()
 	service := NewRecordService(db)
@@ -237,14 +237,13 @@ func TestRecordValidation_SelectOptions(t *testing.T) {
 	}
 	db.Create(&categoryField)
 
-	// Create multi select field
+	// Create list field
 	tagsField := models.Field{
 		ID:       "fld_tags",
 		TableID:  "tbl_test",
 		Name:     "Tags",
-		Type:     "multi_select",
+		Type:     "list",
 		Required: false,
-		Options:  `{"options":["New","Sale","Featured"]}`,
 	}
 	db.Create(&tagsField)
 
@@ -269,16 +268,17 @@ func TestRecordValidation_SelectOptions(t *testing.T) {
 	_, err = service.CreateRecord(invalidSingleReq, "usr_test")
 	assert.Error(t, err, "Invalid single select value should fail")
 
-	// Test invalid multi select
-	invalidMultiReq := CreateRecordRequest{
+	// Test invalid list
+	invalidListReq := CreateRecordRequest{
 		TableID: "tbl_test",
 		Data: map[string]interface{}{
 			"Category": "Electronics",
-			"Tags":     []interface{}{"New", "InvalidTag"},
+			"Tags":     []interface{}{"New", true},
 		},
 	}
-	_, err = service.CreateRecord(invalidMultiReq, "usr_test")
-	assert.Error(t, err, "Invalid multi select value should fail")
+	_, err = service.CreateRecord(invalidListReq, "usr_test")
+	assert.Error(t, err, "Invalid list value should fail")
+	assert.Contains(t, err.Error(), "列表项必须是字符串")
 }
 
 // TestRecordValidation_RequiredFields tests required field validation

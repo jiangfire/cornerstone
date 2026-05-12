@@ -8,34 +8,30 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRecordService_SelectAndMultiselectValidationClosedLoop(t *testing.T) {
+func TestRecordService_SelectAndListValidationClosedLoop(t *testing.T) {
 	db := setupResourceTestDB(t)
 	recordService := NewRecordService(db)
-	fieldService := NewFieldService(db)
 
 	owner := createResourceUser(t, db, "record_owner_selects")
 	database := createResourceDatabase(t, db, owner.ID, "RecordSelectDB")
 	table := createResourceTable(t, db, database.ID, "Orders")
 
-	_, err := fieldService.CreateField(CreateFieldRequest{
+	configJSON, err := json.Marshal(FieldConfig{
+		Options: []string{"draft", "approved"},
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.Create(&models.Field{
 		TableID: table.ID,
 		Name:    "status",
 		Type:    "select",
-		Config: FieldConfig{
-			Options: []string{"draft", "approved"},
-		},
-	}, owner.ID)
-	require.NoError(t, err)
+		Options: string(configJSON),
+	}).Error)
 
-	_, err = fieldService.CreateField(CreateFieldRequest{
+	require.NoError(t, db.Create(&models.Field{
 		TableID: table.ID,
 		Name:    "tags",
-		Type:    "multiselect",
-		Config: FieldConfig{
-			Options: []string{"urgent", "finance", "ops"},
-		},
-	}, owner.ID)
-	require.NoError(t, err)
+		Type:    "list",
+	}).Error)
 
 	_, err = recordService.CreateRecord(CreateRecordRequest{
 		TableID: table.ID,
@@ -59,7 +55,46 @@ func TestRecordService_SelectAndMultiselectValidationClosedLoop(t *testing.T) {
 		TableID: table.ID,
 		Data: map[string]interface{}{
 			"status": "approved",
-			"tags":   []interface{}{"urgent", "invalid_tag"},
+			"tags":   []interface{}{"urgent", 1},
+		},
+	}, owner.ID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "列表项必须是字符串")
+}
+
+func TestRecordService_LegacyMultiselectValidationRemainsCompatible(t *testing.T) {
+	db := setupResourceTestDB(t)
+	recordService := NewRecordService(db)
+
+	owner := createResourceUser(t, db, "record_owner_legacy_multiselect")
+	database := createResourceDatabase(t, db, owner.ID, "RecordLegacyMultiselectDB")
+	table := createResourceTable(t, db, database.ID, "Orders")
+
+	configJSON, err := json.Marshal(FieldConfig{
+		Options: []string{"urgent", "finance", "ops"},
+	})
+	require.NoError(t, err)
+	legacyField := models.Field{
+		TableID:  table.ID,
+		Name:     "tags",
+		Type:     "multiselect",
+		Required: false,
+		Options:  string(configJSON),
+	}
+	require.NoError(t, db.Create(&legacyField).Error)
+
+	_, err = recordService.CreateRecord(CreateRecordRequest{
+		TableID: table.ID,
+		Data: map[string]interface{}{
+			"tags": []interface{}{"urgent", "ops"},
+		},
+	}, owner.ID)
+	require.NoError(t, err)
+
+	_, err = recordService.CreateRecord(CreateRecordRequest{
+		TableID: table.ID,
+		Data: map[string]interface{}{
+			"tags": []interface{}{"urgent", "invalid_tag"},
 		},
 	}, owner.ID)
 	require.Error(t, err)
@@ -268,4 +303,68 @@ func TestRecordService_ListRecordsAppliesPaginationAfterPermissionAwareFiltering
 	require.True(t, ok)
 	require.Equal(t, "订单-A", payload["title"])
 	require.NotContains(t, payload, "secret")
+}
+
+func TestRecordService_CreateAndUpdateAttachmentFieldBindings(t *testing.T) {
+	db := setupResourceTestDB(t)
+	recordService := NewRecordService(db)
+	fieldService := NewFieldService(db)
+	fileService := NewFileService(db)
+
+	owner := createResourceUser(t, db, "record_owner_attachment")
+	database := createResourceDatabase(t, db, owner.ID, "RecordAttachmentDB")
+	table := createResourceTable(t, db, database.ID, "Orders")
+	createResourceField(t, db, table.ID, "title", "string", true, "")
+
+	attachmentField, err := fieldService.CreateField(CreateFieldRequest{
+		TableID: table.ID,
+		Name:    "attachments",
+		Type:    "attachment",
+		Config: FieldConfig{
+			AllowedTypes:  []string{".txt"},
+			MaxFileSizeMB: 1,
+			Multiple:      true,
+		},
+	}, owner.ID)
+	require.NoError(t, err)
+
+	tempFile, err := fileService.UploadFile(UploadFileRequest{
+		FieldID: attachmentField.ID,
+		File:    createTestFileHeader(t, "file", "notes.txt", []byte("payload")),
+	}, owner.ID)
+	require.NoError(t, err)
+	require.Empty(t, tempFile.RecordID)
+	require.Equal(t, attachmentField.ID, tempFile.FieldID)
+
+	record, err := recordService.CreateRecord(CreateRecordRequest{
+		TableID: table.ID,
+		Data: map[string]interface{}{
+			"title":       "订单-A",
+			"attachments": []interface{}{tempFile.ID},
+		},
+	}, owner.ID)
+	require.NoError(t, err)
+
+	var storedFile models.File
+	require.NoError(t, db.Where("id = ?", tempFile.ID).First(&storedFile).Error)
+	require.Equal(t, record.ID, storedFile.RecordID)
+	require.Equal(t, attachmentField.ID, storedFile.FieldID)
+
+	updatedRecord, err := recordService.UpdateRecord(record.ID, UpdateRecordRequest{
+		Data: map[string]interface{}{
+			"attachments": []interface{}{},
+		},
+		Version: record.Version,
+	}, owner.ID)
+	require.NoError(t, err)
+
+	require.NoError(t, db.Where("id = ?", tempFile.ID).First(&storedFile).Error)
+	require.Empty(t, storedFile.RecordID)
+
+	detail, err := recordService.GetRecord(updatedRecord.ID, owner.ID)
+	require.NoError(t, err)
+	payload, ok := detail.Data.(map[string]interface{})
+	require.True(t, ok)
+	require.Contains(t, payload, "attachments")
+	require.Equal(t, []interface{}{}, payload["attachments"])
 }

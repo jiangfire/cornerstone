@@ -14,6 +14,59 @@ import (
 	"gorm.io/gorm"
 )
 
+func parseStringListValue(value interface{}) ([]string, error) {
+	switch values := value.(type) {
+	case []string:
+		return values, nil
+	case []interface{}:
+		items := make([]string, 0, len(values))
+		for _, item := range values {
+			str, ok := item.(string)
+			if !ok {
+				return nil, errors.New("列表项必须是字符串")
+			}
+			items = append(items, str)
+		}
+		return items, nil
+	default:
+		return nil, errors.New("期望字符串数组类型")
+	}
+}
+
+func parseAttachmentValue(value interface{}) ([]string, error) {
+	switch values := value.(type) {
+	case string:
+		if strings.TrimSpace(values) == "" {
+			return []string{}, nil
+		}
+		return []string{values}, nil
+	case []string:
+		items := make([]string, 0, len(values))
+		for _, item := range values {
+			trimmed := strings.TrimSpace(item)
+			if trimmed != "" {
+				items = append(items, trimmed)
+			}
+		}
+		return items, nil
+	case []interface{}:
+		items := make([]string, 0, len(values))
+		for _, item := range values {
+			str, ok := item.(string)
+			if !ok {
+				return nil, errors.New("附件值必须是文件ID或文件ID数组")
+			}
+			trimmed := strings.TrimSpace(str)
+			if trimmed != "" {
+				items = append(items, trimmed)
+			}
+		}
+		return items, nil
+	default:
+		return nil, errors.New("附件值必须是文件ID或文件ID数组")
+	}
+}
+
 // RecordService 数据记录服务
 type RecordService struct {
 	db *gorm.DB
@@ -97,7 +150,7 @@ func (s *RecordService) checkTableAccess(tableID, userID string, requiredRoles [
 }
 
 // validateRecordData 验证记录数据
-func (s *RecordService) validateRecordData(tableID string, data map[string]interface{}) error {
+func (s *RecordService) validateRecordData(tableID string, data map[string]interface{}, currentRecordID, userID string) error {
 	// 获取表的所有字段定义
 	var fields []models.Field
 	err := s.db.Where("table_id = ? AND deleted_at IS NULL", tableID).Find(&fields).Error
@@ -131,9 +184,114 @@ func (s *RecordService) validateRecordData(tableID string, data map[string]inter
 			continue
 		}
 
+		if isAttachmentFieldType(field.Type) {
+			if err := s.validateAttachmentFieldValue(field, value, currentRecordID, userID); err != nil {
+				return fmt.Errorf("字段 '%s' 验证失败: %w", field.Name, err)
+			}
+			continue
+		}
+
 		// 根据字段类型验证数据
 		if err := s.validateFieldValue(field, value); err != nil {
 			return fmt.Errorf("字段 '%s' 验证失败: %w", field.Name, err)
+		}
+	}
+
+	return nil
+}
+
+func (s *RecordService) validateAttachmentFieldValue(field models.Field, value interface{}, currentRecordID, userID string) error {
+	fileIDs, err := parseAttachmentValue(value)
+	if err != nil {
+		return err
+	}
+
+	config := parseStoredFieldConfig(field.Options)
+	if !config.Multiple && len(fileIDs) > 1 {
+		return errors.New("该附件字段只允许上传单个文件")
+	}
+
+	seen := make(map[string]struct{}, len(fileIDs))
+	for _, fileID := range fileIDs {
+		if _, exists := seen[fileID]; exists {
+			return fmt.Errorf("附件ID重复: %s", fileID)
+		}
+		seen[fileID] = struct{}{}
+
+		file, _, err := NewFileService(s.db).getAccessibleFile(fileID, userID, []string{"owner", "admin", "editor"})
+		if err != nil {
+			return err
+		}
+		if file.FieldID != field.ID {
+			return errors.New("附件不属于当前字段")
+		}
+		if currentRecordID == "" {
+			if file.RecordID != "" {
+				return errors.New("创建记录时只能引用未绑定记录的附件")
+			}
+		} else if file.RecordID != "" && file.RecordID != currentRecordID {
+			return errors.New("附件已绑定到其他记录")
+		}
+		if config.MaxFileSizeMB > 0 && file.FileSize > int64(config.MaxFileSizeMB)*1024*1024 {
+			return fmt.Errorf("附件大小超过字段限制（最大%dMB）", config.MaxFileSizeMB)
+		}
+		if !fileMatchesAllowedTypes(file.FileName, file.FileType, config.AllowedTypes) {
+			return errors.New("附件类型不符合字段限制")
+		}
+	}
+
+	return nil
+}
+
+func attachmentFieldIDsFromData(field models.Field, data map[string]interface{}) ([]string, error) {
+	value, exists := data[field.Name]
+	if !exists {
+		return []string{}, nil
+	}
+	return parseAttachmentValue(value)
+}
+
+func (s *RecordService) syncAttachmentBindings(tx *gorm.DB, recordID string, fields []models.Field, data map[string]interface{}) error {
+	for _, field := range fields {
+		if !isAttachmentFieldType(field.Type) {
+			continue
+		}
+
+		fileIDs, err := attachmentFieldIDsFromData(field, data)
+		if err != nil {
+			return fmt.Errorf("同步附件字段 %s 失败: %w", field.Name, err)
+		}
+
+		referenced := make(map[string]struct{}, len(fileIDs))
+		for _, fileID := range fileIDs {
+			referenced[fileID] = struct{}{}
+		}
+
+		var existingFiles []models.File
+		if err := tx.Where("record_id = ? AND field_id = ?", recordID, field.ID).Find(&existingFiles).Error; err != nil {
+			return fmt.Errorf("查询附件绑定失败: %w", err)
+		}
+
+		for _, existingFile := range existingFiles {
+			if _, ok := referenced[existingFile.ID]; ok {
+				continue
+			}
+			if err := tx.Model(&models.File{}).Where("id = ?", existingFile.ID).Update("record_id", "").Error; err != nil {
+				return fmt.Errorf("解除附件绑定失败: %w", err)
+			}
+		}
+
+		if len(fileIDs) == 0 {
+			continue
+		}
+
+		if err := tx.Model(&models.File{}).
+			Where("id IN ?", fileIDs).
+			Updates(map[string]interface{}{
+				"record_id": recordID,
+				"field_id":  field.ID,
+			}).Error; err != nil {
+			return fmt.Errorf("绑定附件失败: %w", err)
 		}
 	}
 
@@ -147,7 +305,7 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 		return nil
 	}
 
-	switch field.Type {
+	switch normalizeFieldType(field.Type) {
 	case "string", "text":
 		if _, ok := value.(string); !ok {
 			return errors.New("期望字符串类型")
@@ -226,25 +384,28 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 			}
 		}
 
-	case "multiselect", "multi_select":
-		if _, ok := value.([]interface{}); !ok {
-			return errors.New("期望数组类型")
+	case "list":
+		items, err := parseStringListValue(value)
+		if err != nil {
+			return err
 		}
-		// 检查选项是否有效
-		if field.Options != "" {
+
+		// 历史 multiselect / multi_select 字段继续沿用选项约束；
+		// 新 list 类型只校验“字符串数组”，不强制命中建议项。
+		if (field.Type == "multiselect" || field.Type == "multi_select") && field.Options != "" {
 			var config map[string]interface{}
 			if err := json.Unmarshal([]byte(field.Options), &config); err == nil {
 				if options, exists := config["options"].([]interface{}); exists {
-					for _, val := range value.([]interface{}) {
+					for _, val := range items {
 						valid := false
 						for _, opt := range options {
-							if opt.(string) == val.(string) {
+							if opt.(string) == val {
 								valid = true
 								break
 							}
 						}
 						if !valid {
-							return fmt.Errorf("无效的选项值: %s", val.(string))
+							return fmt.Errorf("无效的选项值: %s", val)
 						}
 					}
 				}
@@ -497,7 +658,7 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 	}
 
 	// 2. 验证数据
-	if err := s.validateRecordData(req.TableID, normalizedData); err != nil {
+	if err := s.validateRecordData(req.TableID, normalizedData, "", userID); err != nil {
 		return nil, err
 	}
 
@@ -507,7 +668,7 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 		return nil, fmt.Errorf("数据序列化失败: %w", err)
 	}
 
-	// 4. 创建记录
+	// 4. 创建记录并绑定附件
 	record := models.Record{
 		TableID:   req.TableID,
 		Data:      string(dataJSON),
@@ -516,8 +677,16 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 		Version:   1,
 	}
 
-	if err := s.db.Create(&record).Error; err != nil {
-		return nil, fmt.Errorf("创建记录失败: %w", err)
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(&record).Error; err != nil {
+			return fmt.Errorf("创建记录失败: %w", err)
+		}
+		if err := s.syncAttachmentBindings(tx, record.ID, fields, normalizedData); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	NewPluginService(s.db).TriggerByTable(req.TableID, "create", record.ID, userID, map[string]interface{}{
@@ -821,7 +990,7 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 	}
 
 	// 4. 验证数据
-	if err := s.validateRecordData(record.TableID, currentData); err != nil {
+	if err := s.validateRecordData(record.TableID, currentData, record.ID, userID); err != nil {
 		return nil, err
 	}
 
@@ -832,26 +1001,36 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 	}
 
 	// 6. 原子更新，避免并发覆盖写
-	updateQuery := s.db.Model(&models.Record{}).
-		Where("id = ? AND deleted_at IS NULL", recordID)
-	if req.Version > 0 {
-		updateQuery = updateQuery.Where("version = ?", req.Version)
-	}
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		updateQuery := tx.Model(&models.Record{}).
+			Where("id = ? AND deleted_at IS NULL", recordID)
+		if req.Version > 0 {
+			updateQuery = updateQuery.Where("version = ?", req.Version)
+		}
 
-	updateResult := updateQuery.Updates(map[string]interface{}{
-		"data":       string(dataJSON),
-		"updated_by": userID,
-		"version":    gorm.Expr("version + 1"),
-	})
-	if updateResult.Error != nil {
-		return nil, fmt.Errorf("更新记录失败: %w", updateResult.Error)
-	}
-	if updateResult.RowsAffected == 0 {
-		return nil, errors.New("记录已被其他用户修改，请刷新后重试")
-	}
+		updateResult := updateQuery.Updates(map[string]interface{}{
+			"data":       string(dataJSON),
+			"updated_by": userID,
+			"version":    gorm.Expr("version + 1"),
+		})
+		if updateResult.Error != nil {
+			return fmt.Errorf("更新记录失败: %w", updateResult.Error)
+		}
+		if updateResult.RowsAffected == 0 {
+			return errors.New("记录已被其他用户修改，请刷新后重试")
+		}
 
-	if err := s.db.Where("id = ?", recordID).First(&record).Error; err != nil {
-		return nil, fmt.Errorf("读取更新后记录失败: %w", err)
+		if err := s.syncAttachmentBindings(tx, recordID, fields, currentData); err != nil {
+			return err
+		}
+
+		if err := tx.Where("id = ?", recordID).First(&record).Error; err != nil {
+			return fmt.Errorf("读取更新后记录失败: %w", err)
+		}
+
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	NewPluginService(s.db).TriggerByTable(record.TableID, "update", record.ID, userID, map[string]interface{}{
@@ -940,8 +1119,21 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 		return nil, err
 	}
 
+	for _, field := range fields {
+		if !isAttachmentFieldType(field.Type) {
+			continue
+		}
+		fileIDs, err := attachmentFieldIDsFromData(field, normalizedData)
+		if err != nil {
+			return nil, err
+		}
+		if len(fileIDs) > 0 {
+			return nil, errors.New("批量创建暂不支持 attachment 字段")
+		}
+	}
+
 	// 2. 验证数据
-	if err := s.validateRecordData(req.TableID, normalizedData); err != nil {
+	if err := s.validateRecordData(req.TableID, normalizedData, "", userID); err != nil {
 		return nil, err
 	}
 

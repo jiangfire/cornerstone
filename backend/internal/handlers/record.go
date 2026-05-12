@@ -86,7 +86,7 @@ func ListRecords(c *gin.Context) {
 	}
 
 	types.Success(c, gin.H{
-		"records":  result.Records,
+		"items":    result.Records,
 		"total":    result.Total,
 		"has_more": result.HasMore,
 	})

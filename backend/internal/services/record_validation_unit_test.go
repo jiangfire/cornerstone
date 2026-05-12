@@ -67,7 +67,7 @@ func TestValidateFieldValue_MaxLength(t *testing.T) {
 	assert.Contains(t, err.Error(), "长度不能超过")
 }
 
-// TestValidateFieldValue_SelectOptions tests single and multi-select validation
+// TestValidateFieldValue_SelectOptions tests select, list, and legacy multi-select validation
 func TestValidateFieldValue_SelectOptions(t *testing.T) {
 	service := &RecordService{}
 
@@ -95,6 +95,17 @@ func TestValidateFieldValue_SelectOptions(t *testing.T) {
 	err = service.validateFieldValue(singleSelectField, "InvalidCategory")
 	assert.Error(t, err, "Invalid single select should fail")
 
+	// List
+	listField := models.Field{
+		Type: "list",
+	}
+
+	err = service.validateFieldValue(listField, []interface{}{"New", "Featured"})
+	assert.NoError(t, err, "Valid list values should pass")
+
+	err = service.validateFieldValue(listField, []interface{}{"New", 1})
+	assert.Error(t, err, "Non-string list item should fail")
+
 	// Multiselect alias
 	multiselectField := models.Field{
 		Type:    "multiselect",
@@ -107,7 +118,7 @@ func TestValidateFieldValue_SelectOptions(t *testing.T) {
 	err = service.validateFieldValue(multiselectField, []interface{}{"New", "InvalidTag"})
 	assert.Error(t, err, "Invalid multiselect alias should fail")
 
-	// Multi select
+	// Multi select alias
 	multiSelectField := models.Field{
 		Type:    "multi_select",
 		Options: `{"options":["New","Sale","Featured"]}`,
@@ -465,6 +476,7 @@ func TestValidateFieldValue_NilHandling(t *testing.T) {
 		{Type: "number"},
 		{Type: "boolean"},
 		{Type: "date"},
+		{Type: "list"},
 		{Type: "single_select"},
 		{Type: "multi_select"},
 	}
