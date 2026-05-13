@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -677,4 +678,116 @@ func TestGovernanceService_DispatchOutboxEventUsesStoredHTTPMethod(t *testing.T)
 	require.NoError(t, db.Where("id = ?", outbox.ID).First(&refreshedOutbox).Error)
 	require.Equal(t, applyStatusSucceeded, refreshedOutbox.Status)
 	require.Equal(t, http.StatusOK, refreshedOutbox.LastResponseCode)
+}
+
+func TestMapRecommendationTypeToReviewType(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"term_binding", "term_binding"},
+		{"classification", "classification"},
+		{"dq_rule", "dq_rule"},
+		{"impact_summary", "generic"},
+		{"unknown", "generic"},
+	}
+	for _, tt := range tests {
+		require.Equal(t, tt.want, mapRecommendationTypeToReviewType(tt.input))
+	}
+}
+
+func TestGenerateAIRecommendation_RejectsUnconfiguredClient(t *testing.T) {
+	db := setupGovernanceTestDB(t)
+	service := NewGovernanceService(db)
+
+	_, err := service.GenerateAIRecommendation(context.Background(), GenerateAIRecommendationRequest{
+		TaskID:            "gvt_test",
+		RecommendationType: "term_binding",
+	}, "user_1")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "未配置")
+}
+
+func TestGenerateAIRecommendation_RejectsInvalidRecommendationType(t *testing.T) {
+	db := setupGovernanceTestDB(t)
+	service := NewGovernanceService(db)
+	service.SetLLMGovernorClient(NewLLMGovernorClient("http://localhost:9999", "test-token"))
+
+	_, err := service.GenerateAIRecommendation(context.Background(), GenerateAIRecommendationRequest{
+		TaskID:            "gvt_test",
+		RecommendationType: "invalid_type",
+	}, "user_1")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "不支持")
+}
+
+func TestGenerateAIRecommendation_RejectsUnauthorizedUser(t *testing.T) {
+	db := setupGovernanceTestDB(t)
+	creator, _ := seedGovernanceUsers(t, db)
+	service := NewGovernanceService(db)
+	service.SetLLMGovernorClient(NewLLMGovernorClient("http://localhost:9999", "test-token"))
+
+	task, err := service.CreateTask(CreateGovernanceTaskRequest{
+		Title:      "test task",
+		TaskType:   "term_review",
+		Priority:   "medium",
+		ResourceID: "res_1",
+	}, creator.ID)
+	require.NoError(t, err)
+
+	_, err = service.GenerateAIRecommendation(context.Background(), GenerateAIRecommendationRequest{
+		TaskID:            task.ID,
+		RecommendationType: "term_binding",
+	}, "nonexistent_user")
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "不存在")
+}
+
+func TestGenerateAIRecommendation_CallsLLMAndCreatesReview(t *testing.T) {
+	db := setupGovernanceTestDB(t)
+	creator, _ := seedGovernanceUsers(t, db)
+	service := NewGovernanceService(db)
+
+	// 设置 mock LLM Governor 服务端
+	mockServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		require.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
+		require.Equal(t, "cornerstone", r.Header.Get("X-Source-System"))
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"success":true,"recommendation":{"term":"customer_id","confidence":0.95},"confidence":0.95,"reasoning":"test"}`))
+	}))
+	defer mockServer.Close()
+
+	service.SetLLMGovernorClient(NewLLMGovernorClient(mockServer.URL, "test-token"))
+
+	task, err := service.CreateTask(CreateGovernanceTaskRequest{
+		Title:      "test task for AI",
+		TaskType:   "term_review",
+		Priority:   "medium",
+		ResourceID: "res_2",
+	}, creator.ID)
+	require.NoError(t, err)
+
+	review, err := service.GenerateAIRecommendation(context.Background(), GenerateAIRecommendationRequest{
+		TaskID:            task.ID,
+		RecommendationType: "term_binding",
+		ResourceType:      "column",
+		ResourceID:        "col_123",
+	}, creator.ID)
+	require.NoError(t, err)
+	require.Equal(t, "llm-governor", review.ProposalSource)
+	require.Equal(t, "term_binding", review.ReviewType)
+	require.Contains(t, review.ProposalPayload, "customer_id")
+}
+
+func TestIsSystemAdmin(t *testing.T) {
+	db := setupGovernanceTestDB(t)
+	admin := models.User{Username: "admin", Email: "admin@example.com", Password: "x", IsSystemAdmin: true}
+	normal := models.User{Username: "normal", Email: "normal@example.com", Password: "x", IsSystemAdmin: false}
+	require.NoError(t, db.Create(&admin).Error)
+	require.NoError(t, db.Create(&normal).Error)
+
+	service := NewGovernanceService(db)
+	require.True(t, service.isSystemAdmin(admin.ID))
+	require.False(t, service.isSystemAdmin(normal.ID))
+	require.False(t, service.isSystemAdmin("nonexistent"))
 }

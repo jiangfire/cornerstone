@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"strings"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	"github.com/jiangfire/cornerstone/backend/internal/services"
@@ -8,7 +10,17 @@ import (
 	"github.com/jiangfire/cornerstone/backend/pkg/db"
 )
 
-// CreateGovernanceTask 创建治理任务
+// CreateGovernanceTask godoc
+// @Summary Create governance task
+// @Description Create a new governance task for cross-system data governance
+// @Tags governance
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param request body services.CreateGovernanceTaskRequest true "Governance task request"
+// @Success 200 {object} types.Response{data=models.GovernanceTask}
+// @Failure 400 {object} types.Response
+// @Router /governance/tasks [post]
 func CreateGovernanceTask(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 
@@ -30,7 +42,22 @@ func CreateGovernanceTask(c *gin.Context) {
 	types.Success(c, task)
 }
 
-// ListGovernanceTasks 查询治理任务
+// ListGovernanceTasks godoc
+// @Summary List governance tasks
+// @Description Get list of governance tasks with optional filters
+// @Tags governance
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param status query string false "Filter by status"
+// @Param task_type query string false "Filter by task type"
+// @Param priority query string false "Filter by priority"
+// @Param source_system query string false "Filter by source system"
+// @Param resource_type query string false "Filter by resource type"
+// @Param resource_id query string false "Filter by resource ID"
+// @Success 200 {object} types.Response{data=gin.H}
+// @Failure 500 {object} types.Response
+// @Router /governance/tasks [get]
 func ListGovernanceTasks(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 
@@ -247,4 +274,39 @@ func ApplyGovernanceReview(c *gin.Context) {
 	publishGovernanceTaskChanged(audience, "apply_requested", task)
 
 	types.Success(c, outbox)
+}
+
+// GenerateAIRecommendation 生成 AI 建议
+func GenerateAIRecommendation(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+
+	var req services.GenerateAIRecommendationRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		types.Error(c, 400, "参数错误: "+err.Error())
+		return
+	}
+
+	governanceService := services.NewGovernanceService(db.DB())
+	review, err := governanceService.GenerateAIRecommendation(c.Request.Context(), req, userID)
+	if err != nil {
+		status := 500
+		if isValidationError(err) {
+			status = 400
+		}
+		types.Error(c, status, err.Error())
+		return
+	}
+
+	publishGovernanceReviewChanged(governanceReviewAudience(review, loadGovernanceTask(review.TaskID), userID), "created", review)
+
+	types.Success(c, review)
+}
+
+// isValidationError 判断错误是否为用户输入/配置/权限类错误（应返回 4xx）
+func isValidationError(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "未配置") ||
+		strings.Contains(msg, "不支持") ||
+		strings.Contains(msg, "不存在") ||
+		strings.Contains(msg, "无权")
 }

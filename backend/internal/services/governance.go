@@ -1,6 +1,7 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -59,12 +60,28 @@ var (
 
 // GovernanceService 治理域服务
 type GovernanceService struct {
-	db *gorm.DB
+	db               *gorm.DB
+	llmGovernorClient *LLMGovernorClient
+}
+
+// 包级默认 LLM Governor 客户端，由进程启动时通过
+// SetDefaultLLMGovernorClient 注入；NewGovernanceService 读取该值。
+var defaultLLMGovernorClient *LLMGovernorClient
+
+// SetDefaultLLMGovernorClient 注入进程级默认 LLM Governor 客户端，
+// 影响后续通过 NewGovernanceService 创建的所有 GovernanceService 实例。
+func SetDefaultLLMGovernorClient(client *LLMGovernorClient) {
+	defaultLLMGovernorClient = client
 }
 
 // NewGovernanceService 创建治理域服务
 func NewGovernanceService(db *gorm.DB) *GovernanceService {
-	return &GovernanceService{db: db}
+	return &GovernanceService{db: db, llmGovernorClient: defaultLLMGovernorClient}
+}
+
+// SetLLMGovernorClient 设置 LLM Governor 客户端
+func (s *GovernanceService) SetLLMGovernorClient(client *LLMGovernorClient) {
+	s.llmGovernorClient = client
 }
 
 // GovernanceExternalLinkInput 外部资源引用
@@ -196,6 +213,17 @@ func (s *GovernanceService) ensureUserExists(userID string) error {
 
 func (s *GovernanceService) getTaskAccessibleByUser(taskID, userID string) (*models.GovernanceTask, error) {
 	var task models.GovernanceTask
+	// 系统管理员可直接访问任意任务
+	if s.isSystemAdmin(userID) {
+		err := s.db.Where("id = ?", taskID).First(&task).Error
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, errors.New("治理任务不存在")
+			}
+			return nil, fmt.Errorf("查询治理任务失败: %w", err)
+		}
+		return &task, nil
+	}
 	err := s.db.Where(
 		"id = ? AND (created_by = ? OR assignee_id = ?)",
 		taskID, userID, userID,
@@ -214,10 +242,21 @@ func (s *GovernanceService) getTaskManageableByUser(taskID, userID string) (*mod
 	if err != nil {
 		return nil, err
 	}
+	// 系统管理员可管理任意任务
+	if s.isSystemAdmin(userID) {
+		return task, nil
+	}
 	if task.CreatedBy != userID && task.AssigneeID != userID {
 		return nil, errors.New("无权修改治理任务")
 	}
 	return task, nil
+}
+
+// isSystemAdmin 检查用户是否为系统管理员
+func (s *GovernanceService) isSystemAdmin(userID string) bool {
+	var count int64
+	s.db.Model(&models.User{}).Where("id = ? AND is_system_admin = ?", userID, true).Count(&count)
+	return count > 0
 }
 
 func (s *GovernanceService) logActivity(tx *gorm.DB, userID, action, resourceType, resourceID, description string) error {
@@ -651,4 +690,82 @@ func (s *GovernanceService) DecideReview(reviewID, userID, targetStatus, decisio
 	}
 
 	return review, nil
+}
+
+// GenerateAIRecommendationRequest AI 建议生成请求
+type GenerateAIRecommendationRequest struct {
+	TaskID            string                 `json:"task_id"`
+	RecommendationType string                 `json:"recommendation_type"` // term_binding, classification, dq_rule, impact_summary
+	ResourceType      string                 `json:"resource_type"`
+	ResourceID        string                 `json:"resource_id"`
+	Context           map[string]interface{} `json:"context"`
+}
+
+var allowedRecommendationTypes = map[string]bool{
+	"term_binding":   true,
+	"classification": true,
+	"dq_rule":        true,
+	"impact_summary": true,
+}
+
+// GenerateAIRecommendation 生成 AI 建议
+func (s *GovernanceService) GenerateAIRecommendation(ctx context.Context, req GenerateAIRecommendationRequest, userID string) (*models.GovernanceReview, error) {
+	if s.llmGovernorClient == nil {
+		return nil, errors.New("LLM Governor 服务未配置")
+	}
+
+	if !allowedRecommendationTypes[req.RecommendationType] {
+		return nil, fmt.Errorf("不支持的建议类型: %s", req.RecommendationType)
+	}
+
+	// 复用权限检查：用户须有任务访问权
+	if _, err := s.getTaskAccessibleByUser(req.TaskID, userID); err != nil {
+		return nil, err
+	}
+
+	llmReq := AIRecommendationRequest{
+		TaskType:     req.RecommendationType,
+		ResourceType: req.ResourceType,
+		ResourceID:   req.ResourceID,
+		Context:      req.Context,
+	}
+
+	response, err := s.llmGovernorClient.GenerateRecommendation(ctx, llmReq)
+	if err != nil {
+		return nil, fmt.Errorf("调用 LLM Governor 失败: %w", err)
+	}
+
+	if !response.Success {
+		return nil, fmt.Errorf("AI 生成建议失败: %s", response.Error)
+	}
+
+	proposalJSON, err := json.Marshal(response.Recommendation)
+	if err != nil {
+		return nil, fmt.Errorf("序列化建议失败: %w", err)
+	}
+
+	reviewReq := CreateGovernanceReviewRequest{
+		TaskID:          req.TaskID,
+		ReviewType:      mapRecommendationTypeToReviewType(req.RecommendationType),
+		ProposalSource:  "llm-governor",
+		ProposalPayload: string(proposalJSON),
+	}
+
+	return s.CreateReview(reviewReq, userID)
+}
+
+// mapRecommendationTypeToReviewType 映射建议类型到审核类型
+func mapRecommendationTypeToReviewType(recommendationType string) string {
+	switch recommendationType {
+	case "term_binding":
+		return "term_binding"
+	case "classification":
+		return "classification"
+	case "dq_rule":
+		return "dq_rule"
+	case "impact_summary":
+		return "generic"
+	default:
+		return "generic"
+	}
 }

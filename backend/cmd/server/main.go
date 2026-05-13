@@ -16,6 +16,7 @@ import (
 	"github.com/jiangfire/cornerstone/backend/internal/frontend"
 	"github.com/jiangfire/cornerstone/backend/internal/handlers"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
+	"github.com/jiangfire/cornerstone/backend/internal/services"
 	applog "github.com/jiangfire/cornerstone/backend/pkg/log"
 )
 
@@ -102,6 +103,13 @@ func main() {
 		integrations.Use(middleware.IntegrationTokenAuth())
 		{
 			integrations.POST("/events", handlers.ReceiveIntegrationEvent)
+		}
+
+		// 注入 LLM Governor 客户端（如果配置了）
+		if cfg.Integrations.LLMGovernorURL != "" && cfg.Integrations.LLMGovernorToken != "" {
+			client := services.NewLLMGovernorClient(cfg.Integrations.LLMGovernorURL, cfg.Integrations.LLMGovernorToken)
+			services.SetDefaultLLMGovernorClient(client)
+			logger.Info("LLM Governor client configured")
 		}
 
 		// 需要认证的路由
@@ -221,6 +229,7 @@ func main() {
 			protected.POST("/governance/reviews/:id/approve", handlers.ApproveGovernanceReview)
 			protected.POST("/governance/reviews/:id/reject", handlers.RejectGovernanceReview)
 			protected.POST("/governance/reviews/:id/apply", handlers.ApplyGovernanceReview)
+				protected.POST("/governance/ai/recommendations", handlers.GenerateAIRecommendation)
 		}
 	}
 
