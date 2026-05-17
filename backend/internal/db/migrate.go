@@ -337,10 +337,10 @@ func generateRandomPassword(length int) (string, error) {
 	if length < 12 {
 		length = 12
 	}
-	max := big.NewInt(int64(len(charset)))
+	maxInt := big.NewInt(int64(len(charset)))
 	b := make([]byte, length)
 	for i := range b {
-		n, err := rand.Int(rand.Reader, max)
+		n, err := rand.Int(rand.Reader, maxInt)
 		if err != nil {
 			return "", fmt.Errorf("crypto/rand: %w", err)
 		}
@@ -356,7 +356,7 @@ func IsSQLite() bool {
 
 // isSQLite 检查是否为 SQLite 数据库
 func isSQLite(db *gorm.DB) bool {
-	return db.Dialector.Name() == "sqlite"
+	return db.Name() == "sqlite"
 }
 
 // createIndexes 创建复合索引以提升查询性能

@@ -130,7 +130,7 @@ func TestGenerateJWT_ContainsStandardClaims(t *testing.T) {
 	if claims.Issuer != "cornerstone" {
 		t.Fatalf("Issuer 期望 cornerstone, 实际 %q", claims.Issuer)
 	}
-	if claims.ExpiresAt == nil || claims.ExpiresAt.Time.Before(time.Now()) {
+	if claims.ExpiresAt == nil || claims.ExpiresAt.Before(time.Now()) {
 		t.Fatal("ExpiresAt 应在未来")
 	}
 }

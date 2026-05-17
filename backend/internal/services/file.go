@@ -260,7 +260,7 @@ func (s *FileService) UploadFile(req UploadFileRequest, userID string) (*models.
 
 	// 4. 创建上传目录
 	uploadDir := fileUploadDir
-	if err := os.MkdirAll(uploadDir, 0750); err != nil {
+	if err := os.MkdirAll(uploadDir, 0o750); err != nil {
 		return nil, fmt.Errorf("创建上传目录失败: %w", err)
 	}
 

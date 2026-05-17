@@ -1,99 +1,97 @@
-# golangci-lint configuration for Cornerstone backend.
-# Compatible with golangci-lint v1.62+ (uses v1 config schema).
-#
-# Goals:
-#   - 默认开启的 staticcheck/govet/errcheck/ineffassign/unused 一定要过
-#   - 加 gosec(扫常见安全反模式) + gocritic(代码气味) 但仅警告级别问题
-#   - 跳过测试文件里的几类长期容忍项
-
+version: "2"
 run:
-  timeout: 5m
   go: "1.25"
-  tests: true
   build-tags:
     - sqlite_omit_load_extension
-
+  tests: true
 linters:
-  disable-all: true
+  default: none
   enable:
     - errcheck
+    - gocritic
+    - gosec
     - govet
     - ineffassign
+    - revive
     - staticcheck
     - unused
-    - gofmt
-    - gosec
-    - gocritic
-    - revive
-
-linters-settings:
-  errcheck:
-    # 这两个家族函数大量被故意忽略错误(测试日志/响应写入回退路径)
-    exclude-functions:
-      - (*github.com/gin-gonic/gin.Context).Error
-      - fmt.Fprintf
-      - fmt.Fprintln
-      - fmt.Fprint
-
-  gosec:
-    excludes:
-      # G104 已被 errcheck 覆盖, 避免重复报告
-      - G104
-      # G304 file path from variable: 我们在 services/plugin.go::resolveScriptPath 等点
-      # 已有显式 allowlist + filepath.Rel 双层校验, 该 lint 全开会持续误报
-      - G304
-      # G306 文件权限 0600/0644: 项目中部分日志/数据库文件需要 0644 共享, 留人工 review
-      - G306
-
-  gocritic:
-    enabled-tags:
-      - diagnostic
-      - performance
-      - style
-    disabled-checks:
-      # 这些与项目现有风格相左, 关掉减少噪音
-      - hugeParam
-      - rangeValCopy
-      - paramTypeCombine
-      - unnamedResult
-      - ifElseChain
-
-  revive:
+  settings:
+    errcheck:
+      exclude-functions:
+        - (*github.com/gin-gonic/gin.Context).Error
+        - fmt.Fprintf
+        - fmt.Fprintln
+        - fmt.Fprint
+    gocritic:
+      disabled-checks:
+        - hugeParam
+        - rangeValCopy
+        - paramTypeCombine
+        - unnamedResult
+        - ifElseChain
+      enabled-tags:
+        - diagnostic
+        - performance
+        - style
+    gosec:
+      excludes:
+        - G104
+        - G304
+        - G306
+    revive:
+      rules:
+        - name: blank-imports
+        - name: context-as-argument
+        - name: dot-imports
+        - name: error-return
+        - name: error-strings
+        - name: error-naming
+        - name: exported
+          disabled: true
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: unreachable-code
+        - name: unused-parameter
+          disabled: true
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: blank-imports
-      - name: context-as-argument
-      - name: dot-imports
-      - name: error-return
-      - name: error-strings
-      - name: error-naming
-      - name: exported
-        disabled: true  # 我们对内部包不要求每个 export 都有 doc comment
-      - name: increment-decrement
-      - name: indent-error-flow
-      - name: range
-      - name: receiver-naming
-      - name: redefines-builtin-id
-      - name: superfluous-else
-      - name: time-naming
-      - name: unexported-return
-      - name: unreachable-code
-      - name: unused-parameter
-        disabled: true  # 大量 handler/service 签名带 ctx 但不用, 不强制
-
+      - linters:
+          - errcheck
+          - gocritic
+          - gosec
+        path: _test\.go
+      - linters:
+          - all
+        path: backend/internal/frontend/dist
+    paths:
+      - backend/bin
+      - backend/internal/frontend/dist
+      - third_party$
+      - builtin$
+      - examples$
 issues:
-  exclude-rules:
-    # 测试文件放宽
-    - path: _test\.go
-      linters:
-        - errcheck
-        - gosec
-        - gocritic
-    # 自动生成 / vendored 跳过
-    - path: backend/internal/frontend/dist
-      linters:
-        - all
-  exclude-dirs:
-    - backend/bin
-    - backend/internal/frontend/dist
   max-issues-per-linter: 0
   max-same-issues: 0
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - backend/bin
+      - backend/internal/frontend/dist
+      - third_party$
+      - builtin$
+      - examples$

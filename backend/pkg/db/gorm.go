@@ -25,7 +25,7 @@ func IsSQLite() bool {
 	if db == nil {
 		return false
 	}
-	return db.Dialector.Name() == "sqlite"
+	return db.Name() == "sqlite"
 }
 
 // IsPostgres 检查当前是否为 PostgreSQL 数据库
@@ -33,7 +33,7 @@ func IsPostgres() bool {
 	if db == nil {
 		return false
 	}
-	return db.Dialector.Name() == "postgres"
+	return db.Name() == "postgres"
 }
 
 // InitDB 初始化数据库连接
@@ -43,8 +43,6 @@ func InitDB(cfg config.DatabaseConfig) error {
 	switch cfg.Type {
 	case "sqlite":
 		db, err = initSQLite(cfg)
-	case "postgres":
-		fallthrough
 	default:
 		db, err = initPostgres(cfg)
 	}

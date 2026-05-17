@@ -305,10 +305,10 @@ func parseIntegrationValue(input, key string) string {
 
 // 已知的 JWT_SECRET 默认/占位值，运行时若命中则视为未配置。
 var weakJWTSecrets = map[string]struct{}{
-	"":                                                   {},
-	"change-this-secret-key":                             {},
-	"your-secret-key-here":                               {},
-	"dev-secret-key-change-in-production":                {},
+	"":                                    {},
+	"change-this-secret-key":              {},
+	"your-secret-key-here":                {},
+	"dev-secret-key-change-in-production": {},
 	"cornerstone-default-secret-key-change-in-production": {},
 }
 

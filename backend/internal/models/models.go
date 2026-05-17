@@ -10,16 +10,16 @@ import (
 
 // User 用户表 (usr_前缀)
 type User struct {
-	ID            string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	Username      string     `gorm:"type:varchar(100);uniqueIndex;not null" json:"username"`
-	Email         string     `gorm:"type:varchar(255);uniqueIndex;not null" json:"email"`
-	Phone         string     `gorm:"type:varchar(50)" json:"phone,omitempty"`
-	Bio           string     `gorm:"type:text" json:"bio,omitempty"`
-	Avatar        string     `gorm:"type:text" json:"avatar,omitempty"`
-	Password      string     `gorm:"type:varchar(255);not null" json:"-"` // 密码哈希，不序列化
-	IsSystemAdmin bool       `gorm:"type:boolean;not null;default:false" json:"is_system_admin"`
-	CreatedAt     time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt     time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID            string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	Username      string         `gorm:"type:varchar(100);uniqueIndex;not null" json:"username"`
+	Email         string         `gorm:"type:varchar(255);uniqueIndex;not null" json:"email"`
+	Phone         string         `gorm:"type:varchar(50)" json:"phone,omitempty"`
+	Bio           string         `gorm:"type:text" json:"bio,omitempty"`
+	Avatar        string         `gorm:"type:text" json:"avatar,omitempty"`
+	Password      string         `gorm:"type:varchar(255);not null" json:"-"` // 密码哈希，不序列化
+	IsSystemAdmin bool           `gorm:"type:boolean;not null;default:false" json:"is_system_admin"`
+	CreatedAt     time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt     time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -38,12 +38,12 @@ func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
 
 // Organization 组织表 (org_前缀)
 type Organization struct {
-	ID          string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	Name        string     `gorm:"type:varchar(255);not null;uniqueIndex:uk_org_owner_name" json:"name"`
-	Description string     `gorm:"type:text" json:"description"`
-	OwnerID     string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_org_owner_name" json:"owner_id"`
-	CreatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID          string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	Name        string         `gorm:"type:varchar(255);not null;uniqueIndex:uk_org_owner_name" json:"name"`
+	Description string         `gorm:"type:text" json:"description"`
+	OwnerID     string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_org_owner_name" json:"owner_id"`
+	CreatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -60,12 +60,12 @@ func (o *Organization) BeforeCreate(tx *gorm.DB) (err error) {
 
 // OrganizationMember 组织成员表 (mem_前缀)
 type OrganizationMember struct {
-	ID             string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	OrganizationID string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_org_user" json:"organization_id"`
-	UserID         string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_org_user" json:"user_id"`
-	Role           string     `gorm:"type:varchar(50);not null;default:'member'" json:"role"` // owner, admin, member
-	JoinedAt       time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"joined_at"`
-	UpdatedAt      time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID             string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	OrganizationID string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_org_user" json:"organization_id"`
+	UserID         string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_org_user" json:"user_id"`
+	Role           string         `gorm:"type:varchar(50);not null;default:'member'" json:"role"` // owner, admin, member
+	JoinedAt       time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"joined_at"`
+	UpdatedAt      time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt      gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -82,14 +82,14 @@ func (om *OrganizationMember) BeforeCreate(tx *gorm.DB) (err error) {
 
 // Database 数据库表 (db_前缀)
 type Database struct {
-	ID          string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	Name        string     `gorm:"type:varchar(255);not null;uniqueIndex:uk_db_owner_name" json:"name"`
-	Description string     `gorm:"type:text" json:"description"`
-	OwnerID     string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_db_owner_name" json:"owner_id"`
-	IsPublic    bool       `gorm:"type:boolean;default:false" json:"is_public"`
-	IsPersonal  bool       `gorm:"type:boolean;default:true" json:"is_personal"` // 个人数据库还是组织数据库
-	CreatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID          string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	Name        string         `gorm:"type:varchar(255);not null;uniqueIndex:uk_db_owner_name" json:"name"`
+	Description string         `gorm:"type:text" json:"description"`
+	OwnerID     string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_db_owner_name" json:"owner_id"`
+	IsPublic    bool           `gorm:"type:boolean;default:false" json:"is_public"`
+	IsPersonal  bool           `gorm:"type:boolean;default:true" json:"is_personal"` // 个人数据库还是组织数据库
+	CreatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -106,12 +106,12 @@ func (d *Database) BeforeCreate(tx *gorm.DB) (err error) {
 
 // DatabaseAccess 数据库权限表 (acc_前缀)
 type DatabaseAccess struct {
-	ID         string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	UserID     string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_db_user" json:"user_id"`
-	DatabaseID string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_db_user" json:"database_id"`
-	Role       string     `gorm:"type:varchar(50);not null" json:"role"` // owner, admin, editor, viewer
-	CreatedAt  time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt  time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID         string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	UserID     string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_db_user" json:"user_id"`
+	DatabaseID string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_db_user" json:"database_id"`
+	Role       string         `gorm:"type:varchar(50);not null" json:"role"` // owner, admin, editor, viewer
+	CreatedAt  time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt  time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt  gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -128,12 +128,12 @@ func (da *DatabaseAccess) BeforeCreate(tx *gorm.DB) (err error) {
 
 // Table 表定义 (tbl_前缀)
 type Table struct {
-	ID          string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	DatabaseID  string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_table_db_name" json:"database_id"`
-	Name        string     `gorm:"type:varchar(255);not null;uniqueIndex:uk_table_db_name" json:"name"`
-	Description string     `gorm:"type:text" json:"description"`
-	CreatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID          string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	DatabaseID  string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_table_db_name" json:"database_id"`
+	Name        string         `gorm:"type:varchar(255);not null;uniqueIndex:uk_table_db_name" json:"name"`
+	Description string         `gorm:"type:text" json:"description"`
+	CreatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -150,15 +150,15 @@ func (t *Table) BeforeCreate(tx *gorm.DB) (err error) {
 
 // Field 字段定义 (fld_前缀)
 type Field struct {
-	ID          string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	TableID     string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_field_table_name" json:"table_id"`
-	Name        string     `gorm:"type:varchar(255);not null;uniqueIndex:uk_field_table_name" json:"name"`
-	Type        string     `gorm:"type:varchar(50);not null" json:"type"` // string, number, boolean, date, attachment, etc.
-	Description string     `gorm:"type:text" json:"description"`
-	Required    bool       `gorm:"type:boolean;default:false" json:"required"`
-	Options     string     `gorm:"type:text" json:"options"` // JSON string for dropdown options, validation rules
-	CreatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID          string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	TableID     string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_field_table_name" json:"table_id"`
+	Name        string         `gorm:"type:varchar(255);not null;uniqueIndex:uk_field_table_name" json:"name"`
+	Type        string         `gorm:"type:varchar(50);not null" json:"type"` // string, number, boolean, date, attachment, etc.
+	Description string         `gorm:"type:text" json:"description"`
+	Required    bool           `gorm:"type:boolean;default:false" json:"required"`
+	Options     string         `gorm:"type:text" json:"options"` // JSON string for dropdown options, validation rules
+	CreatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -175,14 +175,14 @@ func (f *Field) BeforeCreate(tx *gorm.DB) (err error) {
 
 // Record 数据记录 (rec_前缀)
 type Record struct {
-	ID        string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	TableID   string     `gorm:"type:varchar(50);not null" json:"table_id"`
-	Data      string     `gorm:"type:jsonb;not null" json:"data"` // JSONB存储动态字段
-	CreatedBy string     `gorm:"type:varchar(50);not null" json:"created_by"`
-	UpdatedBy string     `gorm:"type:varchar(50)" json:"updated_by"`
-	Version   int        `gorm:"type:integer;default:1" json:"version"` // 乐观锁版本号
-	CreatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID        string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	TableID   string         `gorm:"type:varchar(50);not null" json:"table_id"`
+	Data      string         `gorm:"type:jsonb;not null" json:"data"` // JSONB存储动态字段
+	CreatedBy string         `gorm:"type:varchar(50);not null" json:"created_by"`
+	UpdatedBy string         `gorm:"type:varchar(50)" json:"updated_by"`
+	Version   int            `gorm:"type:integer;default:1" json:"version"` // 乐观锁版本号
+	CreatedAt time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -199,16 +199,16 @@ func (r *Record) BeforeCreate(tx *gorm.DB) (err error) {
 
 // File 文件附件表
 type File struct {
-	ID         string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	RecordID   string     `gorm:"type:varchar(50);default:'';index" json:"record_id"`
-	FieldID    string     `gorm:"type:varchar(50);default:'';index" json:"field_id"`
-	FileName   string     `gorm:"type:varchar(255);not null" json:"file_name"`
-	FileSize   int64      `gorm:"type:bigint;not null" json:"file_size"`
-	FileType   string     `gorm:"type:varchar(100)" json:"file_type"`
-	StorageURL string     `gorm:"type:text" json:"storage_url"`
-	UploadedBy string     `gorm:"type:varchar(50);not null" json:"uploaded_by"`
-	CreatedAt  time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt  time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID         string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	RecordID   string         `gorm:"type:varchar(50);default:'';index" json:"record_id"`
+	FieldID    string         `gorm:"type:varchar(50);default:'';index" json:"field_id"`
+	FileName   string         `gorm:"type:varchar(255);not null" json:"file_name"`
+	FileSize   int64          `gorm:"type:bigint;not null" json:"file_size"`
+	FileType   string         `gorm:"type:varchar(100)" json:"file_type"`
+	StorageURL string         `gorm:"type:text" json:"storage_url"`
+	UploadedBy string         `gorm:"type:varchar(50);not null" json:"uploaded_by"`
+	CreatedAt  time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt  time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt  gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -225,17 +225,17 @@ func (f *File) BeforeCreate(tx *gorm.DB) (err error) {
 
 // Plugin 插件定义 (plg_前缀)
 type Plugin struct {
-	ID           string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	Name         string     `gorm:"type:varchar(255);not null;uniqueIndex:uk_plugin_creator_name" json:"name"`
-	Description  string     `gorm:"type:text" json:"description"`
-	Language     string     `gorm:"type:varchar(50);not null" json:"language"` // go, python, bash
-	EntryFile    string     `gorm:"type:varchar(255);not null" json:"entry_file"`
-	Timeout      int        `gorm:"type:integer;default:5" json:"timeout"` // 超时秒数
-	Config       string     `gorm:"type:text" json:"config"`               // JSON config schema
-	ConfigValues string     `gorm:"type:text" json:"config_values"`        // JSON config values
-	CreatedBy    string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_plugin_creator_name" json:"created_by"`
-	CreatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID           string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	Name         string         `gorm:"type:varchar(255);not null;uniqueIndex:uk_plugin_creator_name" json:"name"`
+	Description  string         `gorm:"type:text" json:"description"`
+	Language     string         `gorm:"type:varchar(50);not null" json:"language"` // go, python, bash
+	EntryFile    string         `gorm:"type:varchar(255);not null" json:"entry_file"`
+	Timeout      int            `gorm:"type:integer;default:5" json:"timeout"` // 超时秒数
+	Config       string         `gorm:"type:text" json:"config"`               // JSON config schema
+	ConfigValues string         `gorm:"type:text" json:"config_values"`        // JSON config values
+	CreatedBy    string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_plugin_creator_name" json:"created_by"`
+	CreatedAt    time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt    time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -252,12 +252,12 @@ func (p *Plugin) BeforeCreate(tx *gorm.DB) (err error) {
 
 // PluginBinding 插件绑定表 (pbd_前缀)
 type PluginBinding struct {
-	ID        string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	PluginID  string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_plugin_table_trigger" json:"plugin_id"`
-	TableID   string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_plugin_table_trigger" json:"table_id"`
-	Trigger   string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_plugin_table_trigger" json:"trigger"` // create, update, delete, manual
-	CreatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID        string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	PluginID  string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_plugin_table_trigger" json:"plugin_id"`
+	TableID   string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_plugin_table_trigger" json:"table_id"`
+	Trigger   string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_plugin_table_trigger" json:"trigger"` // create, update, delete, manual
+	CreatedAt time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -313,15 +313,15 @@ func (TokenBlacklist) TableName() string {
 
 // FieldPermission 字段级权限表 (flp_前缀)
 type FieldPermission struct {
-	ID        string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	TableID   string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_table_field_role" json:"table_id"`
-	FieldID   string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_table_field_role" json:"field_id"`
-	Role      string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_table_field_role" json:"role"` // owner, admin, editor, viewer
-	CanRead   bool       `gorm:"type:boolean;default:true" json:"can_read"`
-	CanWrite  bool       `gorm:"type:boolean;default:false" json:"can_write"`
-	CanDelete bool       `gorm:"type:boolean;default:false" json:"can_delete"`
-	CreatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID        string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	TableID   string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_table_field_role" json:"table_id"`
+	FieldID   string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_table_field_role" json:"field_id"`
+	Role      string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_table_field_role" json:"role"` // owner, admin, editor, viewer
+	CanRead   bool           `gorm:"type:boolean;default:true" json:"can_read"`
+	CanWrite  bool           `gorm:"type:boolean;default:false" json:"can_write"`
+	CanDelete bool           `gorm:"type:boolean;default:false" json:"can_delete"`
+	CreatedAt time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -389,22 +389,22 @@ func (a *AppSettings) BeforeCreate(tx *gorm.DB) (err error) {
 
 // GovernanceTask 治理任务主表 (gvt_前缀)
 type GovernanceTask struct {
-	ID            string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	Title         string     `gorm:"type:varchar(255);not null" json:"title"`
-	Description   string     `gorm:"type:text" json:"description"`
-	TaskType      string     `gorm:"type:varchar(50);not null;index" json:"task_type"`
-	Status        string     `gorm:"type:varchar(50);not null;default:'open';index" json:"status"`
-	Priority      string     `gorm:"type:varchar(20);not null;default:'medium';index" json:"priority"`
-	SourceSystem  string     `gorm:"type:varchar(50);index" json:"source_system"`
-	ResourceType  string     `gorm:"type:varchar(50);index" json:"resource_type"`
-	ResourceID    string     `gorm:"type:varchar(100);index" json:"resource_id"`
-	AssigneeID    string     `gorm:"type:varchar(50);index" json:"assignee_id"`
-	CreatedBy     string     `gorm:"type:varchar(50);not null;index" json:"created_by"`
-	DueAt         *time.Time `gorm:"type:timestamp" json:"due_at,omitempty"`
-	CompletedAt   *time.Time `gorm:"type:timestamp" json:"completed_at,omitempty"`
-	LastCommentAt *time.Time `gorm:"type:timestamp" json:"last_comment_at,omitempty"`
-	CreatedAt     time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt     time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID            string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	Title         string         `gorm:"type:varchar(255);not null" json:"title"`
+	Description   string         `gorm:"type:text" json:"description"`
+	TaskType      string         `gorm:"type:varchar(50);not null;index" json:"task_type"`
+	Status        string         `gorm:"type:varchar(50);not null;default:'open';index" json:"status"`
+	Priority      string         `gorm:"type:varchar(20);not null;default:'medium';index" json:"priority"`
+	SourceSystem  string         `gorm:"type:varchar(50);index" json:"source_system"`
+	ResourceType  string         `gorm:"type:varchar(50);index" json:"resource_type"`
+	ResourceID    string         `gorm:"type:varchar(100);index" json:"resource_id"`
+	AssigneeID    string         `gorm:"type:varchar(50);index" json:"assignee_id"`
+	CreatedBy     string         `gorm:"type:varchar(50);not null;index" json:"created_by"`
+	DueAt         *time.Time     `gorm:"type:timestamp" json:"due_at,omitempty"`
+	CompletedAt   *time.Time     `gorm:"type:timestamp" json:"completed_at,omitempty"`
+	LastCommentAt *time.Time     `gorm:"type:timestamp" json:"last_comment_at,omitempty"`
+	CreatedAt     time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt     time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -421,23 +421,23 @@ func (g *GovernanceTask) BeforeCreate(tx *gorm.DB) (err error) {
 
 // GovernanceReview 治理审核/审批表 (gvr_前缀)
 type GovernanceReview struct {
-	ID              string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	TaskID          string     `gorm:"type:varchar(50);index" json:"task_id"`
-	ReviewType      string     `gorm:"type:varchar(50);not null;index" json:"review_type"`
-	Status          string     `gorm:"type:varchar(20);not null;default:'pending';index" json:"status"`
-	ProposalSource  string     `gorm:"type:varchar(50)" json:"proposal_source"`
-	ProposalPayload string     `gorm:"type:text" json:"proposal_payload"`
-	DecisionPayload string     `gorm:"type:text" json:"decision_payload"`
-	ApplyStatus     string     `gorm:"type:varchar(20);not null;default:'not_requested';index" json:"apply_status"`
-	ApplyError      string     `gorm:"type:text" json:"apply_error"`
-	ApplyResult     string     `gorm:"type:text" json:"apply_result"`
-	ApplyTarget     string     `gorm:"type:varchar(50);index" json:"apply_target"`
-	ReviewerID      string     `gorm:"type:varchar(50);not null;index" json:"reviewer_id"`
-	CreatedBy       string     `gorm:"type:varchar(50);not null;index" json:"created_by"`
-	ReviewedAt      *time.Time `gorm:"type:timestamp" json:"reviewed_at,omitempty"`
-	AppliedAt       *time.Time `gorm:"type:timestamp" json:"applied_at,omitempty"`
-	CreatedAt       time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt       time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID              string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	TaskID          string         `gorm:"type:varchar(50);index" json:"task_id"`
+	ReviewType      string         `gorm:"type:varchar(50);not null;index" json:"review_type"`
+	Status          string         `gorm:"type:varchar(20);not null;default:'pending';index" json:"status"`
+	ProposalSource  string         `gorm:"type:varchar(50)" json:"proposal_source"`
+	ProposalPayload string         `gorm:"type:text" json:"proposal_payload"`
+	DecisionPayload string         `gorm:"type:text" json:"decision_payload"`
+	ApplyStatus     string         `gorm:"type:varchar(20);not null;default:'not_requested';index" json:"apply_status"`
+	ApplyError      string         `gorm:"type:text" json:"apply_error"`
+	ApplyResult     string         `gorm:"type:text" json:"apply_result"`
+	ApplyTarget     string         `gorm:"type:varchar(50);index" json:"apply_target"`
+	ReviewerID      string         `gorm:"type:varchar(50);not null;index" json:"reviewer_id"`
+	CreatedBy       string         `gorm:"type:varchar(50);not null;index" json:"created_by"`
+	ReviewedAt      *time.Time     `gorm:"type:timestamp" json:"reviewed_at,omitempty"`
+	AppliedAt       *time.Time     `gorm:"type:timestamp" json:"applied_at,omitempty"`
+	CreatedAt       time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt       time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt       gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -454,14 +454,14 @@ func (g *GovernanceReview) BeforeCreate(tx *gorm.DB) (err error) {
 
 // GovernanceEvidence 治理整改证据 (gve_前缀)
 type GovernanceEvidence struct {
-	ID           string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	TaskID       string     `gorm:"type:varchar(50);not null;index" json:"task_id"`
-	EvidenceType string     `gorm:"type:varchar(30);not null" json:"evidence_type"`
-	Content      string     `gorm:"type:text" json:"content"`
-	FileID       string     `gorm:"type:varchar(50);index" json:"file_id"`
-	CreatedBy    string     `gorm:"type:varchar(50);not null;index" json:"created_by"`
-	CreatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID           string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	TaskID       string         `gorm:"type:varchar(50);not null;index" json:"task_id"`
+	EvidenceType string         `gorm:"type:varchar(30);not null" json:"evidence_type"`
+	Content      string         `gorm:"type:text" json:"content"`
+	FileID       string         `gorm:"type:varchar(50);index" json:"file_id"`
+	CreatedBy    string         `gorm:"type:varchar(50);not null;index" json:"created_by"`
+	CreatedAt    time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt    time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -478,15 +478,15 @@ func (g *GovernanceEvidence) BeforeCreate(tx *gorm.DB) (err error) {
 
 // GovernanceExternalLink 治理任务与外部资源引用 (gxl_前缀)
 type GovernanceExternalLink struct {
-	ID           string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	TaskID       string     `gorm:"type:varchar(50);not null;index" json:"task_id"`
-	SourceSystem string     `gorm:"type:varchar(50);not null;index" json:"source_system"`
-	ResourceType string     `gorm:"type:varchar(50);not null;index" json:"resource_type"`
-	ResourceID   string     `gorm:"type:varchar(100);not null;index" json:"resource_id"`
-	DisplayName  string     `gorm:"type:varchar(255)" json:"display_name"`
-	TargetURL    string     `gorm:"-" json:"target_url,omitempty"`
-	CreatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID           string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	TaskID       string         `gorm:"type:varchar(50);not null;index" json:"task_id"`
+	SourceSystem string         `gorm:"type:varchar(50);not null;index" json:"source_system"`
+	ResourceType string         `gorm:"type:varchar(50);not null;index" json:"resource_type"`
+	ResourceID   string         `gorm:"type:varchar(100);not null;index" json:"resource_id"`
+	DisplayName  string         `gorm:"type:varchar(255)" json:"display_name"`
+	TargetURL    string         `gorm:"-" json:"target_url,omitempty"`
+	CreatedAt    time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt    time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt    gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
@@ -503,12 +503,12 @@ func (g *GovernanceExternalLink) BeforeCreate(tx *gorm.DB) (err error) {
 
 // GovernanceComment 治理任务评论/批注 (gcm_前缀)
 type GovernanceComment struct {
-	ID        string     `gorm:"type:varchar(50);primaryKey" json:"id"`
-	TaskID    string     `gorm:"type:varchar(50);not null;index" json:"task_id"`
-	Content   string     `gorm:"type:text;not null" json:"content"`
-	CreatedBy string     `gorm:"type:varchar(50);not null;index" json:"created_by"`
-	CreatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
-	UpdatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	ID        string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	TaskID    string         `gorm:"type:varchar(50);not null;index" json:"task_id"`
+	Content   string         `gorm:"type:text;not null" json:"content"`
+	CreatedBy string         `gorm:"type:varchar(50);not null;index" json:"created_by"`
+	CreatedAt time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 

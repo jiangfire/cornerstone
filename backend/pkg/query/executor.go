@@ -42,11 +42,11 @@ func NewExecutorWithConfig(database *gorm.DB, limits QueryLimits, tables Allowed
 }
 
 // isSQLiteDB 检查数据库是否为 SQLite
-func isSQLiteDB(db *gorm.DB) bool {
-	if db == nil {
+func isSQLiteDB(gormDB *gorm.DB) bool {
+	if gormDB == nil {
 		return false
 	}
-	return db.Dialector.Name() == "sqlite"
+	return gormDB.Name() == "sqlite"
 }
 
 // Execute 执行查询

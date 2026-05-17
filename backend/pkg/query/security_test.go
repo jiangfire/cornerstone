@@ -29,7 +29,7 @@ var maliciousIdentifierPayloads = []struct {
 	{"paren", "id)"},
 	{"null_byte", "id\x00admin"},
 	{"newline", "id\nSELECT"},
-	{"star_alone", "*"},      // Select 允许 *；但在其他位置不该穿透（OrderBy / Where 等）
+	{"star_alone", "*"},       // Select 允许 *；但在其他位置不该穿透（OrderBy / Where 等）
 	{"star_qualified", "u.*"}, // 多段含 * → 段校验失败
 	{"sql_keyword_punct", "1=1"},
 	{"leading_digit_segment", "1abc"},

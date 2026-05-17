@@ -3,7 +3,7 @@ package mcp
 import "encoding/json"
 
 const (
-	jsonRPCVersion        = "2.0"
+	jsonRPCVersion         = "2.0"
 	defaultProtocolVersion = "2025-03-26"
 )
 

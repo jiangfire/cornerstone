@@ -440,7 +440,7 @@ func (s *GovernanceService) DispatchOutboxEvent(outboxID string) error {
 
 	body, _ := io.ReadAll(io.LimitReader(resp.Body, 64*1024))
 	bodyText := strings.TrimSpace(string(body))
-	if len(bodyText) == 0 {
+	if bodyText == "" {
 		bodyText = fmt.Sprintf("HTTP %d", resp.StatusCode)
 	}
 

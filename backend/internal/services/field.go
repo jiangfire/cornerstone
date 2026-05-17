@@ -58,14 +58,6 @@ func normalizeFieldType(fieldType string) string {
 	}
 }
 
-func isSelectFieldType(fieldType string) bool {
-	return normalizeFieldType(fieldType) == "select"
-}
-
-func isListFieldType(fieldType string) bool {
-	return normalizeFieldType(fieldType) == "list"
-}
-
 func isDeprecatedFieldType(fieldType string) bool {
 	normalizedType := normalizeFieldType(fieldType)
 	return normalizedType == "select" || normalizedType == "list"

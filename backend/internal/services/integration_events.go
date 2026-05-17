@@ -25,9 +25,9 @@ type ReceiveIntegrationEventRequest struct {
 
 // ReceiveIntegrationEventResult 入站集成事件处理结果
 type ReceiveIntegrationEventResult struct {
-	Event    models.IntegrationInboundEvent `json:"event"`
-	Task     *models.GovernanceTask         `json:"task,omitempty"`
-	Duplicate bool                          `json:"duplicate"`
+	Event     models.IntegrationInboundEvent `json:"event"`
+	Task      *models.GovernanceTask         `json:"task,omitempty"`
+	Duplicate bool                           `json:"duplicate"`
 }
 
 // IntegrationEventService 入站集成事件服务
@@ -96,8 +96,7 @@ func taskFromEvent(sourceSystem string, req ReceiveIntegrationEventRequest) (*mo
 
 	title := ""
 	description := ""
-	taskType := "manual"
-	priority := "medium"
+	var taskType, priority string
 
 	switch req.EventType {
 	case "dq.alert.triggered", "dq.rule.failed":

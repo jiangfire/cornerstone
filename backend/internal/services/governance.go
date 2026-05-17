@@ -60,7 +60,7 @@ var (
 
 // GovernanceService 治理域服务
 type GovernanceService struct {
-	db               *gorm.DB
+	db                *gorm.DB
 	llmGovernorClient *LLMGovernorClient
 }
 
@@ -189,10 +189,6 @@ func sanitizeText(input string) string {
 	input = strings.TrimSpace(input)
 	input = strings.ReplaceAll(input, "\x00", "")
 	return input
-}
-
-func isSystemActor(actorID string) bool {
-	return strings.HasPrefix(strings.TrimSpace(actorID), "system:")
 }
 
 func validateJSONPayload(payload string, field string) (string, error) {
@@ -738,11 +734,11 @@ func (s *GovernanceService) DecideReview(reviewID, userID, targetStatus, decisio
 
 // GenerateAIRecommendationRequest AI 建议生成请求
 type GenerateAIRecommendationRequest struct {
-	TaskID            string                 `json:"task_id"`
+	TaskID             string                 `json:"task_id"`
 	RecommendationType string                 `json:"recommendation_type"` // term_binding, classification, dq_rule, impact_summary
-	ResourceType      string                 `json:"resource_type"`
-	ResourceID        string                 `json:"resource_id"`
-	Context           map[string]interface{} `json:"context"`
+	ResourceType       string                 `json:"resource_type"`
+	ResourceID         string                 `json:"resource_id"`
+	Context            map[string]interface{} `json:"context"`
 }
 
 var allowedRecommendationTypes = map[string]bool{

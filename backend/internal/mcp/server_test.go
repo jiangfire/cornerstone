@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/glebarez/sqlite"
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"github.com/stretchr/testify/require"
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -88,10 +88,7 @@ func TestServerToolsList(t *testing.T) {
 		Method:  "tools/list",
 	})
 
-	var result struct {
-		Tools []ToolDefinition `json:"tools"`
-	}
-	result = decodeResult[struct {
+	result := decodeResult[struct {
 		Tools []ToolDefinition `json:"tools"`
 	}](t, response)
 
@@ -109,8 +106,7 @@ func TestServerToolsCallCreateDatabase(t *testing.T) {
 		Params:  json.RawMessage(`{"name":"create_database","arguments":{"name":"MCP DB","description":"created via mcp"}}`),
 	})
 
-	var result ToolCallResult
-	result = decodeResult[ToolCallResult](t, response)
+	result := decodeResult[ToolCallResult](t, response)
 	require.False(t, result.IsError)
 
 	var count int64
@@ -128,8 +124,7 @@ func TestServerToolsCallQueryDataExpandsAllowedFields(t *testing.T) {
 		Params:  json.RawMessage(`{"name":"query_data","arguments":{"query":{"from":"users","select":["*"]}}}`),
 	})
 
-	var result ToolCallResult
-	result = decodeResult[ToolCallResult](t, response)
+	result := decodeResult[ToolCallResult](t, response)
 	require.False(t, result.IsError)
 
 	payload, err := json.Marshal(result.StructuredContent)

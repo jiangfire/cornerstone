@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/glebarez/sqlite"
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"github.com/stretchr/testify/require"
-	"github.com/glebarez/sqlite"
 	"gorm.io/gorm"
 )
 
@@ -703,7 +703,7 @@ func TestGenerateAIRecommendation_RejectsUnconfiguredClient(t *testing.T) {
 	service := NewGovernanceService(db)
 
 	_, err := service.GenerateAIRecommendation(context.Background(), GenerateAIRecommendationRequest{
-		TaskID:            "gvt_test",
+		TaskID:             "gvt_test",
 		RecommendationType: "term_binding",
 	}, "user_1")
 	require.Error(t, err)
@@ -716,7 +716,7 @@ func TestGenerateAIRecommendation_RejectsInvalidRecommendationType(t *testing.T)
 	service.SetLLMGovernorClient(NewLLMGovernorClient("http://localhost:9999", "test-token"))
 
 	_, err := service.GenerateAIRecommendation(context.Background(), GenerateAIRecommendationRequest{
-		TaskID:            "gvt_test",
+		TaskID:             "gvt_test",
 		RecommendationType: "invalid_type",
 	}, "user_1")
 	require.Error(t, err)
@@ -738,7 +738,7 @@ func TestGenerateAIRecommendation_RejectsUnauthorizedUser(t *testing.T) {
 	require.NoError(t, err)
 
 	_, err = service.GenerateAIRecommendation(context.Background(), GenerateAIRecommendationRequest{
-		TaskID:            task.ID,
+		TaskID:             task.ID,
 		RecommendationType: "term_binding",
 	}, "nonexistent_user")
 	require.Error(t, err)
@@ -770,10 +770,10 @@ func TestGenerateAIRecommendation_CallsLLMAndCreatesReview(t *testing.T) {
 	require.NoError(t, err)
 
 	review, err := service.GenerateAIRecommendation(context.Background(), GenerateAIRecommendationRequest{
-		TaskID:            task.ID,
+		TaskID:             task.ID,
 		RecommendationType: "term_binding",
-		ResourceType:      "column",
-		ResourceID:        "col_123",
+		ResourceType:       "column",
+		ResourceID:         "col_123",
 	}, creator.ID)
 	require.NoError(t, err)
 	require.Equal(t, "llm-governor", review.ProposalSource)

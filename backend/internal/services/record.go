@@ -543,16 +543,17 @@ func tryParseStructuredFilter(filter string) (map[string]interface{}, bool) {
 // buildStructuredFilterClauses 根据可见字段把 JSON 过滤条件翻译为可下推 SQL WHERE 片段。
 //
 // 返回:
-//   clauses          : 应用到 GORM 查询的 (sql, args);字段名通过参数化传给驱动,不直接拼入 SQL 串
-//   refsHiddenField  : 任一过滤键引用了隐藏/未知字段 → true,调用方应直接返回空结果(与 in-memory
-//                     权限感知过滤的可观察行为对齐,避免通过 200 vs 400 做侧信道探测)
-//   err              : value 序列化失败等结构性错误,作为 4xx 抛给客户端
+//
+//	clauses          : 应用到 GORM 查询的 (sql, args);字段名通过参数化传给驱动,不直接拼入 SQL 串
+//	refsHiddenField  : 任一过滤键引用了隐藏/未知字段 → true,调用方应直接返回空结果(与 in-memory
+//	                  权限感知过滤的可观察行为对齐,避免通过 200 vs 400 做侧信道探测)
+//	err              : value 序列化失败等结构性错误,作为 4xx 抛给客户端
 func (s *RecordService) buildStructuredFilterClauses(
 	fields []models.Field,
 	readableFields map[string]models.Field,
 	structured map[string]interface{},
 ) ([]recordFilterClause, bool, error) {
-	isSQLite := s.db.Dialector.Name() == "sqlite"
+	isSQLite := s.db.Name() == "sqlite"
 	clauses := make([]recordFilterClause, 0, len(structured))
 
 	for key, value := range structured {
@@ -601,7 +602,7 @@ func jsonValuesEqual(actual, expected interface{}) bool {
 	if err != nil {
 		return false
 	}
-	return string(actualJSON) == string(expectedJSON)
+	return bytes.Equal(actualJSON, expectedJSON)
 }
 
 func resolveReadableFilterField(fields []models.Field, readableFields map[string]models.Field, filterKey string) (string, bool) {
@@ -773,8 +774,8 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 	var total int64
 	filter := strings.TrimSpace(req.Filter)
 
-	switch {
-	case filter == "":
+	switch filter {
+	case "":
 		// 3a. 无过滤: SQL 分页 + COUNT
 		listQ := s.db.Where("table_id = ? AND deleted_at IS NULL", req.TableID).
 			Order("created_at DESC").Limit(req.Limit).Offset(req.Offset)

@@ -392,6 +392,25 @@ func (s *AuthService) UpdateProfile(userID string, req UpdateProfileRequest) (*m
 	return &user, nil
 }
 
+// UpdateAvatar 更新用户头像（返回更新后的用户）
+func (s *AuthService) UpdateAvatar(userID string, avatarURL string) (*models.User, error) {
+	var user models.User
+	if err := s.db.Where("id = ?", userID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, errors.New("用户不存在")
+		}
+		return nil, fmt.Errorf("查询用户失败: %w", err)
+	}
+
+	user.Avatar = avatarURL
+	if err := s.db.Save(&user).Error; err != nil {
+		return nil, fmt.Errorf("更新头像失败: %w", err)
+	}
+
+	user.Password = ""
+	return &user, nil
+}
+
 // ChangePassword 修改密码
 func (s *AuthService) ChangePassword(userID string, req ChangePasswordRequest) error {
 	if err := validatePassword(req.NewPassword); err != nil {

@@ -42,9 +42,9 @@ func zapLevelToGormLevel(level zapcore.Level) logger.LogLevel {
 }
 
 // NewZapLogger creates a new ZapLogger instance
-func NewZapLogger(logger *zap.Logger) logger.Interface {
+func NewZapLogger(zapLog *zap.Logger) logger.Interface {
 	return &ZapLogger{
-		logger:                    logger,
+		logger:                    zapLog,
 		SlowThreshold:             200 * time.Millisecond,
 		LogLevel:                  zapLevelToGormLevel(zap.InfoLevel),
 		IgnoreRecordNotFoundError: true,

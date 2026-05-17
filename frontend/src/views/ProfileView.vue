@@ -39,7 +39,7 @@
           <div class="avatar-section">
             <h4>头像</h4>
             <div class="avatar-upload">
-              <el-avatar :size="100" :src="profileForm.avatar" class="avatar">
+              <el-avatar :size="100" :src="avatarURL(profileForm.avatar)" class="avatar">
                 <UserFilled v-if="!profileForm.avatar" />
               </el-avatar>
               <div class="upload-actions">
@@ -116,7 +116,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { UserFilled } from '@element-plus/icons-vue'
 import type { UploadFile } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
-import { userAPI } from '@/services/api'
+import { userAPI, avatarAPI, avatarURL } from '@/services/api'
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -180,21 +180,17 @@ const updateProfile = async () => {
   }
 }
 
-// 头像上传配置
-// 后端 User.Avatar 字段为 string + binding:"max=262144" (services/auth.go:54),
-// 故 data URL 长度上限 256KB。原始文件 size 上限 2MB,但 base64 后须再校验。
-const AVATAR_MAX_BYTES = 2 * 1024 * 1024 // 2MB 原始文件
-const AVATAR_ENCODED_LIMIT = 262144 // 后端硬限制
-const AVATAR_ACCEPTED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp'])
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024 // 2MB
+const AVATAR_ACCEPTED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
 
-const handleAvatarChange = (file: UploadFile) => {
+const handleAvatarChange = async (file: UploadFile) => {
   const raw = file.raw
   if (!raw) {
     return
   }
 
   if (!AVATAR_ACCEPTED_MIME.has(raw.type)) {
-    ElMessage.error('仅支持 PNG / JPEG / WebP 格式')
+    ElMessage.error('仅支持 PNG / JPEG / WebP / GIF 格式')
     return
   }
 
@@ -203,29 +199,38 @@ const handleAvatarChange = (file: UploadFile) => {
     return
   }
 
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    const result = e.target?.result
-    if (typeof result !== 'string') {
-      ElMessage.error('头像读取失败')
-      return
+  try {
+    const response = await avatarAPI.upload(raw)
+    if (!response.success || !response.data?.avatar_url) {
+      throw new Error(response.message || '上传失败')
     }
-    if (result.length > AVATAR_ENCODED_LIMIT) {
-      ElMessage.error('该图片体积过大,请使用更小的图片(建议 < 180KB)')
-      return
-    }
-    profileForm.value.avatar = result
-    ElMessage.success('头像已更新,请点击"更新资料"保存')
+    profileForm.value.avatar = response.data.avatar_url
+    ElMessage.success('头像上传成功')
+    // 同步到后端用户资料（头像字段已持久化，但刷新 auth store 保证全局一致）
+    await authStore.fetchProfile()
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error ? error.message : '头像上传失败')
   }
-  reader.onerror = () => {
-    ElMessage.error('头像读取失败')
-  }
-  reader.readAsDataURL(raw)
 }
 
-const removeAvatar = () => {
+const removeAvatar = async () => {
   profileForm.value.avatar = ''
-  ElMessage.success('头像已移除')
+  try {
+    const response = await userAPI.updateProfile({
+      username: profileForm.value.username,
+      email: profileForm.value.email,
+      phone: profileForm.value.phone,
+      bio: profileForm.value.bio,
+      avatar: '',
+    })
+    if (!response.success) {
+      throw new Error(response.message || '移除失败')
+    }
+    ElMessage.success('头像已移除')
+    await authStore.fetchProfile()
+  } catch (error: unknown) {
+    ElMessage.error(error instanceof Error ? error.message : '移除头像失败')
+  }
 }
 
 const changePassword = async () => {

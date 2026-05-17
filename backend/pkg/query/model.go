@@ -35,12 +35,12 @@ type WhereClause struct {
 
 // Condition 单个条件
 type Condition struct {
-	Field string      `json:"field"`           // 字段名
-	Op    string      `json:"op,omitempty"`    // 操作符，省略时为 eq
-	Value interface{} `json:"value"`           // 值
-	Not   bool        `json:"not,omitempty"`   // 是否取反
-	And   []Condition `json:"and,omitempty"`   // 嵌套 AND
-	Or    []Condition `json:"or,omitempty"`    // 嵌套 OR
+	Field string      `json:"field"`         // 字段名
+	Op    string      `json:"op,omitempty"`  // 操作符，省略时为 eq
+	Value interface{} `json:"value"`         // 值
+	Not   bool        `json:"not,omitempty"` // 是否取反
+	And   []Condition `json:"and,omitempty"` // 嵌套 AND
+	Or    []Condition `json:"or,omitempty"`  // 嵌套 OR
 }
 
 // JoinClause JOIN 子句
@@ -89,15 +89,15 @@ func (jc *JoinCondition) UnmarshalJSON(data []byte) error {
 
 // AggregateFunc 聚合函数
 type AggregateFunc struct {
-	Func  string `json:"func"`               // 函数名: count, sum, avg, min, max
-	Field string `json:"field,omitempty"`    // 字段名
-	As    string `json:"as"`                 // 别名
+	Func  string `json:"func"`            // 函数名: count, sum, avg, min, max
+	Field string `json:"field,omitempty"` // 字段名
+	As    string `json:"as"`              // 别名
 }
 
 // OrderByClause 排序子句
 type OrderByClause struct {
-	Field string `json:"field"`              // 字段名
-	Dir   string `json:"dir,omitempty"`      // 方向: asc, desc (默认 asc)
+	Field string `json:"field"`         // 字段名
+	Dir   string `json:"dir,omitempty"` // 方向: asc, desc (默认 asc)
 }
 
 // QueryResult 查询结果
@@ -121,11 +121,11 @@ type BatchQueryResult struct {
 
 // QueryLimits 查询限制配置
 type QueryLimits struct {
-	MaxJoins    int    // 最多 JOIN 表数
-	MaxPageSize int    // 最大分页大小
-	MaxDepth    int    // 嵌套查询最大深度
-	MaxRows     int64  // 最大返回行数（不带分页时）
-	MaxFields   int    // 最大查询字段数
+	MaxJoins    int   // 最多 JOIN 表数
+	MaxPageSize int   // 最大分页大小
+	MaxDepth    int   // 嵌套查询最大深度
+	MaxRows     int64 // 最大返回行数（不带分页时）
+	MaxFields   int   // 最大查询字段数
 }
 
 // DefaultLimits 默认查询限制
@@ -142,20 +142,20 @@ type AllowedTables map[string][]string
 
 // DefaultAllowedTables 默认允许的表
 var DefaultAllowedTables = AllowedTables{
-	"records":          {"id", "table_id", "data", "created_by", "updated_by", "version", "created_at", "updated_at"},
-	"users":            {"id", "username", "email", "phone", "bio", "avatar", "created_at", "updated_at"},
-	"tables":           {"id", "database_id", "name", "description", "created_at", "updated_at"},
-	"databases":        {"id", "name", "description", "owner_id", "is_public", "is_personal", "created_at", "updated_at"},
-	"fields":           {"id", "table_id", "name", "type", "required", "options", "created_at", "updated_at"},
-	"database_access":  {"id", "user_id", "database_id", "role", "created_at", "updated_at"},
-	"field_permissions": {"id", "table_id", "field_id", "role", "can_read", "can_write", "can_delete", "created_at", "updated_at"},
-	"organizations":    {"id", "name", "description", "owner_id", "created_at", "updated_at"},
+	"records":              {"id", "table_id", "data", "created_by", "updated_by", "version", "created_at", "updated_at"},
+	"users":                {"id", "username", "email", "phone", "bio", "avatar", "created_at", "updated_at"},
+	"tables":               {"id", "database_id", "name", "description", "created_at", "updated_at"},
+	"databases":            {"id", "name", "description", "owner_id", "is_public", "is_personal", "created_at", "updated_at"},
+	"fields":               {"id", "table_id", "name", "type", "required", "options", "created_at", "updated_at"},
+	"database_access":      {"id", "user_id", "database_id", "role", "created_at", "updated_at"},
+	"field_permissions":    {"id", "table_id", "field_id", "role", "can_read", "can_write", "can_delete", "created_at", "updated_at"},
+	"organizations":        {"id", "name", "description", "owner_id", "created_at", "updated_at"},
 	"organization_members": {"id", "organization_id", "user_id", "role", "joined_at"},
-	"activity_logs":    {"id", "user_id", "action", "resource_type", "resource_id", "description", "created_at"},
-	"files":            {"id", "record_id", "file_name", "file_size", "file_type", "uploaded_by", "created_at"},
-	"plugins":          {"id", "name", "description", "language", "entry_file", "config", "created_by", "created_at"},
-	"plugin_bindings":  {"id", "plugin_id", "table_id", "trigger", "created_at"},
-	"plugin_executions": {"id", "plugin_id", "table_id", "record_id", "trigger", "status", "output", "error", "duration_ms", "started_at"},
+	"activity_logs":        {"id", "user_id", "action", "resource_type", "resource_id", "description", "created_at"},
+	"files":                {"id", "record_id", "file_name", "file_size", "file_type", "uploaded_by", "created_at"},
+	"plugins":              {"id", "name", "description", "language", "entry_file", "config", "created_by", "created_at"},
+	"plugin_bindings":      {"id", "plugin_id", "table_id", "trigger", "created_at"},
+	"plugin_executions":    {"id", "plugin_id", "table_id", "record_id", "trigger", "status", "output", "error", "duration_ms", "started_at"},
 }
 
 // IsTableAllowed 检查表是否允许访问

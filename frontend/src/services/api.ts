@@ -142,6 +142,26 @@ export const userAPI = {
   },
 }
 
+// 头像 API
+export const avatarAPI = {
+  upload(file: File): Promise<ApiResponse<{ avatar_url: string }>> {
+    const formData = new FormData()
+    formData.append('file', file)
+    return api.post('/users/me/avatar', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: LONG_TIMEOUT_MS,
+    })
+  },
+}
+
+// 头像公开访问地址（处理 dev 代理场景：baseURL 含 origin 时去掉 /api 后缀拼接）
+export function avatarURL(path: string): string {
+  if (!path) return ''
+  if (path.startsWith('http') || path.startsWith('data:')) return path
+  const base = API_CONFIG.baseURL.replace(/\/?api\/?$/, '')
+  return (base || '') + path
+}
+
 // 数据库 API
 export const databaseAPI = {
   list() {

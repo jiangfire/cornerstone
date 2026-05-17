@@ -140,15 +140,6 @@ func (v *Validator) validateConditionFields(ctx context.Context, userID string, 
 	return nil
 }
 
-// parseFieldReference 解析字段引用，返回表名和字段名
-func (v *Validator) parseFieldReference(field string) (string, string) {
-	parts := strings.Split(field, ".")
-	if len(parts) == 2 {
-		return parts[0], parts[1]
-	}
-	return "", field
-}
-
 func (v *Validator) resolveReferenceTable(baseTable string, joins []JoinClause, ref string) string {
 	ref = strings.TrimSpace(ref)
 	if ref == "" {
@@ -252,14 +243,6 @@ func splitJSONBaseField(field string) (string, bool) {
 		return parts[0], true
 	}
 	return "", false
-}
-
-func (v *Validator) isJSONFieldReference(table, field string) bool {
-	baseField, ok := splitJSONBaseField(field)
-	if !ok {
-		return false
-	}
-	return v.allowedTables.IsFieldAllowed(table, baseField)
 }
 
 // checkDataAccess 检查数据访问权限

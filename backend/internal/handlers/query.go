@@ -280,7 +280,7 @@ func isPermissionError(err error) bool {
 
 // containsString 检查字符串是否包含子串
 func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsSubstring(s, substr))
+	return len(s) >= len(substr) && (s == substr || s != "" && containsSubstring(s, substr))
 }
 
 // containsSubstring 简单子串检查

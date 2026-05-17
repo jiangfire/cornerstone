@@ -90,24 +90,23 @@ func main() {
 	r.GET("/ready", handlers.Ready)
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
+	// 头像公开访问（无需认证，用于 img src 直接引用）
+	r.GET("/avatars/:filename", handlers.ServeAvatar)
+
 	// HTTP MCP 路由
 	r.OPTIONS("/mcp", handlers.HandleMCPOptions)
 	mcpRoute := r.Group("/mcp")
 	mcpRoute.Use(middleware.MCPOriginGuard(), middleware.Auth())
-	{
-		mcpRoute.POST("", handlers.HandleMCP)
-		mcpRoute.GET("", handlers.HandleMCPGet)
-	}
+	mcpRoute.POST("", handlers.HandleMCP)
+	mcpRoute.GET("", handlers.HandleMCPGet)
 
 	// 9. API路由组
 	api := r.Group("/api")
 	{
 		// 认证路由（无需认证）
 		auth := api.Group("/auth")
-		{
-			auth.POST("/register", handlers.Register)
-			auth.POST("/login", handlers.Login)
-		}
+		auth.POST("/register", handlers.Register)
+		auth.POST("/login", handlers.Login)
 
 		// 系统集成事件（使用集成 token）
 		integrations := api.Group("/integrations")
@@ -115,9 +114,7 @@ func main() {
 			InboundTokens: cfg.Integrations.InboundTokens,
 			SharedToken:   cfg.Integrations.SharedToken,
 		}))
-		{
-			integrations.POST("/events", handlers.ReceiveIntegrationEvent)
-		}
+		integrations.POST("/events", handlers.ReceiveIntegrationEvent)
 
 		// 注入 LLM Governor 客户端（如果配置了）
 		if cfg.Integrations.LLMGovernorURL != "" && cfg.Integrations.LLMGovernorToken != "" {
@@ -133,6 +130,7 @@ func main() {
 			// 用户相关
 			protected.GET("/users/me", handlers.GetUserInfo)
 			protected.PUT("/users/me", handlers.UpdateUserInfo)
+			protected.POST("/users/me/avatar", handlers.UploadAvatar)
 			protected.PUT("/users/me/password", handlers.ChangeUserPassword)
 			protected.DELETE("/users/me", handlers.DeleteUserAccount)
 			protected.GET("/users", handlers.ListUsers)
@@ -243,7 +241,7 @@ func main() {
 			protected.POST("/governance/reviews/:id/approve", handlers.ApproveGovernanceReview)
 			protected.POST("/governance/reviews/:id/reject", handlers.RejectGovernanceReview)
 			protected.POST("/governance/reviews/:id/apply", handlers.ApplyGovernanceReview)
-				protected.POST("/governance/ai/recommendations", handlers.GenerateAIRecommendation)
+			protected.POST("/governance/ai/recommendations", handlers.GenerateAIRecommendation)
 		}
 	}
 
@@ -328,7 +326,7 @@ func waitPeriodicTasks(wg *sync.WaitGroup, timeout time.Duration) {
 
 func retryOperation(op func() error, maxAttempts int, baseDelay time.Duration) error {
 	var lastErr error
-	for i := 0; i < maxAttempts; i++ {
+	for i := range maxAttempts {
 		if err := op(); err != nil {
 			lastErr = err
 			if i < maxAttempts-1 {

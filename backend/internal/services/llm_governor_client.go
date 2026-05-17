@@ -119,11 +119,11 @@ type AIRecommendationRequest struct {
 
 // AIRecommendationResponse AI 建议响应
 type AIRecommendationResponse struct {
-	Success      bool                   `json:"success"`
+	Success        bool                   `json:"success"`
 	Recommendation map[string]interface{} `json:"recommendation"`
-	Confidence   float64                `json:"confidence"`
-	Reasoning    string                 `json:"reasoning"`
-	Error        string                 `json:"error,omitempty"`
+	Confidence     float64                `json:"confidence"`
+	Reasoning      string                 `json:"reasoning"`
+	Error          string                 `json:"error,omitempty"`
 }
 
 // transientHTTPError 表示一次需要重试的 HTTP 失败 (5xx 或 429)。
