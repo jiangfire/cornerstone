@@ -30,6 +30,17 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <el-pagination
+        v-if="total > 0"
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :total="total"
+        layout="total, prev, pager, next, sizes"
+        :page-sizes="[10, 20, 50, 100]"
+        @current-change="handlePageChange"
+        @size-change="handleSizeChange"
+      />
     </el-card>
 
     <!-- 创建/编辑插件对话框 -->
@@ -261,6 +272,11 @@ const loadingTables = ref(false)
 const plugins = ref<Plugin[]>([])
 const tables = ref<Table[]>([])
 
+// 分页状态
+const currentPage = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+
 const dialogVisible = ref(false)
 const bindDialogVisible = ref(false)
 const bindingsDialogVisible = ref(false)
@@ -345,13 +361,29 @@ const loadTables = async () => {
 const loadPlugins = async () => {
   loading.value = true
   try {
-    const response = await pluginAPI.list()
-    plugins.value = response.data || []
+    const response = await pluginAPI.list({
+      page: currentPage.value,
+      page_size: pageSize.value,
+    })
+    plugins.value = response.data?.items || []
+    total.value = response.data?.total || 0
   } catch (error: unknown) {
     ElMessage.error(error instanceof Error ? (error as Error).message : '加载插件列表失败')
   } finally {
     loading.value = false
   }
+}
+
+// 分页事件
+const handlePageChange = (page: number) => {
+  currentPage.value = page
+  loadPlugins()
+}
+
+const handleSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+  loadPlugins()
 }
 
 // 显示创建对话框
@@ -420,6 +452,7 @@ const handleSubmit = async () => {
       ElMessage.success('创建成功')
     }
     dialogVisible.value = false
+    currentPage.value = 1
     loadPlugins()
   } catch {
     ElMessage.error('操作失败')
@@ -436,6 +469,7 @@ const handleDelete = async (plugin: Plugin) => {
     })
     await pluginAPI.delete(plugin.id)
     ElMessage.success('删除成功')
+    currentPage.value = 1
     loadPlugins()
   } catch (error: unknown) {
     if (error !== 'cancel') {

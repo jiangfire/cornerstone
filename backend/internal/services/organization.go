@@ -98,6 +98,21 @@ type OrgResponse struct {
 	UpdatedAt   string `json:"updated_at"`
 }
 
+// OrgListFilter 组织列表分页参数。
+// 与 governance 的约定一致: Page<=0 → 1, PageSize<=0 → 20, PageSize=-1 跳过分页。
+type OrgListFilter struct {
+	Page     int
+	PageSize int
+}
+
+// OrgList 组织列表分页结果
+type OrgList struct {
+	Items    []OrgResponse `json:"items"`
+	Total    int64         `json:"total"`
+	Page     int           `json:"page"`
+	PageSize int           `json:"page_size"`
+}
+
 // CreateOrganization 创建组织
 func (s *OrganizationService) CreateOrganization(req CreateOrgRequest, ownerID string) (*models.Organization, error) {
 	// 1. 检查组织名称是否已被该用户创建
@@ -137,9 +152,34 @@ func (s *OrganizationService) CreateOrganization(req CreateOrgRequest, ownerID s
 	return &org, nil
 }
 
-// ListOrganizations 获取用户所属组织列表
-func (s *OrganizationService) ListOrganizations(userID string) ([]OrgResponse, error) {
-	// 查询用户所属的组织
+// ListOrganizations 获取用户所属组织列表 (分页)。
+func (s *OrganizationService) ListOrganizations(userID string, filter OrgListFilter) (*OrgList, error) {
+	page := filter.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := filter.PageSize
+	switch {
+	case pageSize == -1:
+		// 跳过分页
+	case pageSize <= 0:
+		pageSize = 20
+	case pageSize > 200:
+		pageSize = 200
+	}
+
+	// 先 count, 用同一组 JOIN 条件
+	var total int64
+	if err := s.db.Raw(`
+		SELECT COUNT(*)
+		FROM organizations o
+		INNER JOIN organization_members om ON o.id = om.organization_id
+		WHERE om.user_id = ? AND o.deleted_at IS NULL
+	`, userID).Scan(&total).Error; err != nil {
+		return nil, fmt.Errorf("统计组织数量失败: %w", err)
+	}
+
+	// 再分页查询
 	var results []struct {
 		OrganizationID   string
 		Name             string
@@ -150,7 +190,7 @@ func (s *OrganizationService) ListOrganizations(userID string) ([]OrgResponse, e
 		UpdatedAt        string
 	}
 
-	err := s.db.Raw(`
+	sql := `
 		SELECT
 			o.id as organization_id,
 			o.name,
@@ -163,13 +203,17 @@ func (s *OrganizationService) ListOrganizations(userID string) ([]OrgResponse, e
 		INNER JOIN organization_members om ON o.id = om.organization_id
 		WHERE om.user_id = ? AND o.deleted_at IS NULL
 		ORDER BY o.created_at DESC
-	`, userID).Scan(&results).Error
+	`
+	args := []any{userID}
+	if pageSize != -1 {
+		sql += ` LIMIT ? OFFSET ?`
+		args = append(args, pageSize, (page-1)*pageSize)
+	}
 
-	if err != nil {
+	if err := s.db.Raw(sql, args...).Scan(&results).Error; err != nil {
 		return nil, fmt.Errorf("数据库查询失败: %w", err)
 	}
 
-	// 转换为响应格式
 	orgs := make([]OrgResponse, len(results))
 	for i, r := range results {
 		orgs[i] = OrgResponse{
@@ -183,7 +227,12 @@ func (s *OrganizationService) ListOrganizations(userID string) ([]OrgResponse, e
 		}
 	}
 
-	return orgs, nil
+	return &OrgList{
+		Items:    orgs,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+	}, nil
 }
 
 // GetOrganization 获取组织详情

@@ -21,6 +21,7 @@ import type {
   FileItem,
   FileListResponse,
   Plugin,
+  PluginListResponse,
   PluginBinding,
   PluginExecution,
   StatsSummary,
@@ -266,8 +267,8 @@ export const fileAPI = {
 
 // 组织 API
 export const organizationAPI = {
-  list() {
-    return request.get<OrganizationListResponse>('/organizations')
+  list(params?: { page?: number; page_size?: number }) {
+    return request.get<OrganizationListResponse>('/organizations', params)
   },
   create(data: Record<string, unknown>) {
     return request.post<Organization>('/organizations', data)
@@ -292,10 +293,10 @@ export const organizationAPI = {
   },
 }
 
-// 插件 API (后端直接返回数组,不包成 {items,total})
+// 插件 API
 export const pluginAPI = {
-  list() {
-    return request.get<Plugin[]>('/plugins')
+  list(params?: { page?: number; page_size?: number }) {
+    return request.get<PluginListResponse>('/plugins', params)
   },
   get(id: string) {
     return request.get<Plugin>(`/plugins/${id}`)

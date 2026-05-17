@@ -287,8 +287,9 @@ func TestGovernanceService_SystemCreatedTaskAccessible(t *testing.T) {
 
 	tasks, err := service.ListTasks(user.ID, GovernanceTaskListFilter{})
 	require.NoError(t, err)
-	require.Len(t, tasks, 1)
-	require.Equal(t, task.ID, tasks[0].ID)
+	require.Len(t, tasks.Items, 1)
+	require.Equal(t, task.ID, tasks.Items[0].ID)
+	require.EqualValues(t, 1, tasks.Total)
 
 	updated, err := service.UpdateTask(task.ID, UpdateGovernanceTaskRequest{
 		Title:       task.Title,
@@ -329,7 +330,8 @@ func TestGovernanceService_SystemCreatedTaskNotVisibleToUnassignedUser(t *testin
 
 	tasks, err := service.ListTasks(other.ID, GovernanceTaskListFilter{})
 	require.NoError(t, err)
-	require.Len(t, tasks, 0)
+	require.Len(t, tasks.Items, 0)
+	require.EqualValues(t, 0, tasks.Total)
 
 	_, err = service.UpdateTask(task.ID, UpdateGovernanceTaskRequest{
 		Title:       task.Title,

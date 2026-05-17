@@ -107,6 +107,17 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <el-pagination
+        v-if="total > 0"
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :total="total"
+        layout="total, prev, pager, next, sizes"
+        :page-sizes="[10, 20, 50, 100]"
+        @current-change="handlePageChange"
+        @size-change="handleSizeChange"
+      />
     </el-card>
 
     <el-dialog v-model="createDialogVisible" title="新建治理任务" width="760px">
@@ -501,7 +512,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { governanceAPI, userAPI } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
@@ -527,6 +538,10 @@ const reviewDialogVisible = ref(false)
 const reviewDecisionDialogVisible = ref(false)
 
 const tasks = ref<GovernanceTask[]>([])
+const currentPage = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+
 const users = ref<User[]>([])
 const selectedDetail = ref<GovernanceTaskDetail | null>(null)
 const currentReview = ref<GovernanceReview | null>(null)
@@ -677,14 +692,29 @@ const loadTasks = async () => {
       task_type: filters.value.task_type || undefined,
       priority: filters.value.priority || undefined,
       resource_id: filters.value.resource_id || undefined,
+      page: currentPage.value,
+      page_size: pageSize.value,
     })
     tasks.value = response.data?.tasks || []
+    total.value = response.data?.total || 0
   } catch (error) {
     console.error(error)
     ElMessage.error('加载治理任务失败')
   } finally {
     loading.value = false
   }
+}
+
+// 分页事件
+const handlePageChange = (page: number) => {
+  currentPage.value = page
+  loadTasks()
+}
+
+const handleSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+  loadTasks()
 }
 
 const hydrateTaskForm = (task: GovernanceTask) => {
@@ -752,6 +782,7 @@ const submitCreateTask = async () => {
     ElMessage.success('治理任务已创建')
     createDialogVisible.value = false
     resetCreateForm()
+    currentPage.value = 1
     await loadTasks()
   } catch (error) {
     console.error(error)
@@ -1069,6 +1100,16 @@ const prettyJson = (value: string) => {
     return value
   }
 }
+
+// 过滤条件变化时回到第一页,避免新过滤集下仍停留在空页
+watch(
+  () => filters.value,
+  () => {
+    currentPage.value = 1
+    loadTasks()
+  },
+  { deep: true },
+)
 
 onMounted(async () => {
   await Promise.all([loadUsers(), loadTasks()])

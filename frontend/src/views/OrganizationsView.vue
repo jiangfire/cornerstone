@@ -35,6 +35,17 @@
           </template>
         </el-table-column>
       </el-table>
+
+      <el-pagination
+        v-if="total > 0"
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :total="total"
+        layout="total, prev, pager, next, sizes"
+        :page-sizes="[10, 20, 50, 100]"
+        @current-change="handlePageChange"
+        @size-change="handleSizeChange"
+      />
     </el-card>
 
     <!-- 成员管理面板 -->
@@ -200,6 +211,11 @@ const isEditMode = ref(false)
 const organizations = ref<Organization[]>([])
 const authStore = useAuthStore()
 
+// 分页状态
+const currentPage = ref(1)
+const pageSize = ref(20)
+const total = ref(0)
+
 const formRef = ref<FormInstance>()
 const form = ref({
   name: '',
@@ -256,15 +272,31 @@ const getRoleType = (role: string) => {
 const loadOrganizations = async () => {
   loading.value = true
   try {
-    const response = await organizationAPI.list()
+    const response = await organizationAPI.list({
+      page: currentPage.value,
+      page_size: pageSize.value,
+    })
     if (response.success && response.data) {
       organizations.value = response.data.organizations || []
+      total.value = response.data.total || 0
     }
   } catch {
     ElMessage.error('加载组织列表失败')
   } finally {
     loading.value = false
   }
+}
+
+// 分页事件
+const handlePageChange = (page: number) => {
+  currentPage.value = page
+  loadOrganizations()
+}
+
+const handleSizeChange = (size: number) => {
+  pageSize.value = size
+  currentPage.value = 1
+  loadOrganizations()
 }
 
 // 处理创建
@@ -310,6 +342,7 @@ const handleDelete = async (row: Organization) => {
     const response = await organizationAPI.delete(row.id)
     if (response.success) {
       ElMessage.success('删除成功')
+      currentPage.value = 1
       await loadOrganizations()
       // 如果删除的是当前选中的组织，关闭成员面板
       if (selectedOrg.value?.id === row.id) {
@@ -349,6 +382,7 @@ const handleSubmit = async () => {
     if (response.success) {
       ElMessage.success(isEditMode.value ? '更新成功' : '创建成功')
       dialogVisible.value = false
+      currentPage.value = 1
       await loadOrganizations()
     }
   } catch {

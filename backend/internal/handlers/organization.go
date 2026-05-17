@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"strconv"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	"github.com/jiangfire/cornerstone/backend/internal/services"
@@ -35,19 +37,30 @@ func CreateOrganization(c *gin.Context) {
 }
 
 // ListOrganizations 获取组织列表
+//
+// @Param page query int false "Page number (1-based, default 1)"
+// @Param page_size query int false "Items per page (default 20, max 200)"
 func ListOrganizations(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 
+	page, _ := strconv.Atoi(c.Query("page"))
+	pageSize, _ := strconv.Atoi(c.Query("page_size"))
+
 	orgService := services.NewOrganizationService(db.DB())
-	orgs, err := orgService.ListOrganizations(userID)
+	orgs, err := orgService.ListOrganizations(userID, services.OrgListFilter{
+		Page:     page,
+		PageSize: pageSize,
+	})
 	if err != nil {
 		types.Error(c, 500, err.Error())
 		return
 	}
 
 	types.Success(c, gin.H{
-		"organizations": orgs,
-		"total":         len(orgs),
+		"organizations": orgs.Items,
+		"total":         orgs.Total,
+		"page":          orgs.Page,
+		"page_size":     orgs.PageSize,
 	})
 }
 

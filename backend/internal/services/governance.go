@@ -117,6 +117,9 @@ type UpdateGovernanceTaskRequest struct {
 }
 
 // GovernanceTaskListFilter 治理任务查询条件
+//
+// Page / PageSize 走"传 0 表示 caller 不关心分页, 服务端兜底为 page=1, page_size=20"的约定;
+// 调用方需要自己抓全量时显式传 PageSize=-1 (跳过 LIMIT/OFFSET)。
 type GovernanceTaskListFilter struct {
 	Status       string
 	TaskType     string
@@ -124,6 +127,16 @@ type GovernanceTaskListFilter struct {
 	SourceSystem string
 	ResourceType string
 	ResourceID   string
+	Page         int
+	PageSize     int
+}
+
+// GovernanceTaskList 治理任务分页结果
+type GovernanceTaskList struct {
+	Items    []models.GovernanceTask `json:"items"`
+	Total    int64                   `json:"total"`
+	Page     int                     `json:"page"`
+	PageSize int                     `json:"page_size"`
 }
 
 // CreateGovernanceEvidenceRequest 创建证据请求
@@ -340,8 +353,11 @@ func (s *GovernanceService) CreateTask(req CreateGovernanceTaskRequest, creatorI
 	return &task, nil
 }
 
-// ListTasks 获取当前用户可见的治理任务
-func (s *GovernanceService) ListTasks(userID string, filter GovernanceTaskListFilter) ([]models.GovernanceTask, error) {
+// ListTasks 获取当前用户可见的治理任务 (分页)。
+//
+// 分页规则: page<=0 视为 1; pageSize<=0 视为 20; pageSize 上限 200 (再大说明调用方该用导出接口)。
+// pageSize=-1 是 caller 的逃生口, 表示放弃分页拿全量(治理任务量级有限, 不会主动开放给前端)。
+func (s *GovernanceService) ListTasks(userID string, filter GovernanceTaskListFilter) (*GovernanceTaskList, error) {
 	query := s.db.Model(&models.GovernanceTask{}).
 		Where("created_by = ? OR assignee_id = ?", userID, userID)
 
@@ -364,11 +380,39 @@ func (s *GovernanceService) ListTasks(userID string, filter GovernanceTaskListFi
 		query = query.Where("resource_id = ?", strings.TrimSpace(filter.ResourceID))
 	}
 
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, fmt.Errorf("统计治理任务失败: %w", err)
+	}
+
+	page := filter.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := filter.PageSize
+	switch {
+	case pageSize == -1:
+		// 跳过分页, 不在 query 上加 LIMIT/OFFSET
+	case pageSize <= 0:
+		pageSize = 20
+	case pageSize > 200:
+		pageSize = 200
+	}
+
+	if pageSize != -1 {
+		query = query.Offset((page - 1) * pageSize).Limit(pageSize)
+	}
+
 	var tasks []models.GovernanceTask
 	if err := query.Order("created_at DESC").Find(&tasks).Error; err != nil {
 		return nil, fmt.Errorf("查询治理任务失败: %w", err)
 	}
-	return tasks, nil
+	return &GovernanceTaskList{
+		Items:    tasks,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+	}, nil
 }
 
 // GetTask 获取治理任务详情

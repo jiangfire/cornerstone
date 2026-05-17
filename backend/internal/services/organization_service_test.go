@@ -84,9 +84,10 @@ func TestOrganizationService_DeleteOrganizationSoftDeleteAndAllowsRecreate(t *te
 	require.NoError(t, db.Unscoped().Where("id = ?", org.ID).First(&stored).Error)
 	require.True(t, stored.DeletedAt.Valid)
 
-	listed, err := service.ListOrganizations(owner.ID)
+	listed, err := service.ListOrganizations(owner.ID, OrgListFilter{})
 	require.NoError(t, err)
-	require.Empty(t, listed)
+	require.Empty(t, listed.Items)
+	require.EqualValues(t, 0, listed.Total)
 
 	_, err = service.GetOrganization(org.ID, owner.ID)
 	require.Error(t, err)
@@ -233,9 +234,10 @@ func TestOrganizationService_ListOrganizationsExcludesDeletedAndOrdersNewestFirs
 
 	require.NoError(t, service.DeleteOrganization(middle.ID, owner.ID))
 
-	listed, err := service.ListOrganizations(owner.ID)
+	listed, err := service.ListOrganizations(owner.ID, OrgListFilter{})
 	require.NoError(t, err)
-	require.Len(t, listed, 2)
-	require.Equal(t, newest.ID, listed[0].ID)
-	require.Equal(t, oldest.ID, listed[1].ID)
+	require.Len(t, listed.Items, 2)
+	require.Equal(t, newest.ID, listed.Items[0].ID)
+	require.Equal(t, oldest.ID, listed.Items[1].ID)
+	require.EqualValues(t, 2, listed.Total)
 }

@@ -31,17 +31,26 @@ func CreatePlugin(c *gin.Context) {
 }
 
 // ListPlugins 列出插件
+//
+// @Param page query int false "Page number (1-based, default 1)"
+// @Param page_size query int false "Items per page (default 20, max 200)"
 func ListPlugins(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 
+	page, _ := strconv.Atoi(c.Query("page"))
+	pageSize, _ := strconv.Atoi(c.Query("page_size"))
+
 	pluginService := services.NewPluginService(db.DB())
-	plugins, err := pluginService.ListPlugins(userID)
+	result, err := pluginService.ListPlugins(userID, services.PluginListFilter{
+		Page:     page,
+		PageSize: pageSize,
+	})
 	if err != nil {
 		types.Error(c, 500, err.Error())
 		return
 	}
 
-	types.Success(c, plugins)
+	types.Success(c, result)
 }
 
 // GetPlugin 获取插件详情

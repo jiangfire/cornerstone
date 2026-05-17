@@ -60,18 +60,23 @@ describe('PluginsView', () => {
     vi.clearAllMocks()
     confirmMock.mockResolvedValue(true)
     pluginAPI.list.mockResolvedValue({
-      data: [
-        {
-          id: 'plg_1',
-          name: 'Sync Plugin',
-          description: 'sync',
-          language: 'bash',
-          entry_file: 'main.sh',
-          timeout: 30,
-          created_by: 'usr_1',
-          created_at: '2026-03-29 10:00:00',
-        },
-      ],
+      data: {
+        items: [
+          {
+            id: 'plg_1',
+            name: 'Sync Plugin',
+            description: 'sync',
+            language: 'bash',
+            entry_file: 'main.sh',
+            timeout: 30,
+            created_by: 'usr_1',
+            created_at: '2026-03-29 10:00:00',
+          },
+        ],
+        total: 1,
+        page: 1,
+        page_size: 20,
+      },
     })
     pluginAPI.create.mockResolvedValue({ data: { id: 'plg_2' } })
     pluginAPI.update.mockResolvedValue({ data: { id: 'plg_1' } })

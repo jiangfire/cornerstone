@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -55,11 +56,16 @@ func CreateGovernanceTask(c *gin.Context) {
 // @Param source_system query string false "Filter by source system"
 // @Param resource_type query string false "Filter by resource type"
 // @Param resource_id query string false "Filter by resource ID"
-// @Success 200 {object} types.Response{data=gin.H}
+// @Param page query int false "Page number (1-based, default 1)"
+// @Param page_size query int false "Items per page (default 20, max 200)"
+// @Success 200 {object} types.Response{data=services.GovernanceTaskList}
 // @Failure 500 {object} types.Response
 // @Router /governance/tasks [get]
 func ListGovernanceTasks(c *gin.Context) {
 	userID := middleware.GetUserID(c)
+
+	page, _ := strconv.Atoi(c.Query("page"))
+	pageSize, _ := strconv.Atoi(c.Query("page_size"))
 
 	filter := services.GovernanceTaskListFilter{
 		Status:       c.Query("status"),
@@ -68,18 +74,22 @@ func ListGovernanceTasks(c *gin.Context) {
 		SourceSystem: c.Query("source_system"),
 		ResourceType: c.Query("resource_type"),
 		ResourceID:   c.Query("resource_id"),
+		Page:         page,
+		PageSize:     pageSize,
 	}
 
 	governanceService := services.NewGovernanceService(db.DB())
-	tasks, err := governanceService.ListTasks(userID, filter)
+	result, err := governanceService.ListTasks(userID, filter)
 	if err != nil {
 		types.Error(c, 500, err.Error())
 		return
 	}
 
 	types.Success(c, gin.H{
-		"tasks": tasks,
-		"total": len(tasks),
+		"tasks":     result.Items,
+		"total":     result.Total,
+		"page":      result.Page,
+		"page_size": result.PageSize,
 	})
 }
 

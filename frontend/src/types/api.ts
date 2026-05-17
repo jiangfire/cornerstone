@@ -179,6 +179,8 @@ export interface Organization {
 export interface OrganizationListResponse {
   organizations: Organization[]
   total: number
+  page: number
+  page_size: number
 }
 
 // 后端 `ListMembers` 返回 `{id, organization_id, user_id, username, email, role, joined_at}`,
@@ -231,6 +233,13 @@ export interface Plugin {
   created_by: string
   created_at: string
   updated_at: string
+}
+
+export interface PluginListResponse {
+  items: Plugin[]
+  total: number
+  page: number
+  page_size: number
 }
 
 // 后端 `BindingDetail`(`ListBindings` 返回类型)在 `PluginBinding` 上 join 出 `table_name/database_name`,
@@ -364,6 +373,8 @@ export interface GovernanceExternalLink {
 export interface GovernanceTaskListResponse {
   tasks: GovernanceTask[]
   total: number
+  page: number
+  page_size: number
 }
 
 export interface GovernanceTaskDetail {

@@ -127,13 +127,57 @@ func (s *PluginService) CreatePlugin(req CreatePluginRequest, userID string) (*m
 	return &plugin, nil
 }
 
-// ListPlugins 列出插件
-func (s *PluginService) ListPlugins(userID string) ([]models.Plugin, error) {
+// PluginListFilter 插件列表分页参数
+type PluginListFilter struct {
+	Page     int
+	PageSize int
+}
+
+// PluginList 插件列表分页结果
+type PluginList struct {
+	Items    []models.Plugin `json:"items"`
+	Total    int64           `json:"total"`
+	Page     int             `json:"page"`
+	PageSize int             `json:"page_size"`
+}
+
+// ListPlugins 列出插件 (分页)。
+func (s *PluginService) ListPlugins(userID string, filter PluginListFilter) (*PluginList, error) {
+	query := s.db.Model(&models.Plugin{}).Where("created_by = ?", userID)
+
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return nil, fmt.Errorf("统计插件数量失败: %w", err)
+	}
+
+	page := filter.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := filter.PageSize
+	switch {
+	case pageSize == -1:
+	case pageSize <= 0:
+		pageSize = 20
+	case pageSize > 200:
+		pageSize = 200
+	}
+
+	if pageSize != -1 {
+		query = query.Offset((page - 1) * pageSize).Limit(pageSize)
+	}
+
 	var plugins []models.Plugin
-	if err := s.db.Where("created_by = ?", userID).Find(&plugins).Error; err != nil {
+	if err := query.Find(&plugins).Error; err != nil {
 		return nil, fmt.Errorf("查询插件列表失败: %w", err)
 	}
-	return plugins, nil
+
+	return &PluginList{
+		Items:    plugins,
+		Total:    total,
+		Page:     page,
+		PageSize: pageSize,
+	}, nil
 }
 
 func (s *PluginService) getOwnedPlugin(pluginID, userID string) (*models.Plugin, error) {
