@@ -40,6 +40,17 @@
           <template #title>系统设置</template>
         </el-menu-item>
       </el-menu>
+      <a
+        v-if="sourceHref"
+        class="sidebar-source-link"
+        :href="sourceHref"
+        target="_blank"
+        rel="noopener noreferrer"
+        :title="`Source code (${SOURCE_URL})`"
+      >
+        <el-icon><Link /></el-icon>
+        <span v-show="!sidebarCollapsed" class="source-text">Source Code (AGPL-3.0)</span>
+      </a>
       <div class="sidebar-collapse-btn" @click="sidebarCollapsed = !sidebarCollapsed">
         <el-icon>
           <Fold v-if="!sidebarCollapsed" />
@@ -82,10 +93,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { ref, watch, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { usePageMeta } from '@/composables/usePageMeta'
+import { safeHttpUrl } from '@/utils/safeUrl'
 import {
   UserFilled,
   ArrowDown,
@@ -97,6 +109,7 @@ import {
   Setting,
   Fold,
   Expand,
+  Link,
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -106,6 +119,11 @@ const { title } = usePageMeta()
 
 const sidebarCollapsed = ref(false)
 const mobileMenuOpen = ref(false)
+
+// AGPL-3.0 第 13 条要求向网络服务用户提供获取源代码的方式。
+// 这里给出仓库公共 HTTPS 地址; safeHttpUrl 是项目约定的统一防护层 (字符串虽是编译期常量, 但走同一通路便于审计)。
+const SOURCE_URL = 'https://github.com/jiangfire/cornerstone'
+const sourceHref = computed(() => safeHttpUrl(SOURCE_URL))
 
 // Close mobile menu on navigation
 watch(
@@ -222,6 +240,32 @@ const handleCommand = (command: string) => {
       justify-content: center;
     }
   }
+}
+
+.sidebar-source-link {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  color: var(--fa-text-muted);
+  font-size: 12px;
+  text-decoration: none;
+  border-top: var(--fa-border-subtle);
+  transition: color 0.2s;
+  white-space: nowrap;
+  overflow: hidden;
+
+  &:hover {
+    color: var(--fa-accent-solid);
+  }
+
+  .el-icon {
+    flex-shrink: 0;
+  }
+}
+
+.source-text {
+  white-space: nowrap;
 }
 
 .sidebar-collapse-btn {

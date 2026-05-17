@@ -37,6 +37,7 @@ const {
     downloadBlob: vi.fn(),
     download: vi.fn(),
     delete: vi.fn(),
+    upload: vi.fn(),
   },
   databaseAPI: {
     getDetail: vi.fn(),
@@ -135,6 +136,7 @@ describe('RecordsView', () => {
     fileAPI.downloadBlob.mockResolvedValue(new Blob(['file']))
     fileAPI.download.mockReturnValue('/api/files/direct-link')
     exportAPI.downloadRecords.mockResolvedValue(new Blob(['id,title'], { type: 'text/csv' }))
+    fileAPI.upload.mockResolvedValue({ success: true })
     defaultApi.post.mockResolvedValue({})
 
     createObjectURLMock = vi.fn(() => 'blob:mock-object-url')
@@ -521,25 +523,27 @@ describe('RecordsView', () => {
     expect(messageWarning).toHaveBeenCalledWith('请先保存记录后再上传文件')
 
     vm.currentRecordId = 'rec_1'
-    defaultApi.post.mockImplementationOnce(
+    fileAPI.upload.mockImplementationOnce(
       async (
-        _url: string,
-        _formData: FormData,
-        config: { onUploadProgress?: (progress: { loaded: number; total?: number }) => void },
+        _params: { recordId?: string; fieldId?: string; file: File },
+        onUploadProgress?: (progress: { loaded: number; total?: number }) => void,
       ) => {
-        config.onUploadProgress?.({ loaded: 5, total: 10 })
-        return {}
+        onUploadProgress?.({ loaded: 5, total: 10 })
+        return { success: true }
       },
     )
 
     await vm.handleFileSelect({ raw: new File(['x'], 'report.txt') })
 
-    expect(defaultApi.post).toHaveBeenCalled()
+    expect(fileAPI.upload).toHaveBeenCalledWith(
+      expect.objectContaining({ recordId: 'rec_1' }),
+      expect.any(Function),
+    )
     expect(messageSuccess).toHaveBeenCalledWith('文件上传成功')
     expect(vm.uploadProgress).toBe(0)
     expect(fileAPI.listByRecord).toHaveBeenCalledWith('rec_1')
 
-    defaultApi.post.mockRejectedValueOnce({
+    fileAPI.upload.mockRejectedValueOnce({
       response: { data: { message: '上传被拒绝' } },
     })
     await vm.handleFileSelect({ raw: new File(['x'], 'report.txt') })

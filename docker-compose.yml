@@ -47,11 +47,7 @@ services:
       PORT: 8080
 
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      LOG_OUTPUT: /app/logs/app.log
-      LOG_ERROR: /app/logs/error.log
-      LOG_MAX_SIZE: ${LOG_MAX_SIZE:-100}
-      LOG_MAX_AGE: ${LOG_MAX_AGE:-7}
-      LOG_MAX_BACKUPS: ${LOG_MAX_BACKUPS:-5}
+      # 日志统一输出 JSON 到 stdout, 轮转/采集交给 docker / 编排层 (compose `logging` 块或 k8s sidecar)。
 
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (use 32+ bytes from a CSPRNG; e.g. `openssl rand -base64 48`)}
       JWT_EXPIRATION: ${JWT_EXPIRATION:-24}
@@ -66,13 +62,11 @@ services:
       LLM_GOVERNOR_TOKEN: ${LLM_GOVERNOR_TOKEN:-}
       INTEGRATION_BASE_URLS: ${INTEGRATION_BASE_URLS:-}
       INTEGRATION_SHARED_TOKEN: ${INTEGRATION_SHARED_TOKEN:-}
-    volumes:
-      - backend_logs:/app/logs
     depends_on:
       postgres:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/ready"]
       interval: 30s
       timeout: 3s
       retries: 3
@@ -82,8 +76,6 @@ services:
 
 volumes:
   postgres_data:
-    driver: local
-  backend_logs:
     driver: local
 
 networks:

@@ -2,17 +2,15 @@ package log
 
 import (
 	"os"
-	"path/filepath"
 
 	"github.com/jiangfire/cornerstone/backend/internal/config"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
-	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 var logger *zap.Logger
 
-// Logger 返回全局logger实例
+// Logger 返回全局 logger 实例
 func Logger() *zap.Logger {
 	if logger == nil {
 		panic("zap logger not initialized")
@@ -20,45 +18,24 @@ func Logger() *zap.Logger {
 	return logger
 }
 
-// GetLogger 兼容函数，返回logger实例
+// GetLogger 兼容函数, 返回 logger 实例
 func GetLogger() *zap.Logger {
 	return Logger()
 }
 
-// InitLogger 初始化日志系统
+// InitLogger 初始化日志系统。
+//
+// 设计取舍 (2026-05 P3-6):
+//   - 容器化部署的标准做法是结构化日志走 stdout, 由编排层 (docker/k8s/journald) 接管轮转与聚合;
+//     应用自身写文件 + lumberjack 轮转会与外部 sidecar 重复, 还要求挂卷可写。
+//   - 因此这里只输出一份 JSON 到 stdout, 不再分文件、不再分级旁路 (error 仍可由采集端过滤 level=error)。
+//   - LoggerConfig 上保留 Level 字段, 其余字段已从配置层移除。
 func InitLogger(cfg config.LoggerConfig) error {
-	// 创建日志目录
-	if err := os.MkdirAll(filepath.Dir(cfg.OutputPath), 0750); err != nil {
-		return err
-	}
-
-	if err := os.MkdirAll(filepath.Dir(cfg.ErrorPath), 0750); err != nil {
-		return err
-	}
-
 	level, err := zapcore.ParseLevel(cfg.Level)
 	if err != nil {
 		return err
 	}
 
-	// 配置日志轮转
-	appLogger := &lumberjack.Logger{
-		Filename:   cfg.OutputPath,
-		MaxSize:    cfg.MaxSize,
-		MaxBackups: cfg.MaxBackups,
-		MaxAge:     cfg.MaxAge,
-		Compress:   true,
-	}
-
-	errorLogger := &lumberjack.Logger{
-		Filename:   cfg.ErrorPath,
-		MaxSize:    cfg.MaxSize,
-		MaxBackups: cfg.MaxBackups,
-		MaxAge:     cfg.MaxAge,
-		Compress:   true,
-	}
-
-	// 编码器配置
 	encoderConfig := zapcore.EncoderConfig{
 		TimeKey:        "time",
 		LevelKey:       "level",
@@ -74,35 +51,17 @@ func InitLogger(cfg config.LoggerConfig) error {
 		EncodeCaller:   zapcore.ShortCallerEncoder,
 	}
 
-	// 创建核心，同时输出到文件和控制台
-	core := zapcore.NewTee(
-		// 应用日志
-		zapcore.NewCore(
-			zapcore.NewJSONEncoder(encoderConfig),
-			zapcore.AddSync(appLogger),
-			level,
-		),
-		// 错误日志（只记录Error及以上级别）
-		zapcore.NewCore(
-			zapcore.NewJSONEncoder(encoderConfig),
-			zapcore.AddSync(errorLogger),
-			zapcore.ErrorLevel,
-		),
-		// 控制台输出
-		zapcore.NewCore(
-			zapcore.NewConsoleEncoder(encoderConfig),
-			zapcore.AddSync(os.Stdout),
-			level,
-		),
+	core := zapcore.NewCore(
+		zapcore.NewJSONEncoder(encoderConfig),
+		zapcore.AddSync(os.Stdout),
+		level,
 	)
 
-	// 创建logger
 	logger = zap.New(core,
 		zap.AddCaller(),
 		zap.AddStacktrace(zapcore.ErrorLevel),
 	)
 
-	// 替换全局logger
 	zap.ReplaceGlobals(logger)
 
 	return nil
@@ -115,42 +74,42 @@ func Sync() {
 	}
 }
 
-// Info 记录info级别日志
+// Info 记录 info 级别日志
 func Info(msg string, fields ...zap.Field) {
 	Logger().Info(msg, fields...)
 }
 
-// Error 记录error级别日志
+// Error 记录 error 级别日志
 func Error(msg string, fields ...zap.Field) {
 	Logger().Error(msg, fields...)
 }
 
-// Warn 记录warn级别日志
+// Warn 记录 warn 级别日志
 func Warn(msg string, fields ...zap.Field) {
 	Logger().Warn(msg, fields...)
 }
 
-// Debug 记录debug级别日志
+// Debug 记录 debug 级别日志
 func Debug(msg string, fields ...zap.Field) {
 	Logger().Debug(msg, fields...)
 }
 
-// Fatal 记录fatal级别日志并退出
+// Fatal 记录 fatal 级别日志并退出
 func Fatal(msg string, fields ...zap.Field) {
 	Logger().Fatal(msg, fields...)
 }
 
-// Infof 格式化info日志
-func Infof(format string, args ...interface{}) {
+// Infof 格式化 info 日志
+func Infof(format string, args ...any) {
 	Logger().Sugar().Infof(format, args...)
 }
 
-// Errorf 格式化error日志
-func Errorf(format string, args ...interface{}) {
+// Errorf 格式化 error 日志
+func Errorf(format string, args ...any) {
 	Logger().Sugar().Errorf(format, args...)
 }
 
-// Fatalf 格式化fatal日志并退出
-func Fatalf(format string, args ...interface{}) {
+// Fatalf 格式化 fatal 日志并退出
+func Fatalf(format string, args ...any) {
 	Logger().Sugar().Fatalf(format, args...)
 }

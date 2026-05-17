@@ -62,8 +62,10 @@ USER app
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
+# 使用 /ready (readiness): 应用 + 数据库都健康才返回 200, DB 挂时返回 503,
+# compose / k8s 据此把容器摘下来,而不是仅看进程是否在跑。
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/ready || exit 1
 
 # Run the application
 CMD ["./cornerstone"]

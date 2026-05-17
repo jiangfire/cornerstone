@@ -18,6 +18,7 @@ import type {
   Organization,
   OrganizationListResponse,
   OrganizationMemberListResponse,
+  FileItem,
   FileListResponse,
   Plugin,
   PluginBinding,
@@ -31,11 +32,14 @@ import type {
   GovernanceReview,
 } from '@/types/api'
 
-// API 配置
+// API 配置：全局默认 10s 超时；耗时类调用（上传/导出/AI）在各自方法里覆盖为 60s。
 const API_CONFIG = {
   baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
   timeout: 10000,
 }
+
+// 长耗时操作的统一超时（上传 / 导出 / AI 推理）
+const LONG_TIMEOUT_MS = 60000
 
 // 创建 Axios 实例
 const api: AxiosInstance = axios.create(API_CONFIG)
@@ -227,6 +231,25 @@ export const recordAPI = {
 
 // 文件 API
 export const fileAPI = {
+  // 上传文件：60s 超时（覆盖全局 10s），可选 onUploadProgress 回调追踪进度
+  upload(
+    params: { recordId?: string; fieldId?: string; file: File },
+    onUploadProgress?: (progressEvent: { loaded: number; total?: number }) => void,
+  ): Promise<ApiResponse<FileItem>> {
+    const formData = new FormData()
+    if (params.recordId) {
+      formData.append('record_id', params.recordId)
+    }
+    if (params.fieldId) {
+      formData.append('field_id', params.fieldId)
+    }
+    formData.append('file', params.file)
+    return api.post('/files/upload', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+      timeout: LONG_TIMEOUT_MS,
+      onUploadProgress,
+    })
+  },
   listByRecord(recordId: string) {
     return request.get<FileListResponse>(`/records/${recordId}/files`)
   },
@@ -315,6 +338,7 @@ export const settingsAPI = {
 
 // 导出 API
 export const exportAPI = {
+  // 导出可能扫表/打包：60s 超时（覆盖全局 10s）
   downloadRecords(tableId: string, format: 'csv' | 'json' = 'csv', filter = '') {
     const params: Record<string, string> = {
       table_id: tableId,
@@ -323,7 +347,11 @@ export const exportAPI = {
     if (filter.trim() !== '') {
       params.filter = filter.trim()
     }
-    return api.get<Blob, Blob>('/records/export', { params, responseType: 'blob' })
+    return api.get<Blob, Blob>('/records/export', {
+      params,
+      responseType: 'blob',
+      timeout: LONG_TIMEOUT_MS,
+    })
   },
 }
 
@@ -371,6 +399,16 @@ export const governanceAPI = {
   },
   applyReview(id: string) {
     return request.post(`/governance/reviews/${id}/apply`)
+  },
+  // AI 推荐生成：调用上游 LLM Governor，60s 超时（覆盖全局 10s）
+  generateAIRecommendations(data: {
+    task_id: string
+    recommendation_type: 'term_binding' | 'classification' | 'dq_rule' | 'impact_summary'
+    resource_type?: string
+    resource_id?: string
+    context?: Record<string, unknown>
+  }): Promise<ApiResponse<GovernanceReview>> {
+    return api.post('/governance/ai/recommendations', data, { timeout: LONG_TIMEOUT_MS })
   },
 }
 

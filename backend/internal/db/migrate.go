@@ -225,7 +225,7 @@ func Migrate() error {
 //  1. 环境变量 BOOTSTRAP_ADMIN_PASSWORD（推荐用于容器化部署）
 //  2. crypto/rand 生成 16 位随机密码
 //
-// 凭据**仅**通过以下方式输出，绝不写入 zap 日志（防止随 lumberjack 归档泄漏）：
+// 凭据**仅**通过以下方式输出，绝不写入 zap 日志（防止随采集端归档泄漏）：
 //   - 写入 data/initial-admin.txt（权限 0600，已存在则跳过覆盖）
 //   - 同步打印一次到 stderr 供 TTY 启动场景查看
 func createDefaultAdminUser(database *gorm.DB) error {

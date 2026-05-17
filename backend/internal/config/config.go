@@ -47,14 +47,10 @@ type ServerConfig struct {
 	Port string
 }
 
-// LoggerConfig 日志配置
+// LoggerConfig 日志配置。
+// P3-6 起日志统一输出 JSON 到 stdout, 轮转交给容器编排层, 这里只暴露级别。
 type LoggerConfig struct {
-	Level      string
-	OutputPath string
-	ErrorPath  string
-	MaxSize    int
-	MaxAge     int
-	MaxBackups int
+	Level string
 }
 
 // JWTConfig JWT配置
@@ -107,12 +103,7 @@ func Load() (*Config, error) {
 			Port: getEnv("PORT", "8080"),
 		},
 		Logger: LoggerConfig{
-			Level:      getEnv("LOG_LEVEL", "info"),
-			OutputPath: getEnv("LOG_OUTPUT", "logs/app.log"),
-			ErrorPath:  getEnv("LOG_ERROR", "logs/error.log"),
-			MaxSize:    getEnvAsInt("LOG_MAX_SIZE", 100),
-			MaxAge:     getEnvAsInt("LOG_MAX_AGE", 7),
-			MaxBackups: getEnvAsInt("LOG_MAX_BACKUPS", 5),
+			Level: getEnv("LOG_LEVEL", "info"),
 		},
 		JWT: JWTConfig{
 			Secret:     getEnv("JWT_SECRET", "change-this-secret-key"),

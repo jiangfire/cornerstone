@@ -20,6 +20,7 @@ import (
 	"github.com/jiangfire/cornerstone/backend/pkg/asyncworker"
 	applog "github.com/jiangfire/cornerstone/backend/pkg/log"
 	"github.com/jiangfire/cornerstone/backend/pkg/utils"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 // Version is set at build time via -ldflags="-X main.Version=..."
@@ -68,6 +69,7 @@ func main() {
 	// 6. 创建Gin引擎
 	gin.SetMode(cfg.Server.Mode)
 	r := gin.New()
+	handlers.SetVersion(Version)
 	handlers.ConfigureMCP(handlers.MCPOptions{
 		SSEKeepaliveInterval: time.Duration(cfg.MCP.SSEKeepaliveSec) * time.Second,
 		SSERetryInterval:     time.Duration(cfg.MCP.SSERetryMS) * time.Millisecond,
@@ -80,15 +82,13 @@ func main() {
 	r.Use(middleware.RequestID())
 	r.Use(middleware.RequestLogger())
 
-	// 8. 健康检查路由
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status":  "healthy",
-			"service": "cornerstone-backend",
-			"version": Version,
-			"time":    time.Now().Format(time.RFC3339),
-		})
-	})
+	// 8. 健康检查 + 指标路由
+	// /health  : liveness, 不查依赖, 进程在跑就 200
+	// /ready   : readiness, 失败时返回 503, 用作 compose / k8s 探针
+	// /metrics : Prometheus 抓取端点, 暴露 Go runtime + process collector 默认指标
+	r.GET("/health", handlers.Health)
+	r.GET("/ready", handlers.Ready)
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
 
 	// HTTP MCP 路由
 	r.OPTIONS("/mcp", handlers.HandleMCPOptions)

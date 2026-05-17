@@ -664,18 +664,13 @@ const handleFileSelect = async (file: { raw: File }) => {
 
   uploadProgress.value = 0
   try {
-    // Use axios directly to track upload progress
-    const formData = new FormData()
-    formData.append('record_id', currentRecordId.value)
-    formData.append('file', file.raw)
-
-    const apiInstance = (await import('@/services/api')).default
-    await apiInstance.post('/files/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      onUploadProgress: (progressEvent: { loaded: number; total?: number }) => {
+    // 走 fileAPI.upload(60s 超时),保持上传进度回调
+    await fileAPI.upload(
+      { recordId: currentRecordId.value, file: file.raw },
+      (progressEvent: { loaded: number; total?: number }) => {
         uploadProgress.value = Math.floor((progressEvent.loaded * 100) / (progressEvent.total || 1))
       },
-    })
+    )
 
     ElMessage.success('文件上传成功')
     await loadAttachedFiles(currentRecordId.value)
