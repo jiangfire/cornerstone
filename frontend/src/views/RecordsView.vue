@@ -51,53 +51,17 @@
         <el-button v-if="canCreate" type="primary" @click="handleCreate">创建记录</el-button>
       </el-empty>
 
-      <el-table v-else :data="records" style="width: 100%" v-loading="loading" border>
-        <el-table-column
-          v-for="field in fields"
-          :key="field.id"
-          :prop="field.name"
-          :label="field.name"
-          :min-width="getFieldWidth(field.type)"
-        >
-          <template #default="{ row }">
-            <span v-if="field.type === 'boolean'">
-              <el-tag :type="row.data[field.name] ? 'success' : 'info'">
-                {{ row.data[field.name] ? '是' : '否' }}
-              </el-tag>
-            </span>
-            <span v-else-if="field.type === 'date' || field.type === 'datetime'">
-              {{ formatDateTime(row.data[field.name], field.type) }}
-            </span>
-            <span v-else-if="field.type === 'multiselect'" class="multiselect-cell">
-              <template v-if="Array.isArray(row.data[field.name]) && row.data[field.name].length">
-                <el-tag
-                  v-for="item in row.data[field.name] as unknown[]"
-                  :key="String(item)"
-                  size="small"
-                  class="multiselect-tag"
-                >
-                  {{ item }}
-                </el-tag>
-              </template>
-              <span v-else>-</span>
-            </span>
-            <span v-else>{{ row.data[field.name] || '-' }}</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="created_at" label="创建时间" width="180" fixed="right">
-          <template #default="{ row }">
-            {{ formatDate(row.created_at) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
-          <template #default="{ row }">
-            <el-button v-if="canEdit" size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button v-if="canDelete" size="small" type="danger" @click="handleDelete(row)"
-              >删除</el-button
-            >
-          </template>
-        </el-table-column>
-      </el-table>
+      <div v-else ref="tableContainerRef" v-loading="loading" class="table-wrapper">
+        <el-table-v2
+          v-if="tableWidth > 0"
+          :columns="tableColumns"
+          :data="records"
+          :width="tableWidth"
+          :height="500"
+          :row-height="48"
+          fixed
+        />
+      </div>
 
       <!-- 分页 -->
       <div class="pagination" v-if="records.length > 0">
@@ -298,7 +262,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, h, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Refresh, Search, Upload, Document, Download } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -350,6 +314,84 @@ const form = ref<Record<string, unknown>>({})
 const currentRecordId = ref('')
 
 const dialogTitle = ref('新建记录')
+
+// 虚拟表格尺寸
+const tableContainerRef = ref<HTMLDivElement>()
+const tableWidth = ref(0)
+
+const updateTableWidth = () => {
+  if (tableContainerRef.value) {
+    tableWidth.value = tableContainerRef.value.clientWidth
+  }
+}
+
+// 动态列渲染器
+const createFieldCellRenderer = (field: Field) => {
+  return ({ rowData }: { rowData: RecordData }) => {
+    const value = rowData.data[field.name]
+    if (field.type === 'boolean') {
+      return h('el-tag', { type: value ? 'success' : 'info' }, value ? '是' : '否')
+    }
+    if (field.type === 'date' || field.type === 'datetime') {
+      return h('span', formatDateTime(value as string, field.type))
+    }
+    if (field.type === 'multiselect') {
+      const arr = Array.isArray(value) ? value : []
+      if (arr.length) {
+        return h(
+          'span',
+          { class: 'multiselect-cell' },
+          arr.map((item) =>
+            h('el-tag', { key: String(item), size: 'small', class: 'multiselect-tag' }, String(item)),
+          ),
+        )
+      }
+      return h('span', '-')
+    }
+    return h('span', value || '-')
+  }
+}
+
+const tableColumns = computed(() => {
+  const cols: any[] = fields.value.map((field) => ({
+    key: field.id,
+    dataKey: field.name,
+    title: field.name,
+    width: getFieldWidth(field.type),
+    cellRenderer: createFieldCellRenderer(field),
+  }))
+
+  cols.push({
+    key: 'created_at',
+    dataKey: 'created_at',
+    title: '创建时间',
+    width: 180,
+    fixed: 'right',
+    cellRenderer: ({ rowData }: { rowData: RecordData }) => h('span', formatDate(rowData.created_at)),
+  })
+
+  cols.push({
+    key: 'actions',
+    dataKey: 'actions',
+    title: '操作',
+    width: 150,
+    fixed: 'right',
+    cellRenderer: ({ rowData }: { rowData: RecordData }) => {
+      const buttons: ReturnType<typeof h>[] = []
+      if (canEdit.value) {
+        buttons.push(h('el-button', { size: 'small', onClick: () => handleEdit(rowData) }, '编辑'))
+      }
+      if (canDelete.value) {
+        buttons.push(
+          h('el-button', { size: 'small', type: 'danger', onClick: () => handleDelete(rowData) }, '删除'),
+        )
+      }
+      return h('div', buttons)
+    },
+  })
+
+  return cols
+})
 
 // 文件管理相关变量
 const fileList = ref<
@@ -778,12 +820,17 @@ watch(searchText, () => {
 })
 
 onMounted(() => {
+  nextTick(() => {
+    updateTableWidth()
+    window.addEventListener('resize', updateTableWidth)
+  })
   loadTableInfo()
   loadFields()
   loadRecords()
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', updateTableWidth)
   if (searchTimeout) {
     clearTimeout(searchTimeout)
     searchTimeout = null
@@ -826,6 +873,11 @@ onUnmounted(() => {
     margin-top: 16px;
     display: flex;
     justify-content: flex-end;
+  }
+
+  .table-wrapper {
+    border: 1px solid #e4e7ed;
+    border-radius: 4px;
   }
 }
 </style>
