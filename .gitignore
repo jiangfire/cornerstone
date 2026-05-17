@@ -134,9 +134,6 @@ docs/build/
 # 其他
 # ============================================
 
-# Docker
-.dockerignore
-
 # CI/CD
 .github/secrets/
 

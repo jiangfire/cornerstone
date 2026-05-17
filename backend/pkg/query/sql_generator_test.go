@@ -141,7 +141,7 @@ func TestSQLGenerator_Generate(t *testing.T) {
 				From:   "records",
 				Select: []string{"records.id", "users.name"},
 				Join: []JoinClause{
-					{Type: "left", Table: "users", As: "u", On: "records.created_by = u.id"},
+					{Type: "left", Table: "users", As: "u", On: JoinCondition{Left: "records.created_by", Op: "=", Right: "u.id"}},
 				},
 			},
 			checkFunc: func(t *testing.T, sql string, params []interface{}) {
@@ -188,9 +188,9 @@ func TestSQLGenerator_Generate(t *testing.T) {
 				Select: []string{"data->>name"},
 			},
 			checkFunc: func(t *testing.T, sql string, params []interface{}) {
-				// The field with ->> is treated as a literal expression
-				if !strings.Contains(sql, "data->>name") {
-					t.Errorf("expected data->>name in SQL, got: %s", sql)
+				// Postgres JSON path: "data"->>'name'
+				if !strings.Contains(sql, `"data"->>'name'`) {
+					t.Errorf("expected \"data\"->>'name' in SQL, got: %s", sql)
 				}
 			},
 		},
@@ -505,7 +505,10 @@ func TestSQLGenerator_generateAggregate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.agg.Func, func(t *testing.T) {
-			result := gen.generateAggregate(tt.agg)
+			result, err := gen.generateAggregate(tt.agg)
+			if err != nil {
+				t.Fatalf("generateAggregate 返回错误: %v", err)
+			}
 			if result != tt.expected {
 				t.Errorf("expected %s, got %s", tt.expected, result)
 			}

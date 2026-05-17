@@ -49,6 +49,7 @@
                   :show-file-list="false"
                   :on-change="handleAvatarChange"
                   :limit="1"
+                  accept="image/png,image/jpeg,image/webp"
                 >
                   <el-button size="small" type="primary">更换头像</el-button>
                 </el-upload>
@@ -179,18 +180,47 @@ const updateProfile = async () => {
   }
 }
 
+// 头像上传配置
+// 后端 User.Avatar 字段为 string + binding:"max=262144" (services/auth.go:54),
+// 故 data URL 长度上限 256KB。原始文件 size 上限 2MB,但 base64 后须再校验。
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024 // 2MB 原始文件
+const AVATAR_ENCODED_LIMIT = 262144 // 后端硬限制
+const AVATAR_ACCEPTED_MIME = new Set(['image/png', 'image/jpeg', 'image/webp'])
+
 const handleAvatarChange = (file: UploadFile) => {
-  // 模拟头像上传
+  const raw = file.raw
+  if (!raw) {
+    return
+  }
+
+  if (!AVATAR_ACCEPTED_MIME.has(raw.type)) {
+    ElMessage.error('仅支持 PNG / JPEG / WebP 格式')
+    return
+  }
+
+  if (raw.size > AVATAR_MAX_BYTES) {
+    ElMessage.error('头像文件不能超过 2MB')
+    return
+  }
+
   const reader = new FileReader()
   reader.onload = (e) => {
-    if (e.target?.result) {
-      profileForm.value.avatar = e.target.result as string
-      ElMessage.success('头像已更新')
+    const result = e.target?.result
+    if (typeof result !== 'string') {
+      ElMessage.error('头像读取失败')
+      return
     }
+    if (result.length > AVATAR_ENCODED_LIMIT) {
+      ElMessage.error('该图片体积过大,请使用更小的图片(建议 < 180KB)')
+      return
+    }
+    profileForm.value.avatar = result
+    ElMessage.success('头像已更新,请点击"更新资料"保存')
   }
-  if (file.raw) {
-    reader.readAsDataURL(file.raw)
+  reader.onerror = () => {
+    ElMessage.error('头像读取失败')
   }
+  reader.readAsDataURL(raw)
 }
 
 const removeAvatar = () => {

@@ -66,7 +66,8 @@ type JWTConfig struct {
 // IntegrationsConfig 集成与治理回写配置
 type IntegrationsConfig struct {
 	BaseURLs            string
-	OutboundTokens      string
+	InboundTokens       string `json:"-"` // INTEGRATION_TOKENS：入站 source 级 token，格式 sys=tok,sys2=tok2
+	OutboundTokens      string `json:"-"` // OUTBOUND_INTEGRATION_TOKENS：出站目标系统 token
 	SharedToken         string `json:"-"`
 	OutboundTimeoutSec  int
 	OutboxMaxRetries    int
@@ -119,6 +120,7 @@ func Load() (*Config, error) {
 		},
 		Integrations: IntegrationsConfig{
 			BaseURLs:            getEnv("INTEGRATION_BASE_URLS", ""),
+			InboundTokens:       getEnv("INTEGRATION_TOKENS", ""),
 			OutboundTokens:      getEnv("OUTBOUND_INTEGRATION_TOKENS", ""),
 			SharedToken:         getEnv("INTEGRATION_SHARED_TOKEN", ""),
 			OutboundTimeoutSec:  getEnvAsInt("OUTBOUND_INTEGRATION_TIMEOUT_SEC", 5),

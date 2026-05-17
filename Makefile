@@ -130,13 +130,15 @@ backend-embed-build: ## 构建嵌入式后端（包含前端资源）
 	@cd $(BACKEND_DIR) && CGO_ENABLED=$(CGO_ENABLED) $(GO) build -trimpath -ldflags="$(LDFLAGS)" -o ../$(BUILD_DIR)/$(BINARY_NAME) $(BACKEND_MAIN)
 	@echo "嵌入式后端构建完成: $(BUILD_DIR)/$(BINARY_NAME)"
 
-backend-test: ## 运行后端测试
-	@echo "运行后端测试..."
+backend-test: ## 运行后端测试（带竞态检测，默认入口）
+	@echo "运行后端测试（带竞态检测）..."
+	@cd $(BACKEND_DIR) && $(GO) test -race -v ./...
+
+backend-test-no-race: ## 运行后端测试（无竞态检测，CGO 禁用环境用）
+	@echo "运行后端测试（无竞态检测）..."
 	@cd $(BACKEND_DIR) && CGO_ENABLED=0 $(GO) test -v ./...
 
-backend-test-race: ## 运行后端测试（竞态检测）
-	@echo "运行后端测试（竞态检测）..."
-	@cd $(BACKEND_DIR) && CGO_ENABLED=0 $(GO) test -race -v ./...
+backend-test-race: backend-test ## 别名：与 backend-test 等价（保留兼容）
 
 backend-test-cover: ## 运行后端测试（覆盖率分析）
 	@echo "运行后端测试（覆盖率分析）..."
@@ -147,7 +149,7 @@ backend-test-cover: ## 运行后端测试（覆盖率分析）
 backend-lint: ## 运行后端代码检查
 	@echo "运行后端代码检查..."
 	@cd $(BACKEND_DIR) && which golangci-lint > /dev/null || (echo "警告: 未安装 golangci-lint" && exit 0)
-	@cd $(BACKEND_DIR) && golangci-lint run ./...
+	@cd $(BACKEND_DIR) && golangci-lint run --config=../.golangci.yml ./...
 
 backend-fmt: ## 格式化后端代码
 	@echo "格式化后端代码..."
@@ -231,15 +233,14 @@ db-migrate: ## 运行数据库迁移
 	@echo "运行数据库迁移..."
 	@cd $(BACKEND_DIR) && $(GO) run $(BACKEND_MAIN) migrate
 
-db-reset: ## 重置数据库
-	@echo "警告: 这将删除所有数据！"
-	@read -p "确认重置数据库？[y/N] " confirm; \
-	if [ "$$confirm" = "y" ] || [ "$$confirm" = "Y" ]; then \
-		rm -f cornerstone.db backend/cornerstone.db; \
-		echo "数据库已重置"; \
-	else \
-		echo "已取消"; \
+db-reset: ## 重置数据库（需要 CONFIRM=1，例：make db-reset CONFIRM=1）
+	@if [ "$(CONFIRM)" != "1" ]; then \
+		echo "警告: 这将删除所有数据！"; \
+		echo "需要明确确认，请执行: make db-reset CONFIRM=1"; \
+		exit 1; \
 	fi
+	@rm -f cornerstone.db backend/cornerstone.db
+	@echo "数据库已重置"
 
 ##@ 质量检查
 
@@ -251,7 +252,7 @@ check: check-frontend check-backend ## 前后端代码检查
 
 security-scan: ## 运行安全扫描
 	@echo "运行安全扫描..."
-	@cd $(BACKEND_DIR) && which gosec > /dev/null || (echo "警告: 未安装 gosec，请运行: go install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest" && exit 0)
+	@cd $(BACKEND_DIR) && which gosec > /dev/null || (echo "警告: 未安装 gosec，请运行: go install github.com/securego/gosec/v2/cmd/gosec@latest" && exit 0)
 	@cd $(BACKEND_DIR) && gosec ./...
 
 ##@ 快速命令
@@ -314,7 +315,7 @@ install-tools-backend: ## 安装后端开发工具
 	@echo "安装后端开发工具..."
 	@$(GO) install github.com/air-verse/air@latest
 	@$(GO) install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-	@$(GO) install github.com/securecodewarrior/gosec/v2/cmd/gosec@latest
+	@$(GO) install github.com/securego/gosec/v2/cmd/gosec@latest
 	@echo "后端开发工具安装完成"
 	@echo "  - air: 热重载"
 	@echo "  - golangci-lint: 代码检查"

@@ -32,7 +32,7 @@
         </div>
       </template>
 
-      <!-- 筛选和搜索 -->
+      <!-- 筛选和搜索 (watch + 300ms 防抖触发,不再叠加 @keyup.enter 避免双触发) -->
       <div class="filter-bar">
         <el-input
           v-model="searchText"
@@ -40,7 +40,6 @@
           clearable
           style="width: 300px"
           @clear="loadRecords"
-          @keyup.enter="handleSearch"
         >
           <template #append>
             <el-button :icon="Search" @click="handleSearch" />
@@ -68,6 +67,19 @@
             </span>
             <span v-else-if="field.type === 'date' || field.type === 'datetime'">
               {{ formatDateTime(row.data[field.name], field.type) }}
+            </span>
+            <span v-else-if="field.type === 'multiselect'" class="multiselect-cell">
+              <template v-if="Array.isArray(row.data[field.name]) && row.data[field.name].length">
+                <el-tag
+                  v-for="item in row.data[field.name] as unknown[]"
+                  :key="String(item)"
+                  size="small"
+                  class="multiselect-tag"
+                >
+                  {{ item }}
+                </el-tag>
+              </template>
+              <span v-else>-</span>
             </span>
             <span v-else>{{ row.data[field.name] || '-' }}</span>
           </template>
@@ -286,7 +298,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Refresh, Search, Upload, Document, Download } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -403,7 +415,7 @@ const loadFields = async () => {
   try {
     const response = await tableAPI.getFields(tableId)
     if (response.success && response.data) {
-      fields.value = response.data.fields || []
+      fields.value = response.data.items || []
     }
   } catch (err) {
     console.error('Failed to load fields:', err)
@@ -433,20 +445,19 @@ const loadTableInfo = async () => {
 const loadRecords = async () => {
   loading.value = true
   try {
-    const params = {
+    const trimmed = searchText.value.trim()
+    const params: Record<string, string | number> = {
       table_id: tableId,
       limit: pageSize.value,
       offset: (currentPage.value - 1) * pageSize.value,
-      filter: searchText.value.trim(),
     }
-    // Add filter parameter if searching
-    if (searchText.value.trim()) {
-      params.filter = searchText.value.trim()
+    if (trimmed) {
+      params.filter = trimmed
     }
 
     const response = await recordAPI.list(params)
     if (response.success && response.data) {
-      records.value = response.data.records || []
+      records.value = response.data.items || []
       total.value = response.data.total || 0
     }
   } catch {
@@ -505,13 +516,13 @@ const handleCreate = () => {
   dialogVisible.value = true
 }
 
-const handleEdit = (row: RecordData) => {
+const handleEdit = async (row: RecordData) => {
   isEditMode.value = true
   dialogTitle.value = '编辑记录'
   currentRecordId.value = row.id
   form.value = { ...row.data }
   dialogVisible.value = true
-  loadAttachedFiles(row.id)
+  await loadAttachedFiles(row.id)
 }
 
 const handleDelete = async (row: RecordData) => {
@@ -582,7 +593,7 @@ const loadAttachedFiles = async (recordId: string) => {
   loadingFiles.value = true
   try {
     const response = await fileAPI.listByRecord(recordId)
-    attachedFiles.value = response.data || []
+    attachedFiles.value = response.data?.items || []
   } catch (error) {
     console.error('加载附件失败', error)
   } finally {
@@ -590,9 +601,37 @@ const loadAttachedFiles = async (recordId: string) => {
   }
 }
 
-// 文件上传前校验
-const beforeUpload = () => {
+// 文件上传限制
+const MAX_UPLOAD_BYTES = 50 * 1024 * 1024 // 50MB
+const BLOCKED_EXTENSIONS = new Set([
+  'exe',
+  'bat',
+  'cmd',
+  'sh',
+  'msi',
+  'com',
+  'scr',
+  'vbs',
+  'ps1',
+  'jar',
+])
+
+const validateUploadFile = (file: File): boolean => {
+  if (file.size > MAX_UPLOAD_BYTES) {
+    ElMessage.error(`文件大小超过限制（最大 ${formatFileSize(MAX_UPLOAD_BYTES)}）`)
+    return false
+  }
+  const ext = file.name.split('.').pop()?.toLowerCase() || ''
+  if (BLOCKED_EXTENSIONS.has(ext)) {
+    ElMessage.error(`不允许上传 .${ext} 类型文件`)
+    return false
+  }
   return true
+}
+
+// 文件上传前校验（auto-upload 启用时由 Element Plus 调用）
+const beforeUpload = (file: File): boolean => {
+  return validateUploadFile(file)
 }
 
 // 处理文件超出限制
@@ -614,6 +653,12 @@ const getErrorMessage = (error: unknown, fallback: string) => {
 const handleFileSelect = async (file: { raw: File }) => {
   if (!currentRecordId.value) {
     ElMessage.warning('请先保存记录后再上传文件')
+    fileList.value = []
+    return
+  }
+
+  if (!validateUploadFile(file.raw)) {
+    fileList.value = []
     return
   }
 
@@ -633,7 +678,7 @@ const handleFileSelect = async (file: { raw: File }) => {
     })
 
     ElMessage.success('文件上传成功')
-    loadAttachedFiles(currentRecordId.value)
+    await loadAttachedFiles(currentRecordId.value)
     fileList.value = []
     uploadProgress.value = 0
   } catch (error) {
@@ -651,17 +696,27 @@ const clearPreviewFile = () => {
   previewLoading.value = false
 }
 
+// 用单调递增的 requestId 标记最新一次预览请求,避免快速切换时旧响应覆盖新预览
+let previewRequestId = 0
+
 const handlePreviewFile = async (file: { id: string; file_name: string }) => {
   const extension = file.file_name.split('.').pop()?.toLowerCase()
   const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp']
 
+  const requestId = ++previewRequestId
   clearPreviewFile()
   previewLoading.value = true
   previewDialogVisible.value = true
 
   try {
     const blob = await fileAPI.downloadBlob(file.id)
+    if (requestId !== previewRequestId) {
+      return
+    }
     const objectUrl = window.URL.createObjectURL(blob)
+    if (previewFile.value?.url) {
+      window.URL.revokeObjectURL(previewFile.value.url)
+    }
     previewFile.value = {
       id: file.id,
       url: objectUrl,
@@ -669,10 +724,15 @@ const handlePreviewFile = async (file: { id: string; file_name: string }) => {
       isPdf: extension === 'pdf',
     }
   } catch (error) {
+    if (requestId !== previewRequestId) {
+      return
+    }
     previewDialogVisible.value = false
     ElMessage.error(getErrorMessage(error, '文件预览失败'))
   } finally {
-    previewLoading.value = false
+    if (requestId === previewRequestId) {
+      previewLoading.value = false
+    }
   }
 }
 
@@ -699,7 +759,7 @@ const handleDeleteFile = async (file: { id: string }) => {
     await ElMessageBox.confirm('确定要删除该文件吗？', '提示', { type: 'warning' })
     await fileAPI.delete(file.id)
     ElMessage.success('删除成功')
-    loadAttachedFiles(currentRecordId.value)
+    await loadAttachedFiles(currentRecordId.value)
   } catch (err) {
     if (err !== 'cancel') {
       ElMessage.error('删除失败')
@@ -726,6 +786,16 @@ onMounted(() => {
   loadTableInfo()
   loadFields()
   loadRecords()
+})
+
+onUnmounted(() => {
+  if (searchTimeout) {
+    clearTimeout(searchTimeout)
+    searchTimeout = null
+  }
+  if (previewFile.value?.url) {
+    window.URL.revokeObjectURL(previewFile.value.url)
+  }
 })
 </script>
 

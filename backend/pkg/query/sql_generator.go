@@ -48,10 +48,16 @@ func (g *SQLGenerator) Generate(req *QueryRequest) (*SQLQuery, error) {
 	query.Params = append(query.Params, whereParams...)
 
 	// 5. 生成 GROUP BY 子句
-	groupByClause := g.generateGroupBy(req)
+	groupByClause, err := g.generateGroupBy(req)
+	if err != nil {
+		return nil, err
+	}
 
 	// 6. 生成 ORDER BY 子句
-	orderByClause := g.generateOrderBy(req)
+	orderByClause, err := g.generateOrderBy(req)
+	if err != nil {
+		return nil, err
+	}
 
 	// 7. 生成分页子句
 	limitClause, limitParams := g.generateLimit(req)
@@ -106,18 +112,29 @@ func (g *SQLGenerator) generateSelect(req *QueryRequest) (string, error) {
 
 		// 添加普通字段
 		for _, f := range req.Select {
-			fields = append(fields, g.generateFieldExpression(f))
+			expr, err := g.generateFieldExpression(f)
+			if err != nil {
+				return "", err
+			}
+			fields = append(fields, expr)
 		}
 
 		// 添加聚合函数
 		for _, agg := range req.Aggregate {
-			aggSQL := g.generateAggregate(agg)
+			aggSQL, err := g.generateAggregate(agg)
+			if err != nil {
+				return "", err
+			}
 			fields = append(fields, aggSQL)
 		}
 	} else {
 		fields = make([]string, 0, len(req.Select))
 		for _, f := range req.Select {
-			fields = append(fields, g.generateFieldExpression(f))
+			expr, err := g.generateFieldExpression(f)
+			if err != nil {
+				return "", err
+			}
+			fields = append(fields, expr)
 		}
 	}
 
@@ -129,17 +146,24 @@ func (g *SQLGenerator) generateSelect(req *QueryRequest) (string, error) {
 }
 
 // generateAggregate 生成聚合函数 SQL
-func (g *SQLGenerator) generateAggregate(agg AggregateFunc) string {
+func (g *SQLGenerator) generateAggregate(agg AggregateFunc) (string, error) {
 	funcName := strings.ToUpper(agg.Func)
 	field := agg.Field
 
+	if err := ValidateIdentifier(agg.As); err != nil {
+		return "", fmt.Errorf("aggregate.as %w", err)
+	}
+
 	if field == "" || field == "*" {
-		return fmt.Sprintf("%s(*) AS %s", funcName, g.quoteIdentifier(agg.As))
+		return fmt.Sprintf("%s(*) AS %s", funcName, g.quoteIdentifier(agg.As)), nil
 	}
 
 	// 处理 JSON 字段路径
-	fieldExpr := g.generateFieldExpression(field)
-	return fmt.Sprintf("%s(%s) AS %s", funcName, fieldExpr, g.quoteIdentifier(agg.As))
+	fieldExpr, err := g.generateFieldExpression(field)
+	if err != nil {
+		return "", fmt.Errorf("aggregate.field %w", err)
+	}
+	return fmt.Sprintf("%s(%s) AS %s", funcName, fieldExpr, g.quoteIdentifier(agg.As)), nil
 }
 
 // generateFrom 生成 FROM 子句
@@ -147,28 +171,51 @@ func (g *SQLGenerator) generateFrom(req *QueryRequest) string {
 	return " FROM " + g.quoteIdentifier(req.From)
 }
 
-// generateJoins 生成 JOIN 子句
+// generateJoins 生成 JOIN 子句。
+// 历史实现把 join.On 原样 `fmt.Sprintf` 到 SQL，认证用户可通过
+// `1=1; DROP TABLE users; --` 等载荷注入；现在改为只用结构化 JoinCondition，
+// 两侧都过 ValidateIdentifier、op 走白名单。详见 docs/REVIEW-FIX-PLAN-2026-05.md P1-3。
 func (g *SQLGenerator) generateJoins(req *QueryRequest) (string, error) {
 	if len(req.Join) == 0 {
 		return "", nil
 	}
 
 	var joins []string
-	for _, join := range req.Join {
+	for i, join := range req.Join {
 		joinType := strings.ToUpper(join.Type)
 		if joinType == "" {
 			joinType = "LEFT"
 		}
 
+		if err := ValidateIdentifier(join.Table); err != nil {
+			return "", fmt.Errorf("join[%d].table %w", i, err)
+		}
 		tableRef := g.quoteIdentifier(join.Table)
 		if join.As != "" {
+			if err := ValidateIdentifier(join.As); err != nil {
+				return "", fmt.Errorf("join[%d].as %w", i, err)
+			}
 			tableRef += " AS " + g.quoteIdentifier(join.As)
 		}
 
-		joinSQL := fmt.Sprintf(" %s JOIN %s ON %s", joinType, tableRef, join.On)
-		joins = append(joins, joinSQL)
+		if join.On.IsZero() {
+			return "", fmt.Errorf("invalid_join_condition: join[%d] 缺少 on", i)
+		}
+		if err := ValidateIdentifier(join.On.Left); err != nil {
+			return "", fmt.Errorf("join[%d].on.left %w", i, err)
+		}
+		if err := ValidateIdentifier(join.On.Right); err != nil {
+			return "", fmt.Errorf("join[%d].on.right %w", i, err)
+		}
+		if err := ValidateJoinOp(join.On.Op); err != nil {
+			return "", fmt.Errorf("join[%d].on.op %w", i, err)
+		}
 
-		// TODO: 处理关联表的字段选择（子查询方式）
+		onSQL := g.quoteQualifiedIdentifier(join.On.Left) +
+			" " + join.On.Op + " " +
+			g.quoteQualifiedIdentifier(join.On.Right)
+
+		joins = append(joins, fmt.Sprintf(" %s JOIN %s ON %s", joinType, tableRef, onSQL))
 	}
 
 	return strings.Join(joins, ""), nil
@@ -257,7 +304,10 @@ func (g *SQLGenerator) generateCondition(cond Condition) (string, []interface{},
 	}
 
 	// 处理字段表达式
-	fieldExpr := g.generateFieldExpression(cond.Field)
+	fieldExpr, err := g.generateFieldExpression(cond.Field)
+	if err != nil {
+		return "", nil, err
+	}
 
 	// 根据操作符生成 SQL
 	op := cond.Op
@@ -323,14 +373,41 @@ func (g *SQLGenerator) generateCondition(cond Condition) (string, []interface{},
 	}
 }
 
-// generateFieldExpression 生成字段表达式
-func (g *SQLGenerator) generateFieldExpression(field string) string {
+// generateFieldExpression 生成字段表达式。
+//
+// 历史实现把 `data->>name` 与 `JSON_EXTRACT(data, '$.name')` 中的字段名/路径直接拼进 SQL，
+// 引号字符可直接破出字面量；现在每个段都过 ValidateIdentifier / ValidateJSONPathSegment，
+// 详见 docs/REVIEW-FIX-PLAN-2026-05.md P1-4。
+func (g *SQLGenerator) generateFieldExpression(field string) (string, error) {
+	field = strings.TrimSpace(field)
+	if field == "" {
+		return "", fmt.Errorf("字段名不能为空")
+	}
+
+	// Postgres 形式 `data->>name` 或 `data->name`：等价于 data 列上的 JSON 路径
 	if strings.Contains(field, "->") {
-		return field
+		parts := strings.SplitN(field, "->", 2)
+		if len(parts) != 2 {
+			return "", fmt.Errorf("非法字段名 %q：JSON 引用格式错误", field)
+		}
+		base := strings.TrimSpace(parts[0])
+		path := strings.TrimSpace(parts[1])
+		path = strings.TrimPrefix(path, ">")
+		path = strings.Trim(path, "'\"")
+		if err := ValidateIdentifier(base); err != nil {
+			return "", err
+		}
+		if err := ValidateJSONPath(path); err != nil {
+			return "", err
+		}
+		return g.generateJSONFieldExpression(base, path)
 	}
 
 	// 处理带表别名的字段
 	if strings.Contains(field, ".") {
+		if err := ValidateIdentifier(field); err != nil {
+			return "", err
+		}
 		parts := strings.Split(field, ".")
 		if len(parts) >= 2 {
 			first := parts[0]
@@ -347,22 +424,32 @@ func (g *SQLGenerator) generateFieldExpression(field string) string {
 				)
 			}
 
-			return g.quoteQualifiedIdentifier(strings.Join(parts, "."))
+			return g.quoteQualifiedIdentifier(strings.Join(parts, ".")), nil
 		}
 	}
 
-	return g.quoteIdentifier(field)
+	if err := ValidateIdentifier(field); err != nil {
+		return "", err
+	}
+	return g.quoteIdentifier(field), nil
 }
 
-// generateJSONFieldExpression 生成 JSON 字段表达式
-func (g *SQLGenerator) generateJSONFieldExpression(jsonField, path string) string {
+// generateJSONFieldExpression 生成 JSON 字段表达式。
+// 调用者必须保证 jsonField 与 path 已经过 ValidateIdentifier / ValidateJSONPath；
+// 此处仍重复校验一次作为防御性深度防御（in-depth defense）。
+func (g *SQLGenerator) generateJSONFieldExpression(jsonField, path string) (string, error) {
+	if err := ValidateIdentifier(jsonField); err != nil {
+		return "", err
+	}
+	if err := ValidateJSONPath(path); err != nil {
+		return "", err
+	}
 	if g.isSQLite {
 		// SQLite: JSON_EXTRACT(data, '$.status')
-		return fmt.Sprintf("JSON_EXTRACT(%s, '$.%s')", g.quoteQualifiedIdentifier(jsonField), path)
+		return fmt.Sprintf("JSON_EXTRACT(%s, '$.%s')", g.quoteQualifiedIdentifier(jsonField), path), nil
 	}
-	// PostgreSQL: data->>'status' (返回文本) 或 data->'status' (返回 JSON)
-	// 这里使用 ->> 返回文本形式
-	return fmt.Sprintf("%s->>'%s'", g.quoteQualifiedIdentifier(jsonField), path)
+	// PostgreSQL: data->>'status' 返回 text
+	return fmt.Sprintf("%s->>'%s'", g.quoteQualifiedIdentifier(jsonField), path), nil
 }
 
 func isJSONColumnCandidate(field string) bool {
@@ -370,29 +457,36 @@ func isJSONColumnCandidate(field string) bool {
 }
 
 // generateGroupBy 生成 GROUP BY 子句
-func (g *SQLGenerator) generateGroupBy(req *QueryRequest) string {
+func (g *SQLGenerator) generateGroupBy(req *QueryRequest) (string, error) {
 	if len(req.GroupBy) == 0 {
-		return ""
+		return "", nil
 	}
 
 	fields := make([]string, len(req.GroupBy))
 	for i, f := range req.GroupBy {
-		fields[i] = g.generateFieldExpression(f)
+		expr, err := g.generateFieldExpression(f)
+		if err != nil {
+			return "", err
+		}
+		fields[i] = expr
 	}
 
-	return strings.Join(fields, ", ")
+	return strings.Join(fields, ", "), nil
 }
 
 // generateOrderBy 生成 ORDER BY 子句
-func (g *SQLGenerator) generateOrderBy(req *QueryRequest) string {
+func (g *SQLGenerator) generateOrderBy(req *QueryRequest) (string, error) {
 	if len(req.OrderBy) == 0 {
 		// 默认按 created_at 降序
-		return ""
+		return "", nil
 	}
 
 	orders := make([]string, len(req.OrderBy))
 	for i, o := range req.OrderBy {
-		fieldExpr := g.generateFieldExpression(o.Field)
+		fieldExpr, err := g.generateFieldExpression(o.Field)
+		if err != nil {
+			return "", err
+		}
 		dir := strings.ToUpper(o.Dir)
 		if dir != "ASC" && dir != "DESC" {
 			dir = "ASC"
@@ -400,7 +494,7 @@ func (g *SQLGenerator) generateOrderBy(req *QueryRequest) string {
 		orders[i] = fieldExpr + " " + dir
 	}
 
-	return strings.Join(orders, ", ")
+	return strings.Join(orders, ", "), nil
 }
 
 // generateLimit 生成分页子句

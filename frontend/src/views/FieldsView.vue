@@ -256,7 +256,7 @@ const loadFields = async () => {
   try {
     const response = await tableAPI.getFields(tableId)
     if (response.success && response.data) {
-      fields.value = response.data.fields || []
+      fields.value = response.data.items || []
     }
     // 加载字段权限配置
     await permissionStore.loadFieldPermissions(tableId)

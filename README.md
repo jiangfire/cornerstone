@@ -66,21 +66,36 @@ Cornerstone 是一个面向团队的数据管理平台。
 
 - Docker Desktop（或 Docker Engine + Compose）
 
-### 2) 一键启动
+### 2) 配置凭据
+
+`docker-compose.yml` 强制要求 `POSTGRES_PASSWORD` 和 `JWT_SECRET` 来自 `.env`，
+不再使用任何弱口令默认值；缺失会让 `docker compose up` 直接报错。
 
 ```bash
 git clone https://github.com/jiangfire/cornerstone.git
 cd cornerstone
-docker compose up -d --build
+cp .env.example .env
+# 编辑 .env，至少填好 POSTGRES_PASSWORD 与 JWT_SECRET
+# 推荐：openssl rand -base64 48
 ```
 
-### 3) 访问服务
+### 3) 一键启动
+
+```bash
+# 生产模式（默认）：仅暴露 8080，不对外开放数据库端口
+docker compose up -d --build
+
+# 本地开发模式：额外暴露 5432，启用 debug + CORS=*
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+```
+
+### 4) 访问服务
 
 - 应用首页：`http://localhost:8080`
 - 后端 API：`http://localhost:8080/api`
 - 健康检查：`http://localhost:8080/health`
 
-### 4) 停止服务
+### 5) 停止服务
 
 ```bash
 docker compose down
@@ -182,8 +197,9 @@ pnpm run build:embed
 
 ## 上线前清单（生产建议）
 
-- 将 `SERVER_MODE` 设为 `release`
-- 使用强随机 `JWT_SECRET`
+- 复制 `.env.example` 到 `.env` 并填入强随机 `JWT_SECRET`（≥32 字节）与 `POSTGRES_PASSWORD`
+- 保持 `SERVER_MODE=release`（默认值）；release 模式下空 / 默认 JWT 密钥会拒绝启动
+- 使用 `docker-compose.yml` 单独启动；`docker-compose.dev.yml` 仅本地开发用
 - 为 PostgreSQL 和日志目录启用持久化与备份
 - 通过反向代理统一 HTTPS 与域名
 - 配置基础监控（健康检查、错误日志、容量）
@@ -206,10 +222,11 @@ cornerstone/
 如果你在评估一套可长期维护的数据管理平台，可以直接跑起来：
 
 ```bash
+cp .env.example .env  # 填入 POSTGRES_PASSWORD / JWT_SECRET
 docker compose up -d --build
 ```
 
-你可以先从一个真实业务场景开始（例如“客户管理”或“项目协作”），1 天内验证可用性，1 周内完成首版上线。
+你可以先从一个真实业务场景开始（例如"客户管理"或"项目协作"），1 天内验证可用性，1 周内完成首版上线。
 
 ---
 

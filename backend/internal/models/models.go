@@ -20,7 +20,7 @@ type User struct {
 	IsSystemAdmin bool       `gorm:"type:boolean;not null;default:false" json:"is_system_admin"`
 	CreatedAt     time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt     time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt     *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt     gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 // TableName 表名前缀
@@ -44,7 +44,7 @@ type Organization struct {
 	OwnerID     string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_org_owner_name" json:"owner_id"`
 	CreatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt   *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt   gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (Organization) TableName() string {
@@ -66,7 +66,7 @@ type OrganizationMember struct {
 	Role           string     `gorm:"type:varchar(50);not null;default:'member'" json:"role"` // owner, admin, member
 	JoinedAt       time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"joined_at"`
 	UpdatedAt      time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt      *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt      gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (OrganizationMember) TableName() string {
@@ -90,7 +90,7 @@ type Database struct {
 	IsPersonal  bool       `gorm:"type:boolean;default:true" json:"is_personal"` // 个人数据库还是组织数据库
 	CreatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt   *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt   gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (Database) TableName() string {
@@ -112,7 +112,7 @@ type DatabaseAccess struct {
 	Role       string     `gorm:"type:varchar(50);not null" json:"role"` // owner, admin, editor, viewer
 	CreatedAt  time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt  time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt  *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt  gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (DatabaseAccess) TableName() string {
@@ -134,7 +134,7 @@ type Table struct {
 	Description string     `gorm:"type:text" json:"description"`
 	CreatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt   *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt   gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (Table) TableName() string {
@@ -159,7 +159,7 @@ type Field struct {
 	Options     string     `gorm:"type:text" json:"options"` // JSON string for dropdown options, validation rules
 	CreatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt   time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt   *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt   gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (Field) TableName() string {
@@ -183,7 +183,7 @@ type Record struct {
 	Version   int        `gorm:"type:integer;default:1" json:"version"` // 乐观锁版本号
 	CreatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (Record) TableName() string {
@@ -209,7 +209,7 @@ type File struct {
 	UploadedBy string     `gorm:"type:varchar(50);not null" json:"uploaded_by"`
 	CreatedAt  time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt  time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt  *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt  gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (File) TableName() string {
@@ -236,7 +236,7 @@ type Plugin struct {
 	CreatedBy    string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_plugin_creator_name" json:"created_by"`
 	CreatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt    *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt    gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (Plugin) TableName() string {
@@ -258,7 +258,7 @@ type PluginBinding struct {
 	Trigger   string     `gorm:"type:varchar(50);not null;uniqueIndex:uk_plugin_table_trigger" json:"trigger"` // create, update, delete, manual
 	CreatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (PluginBinding) TableName() string {
@@ -322,7 +322,7 @@ type FieldPermission struct {
 	CanDelete bool       `gorm:"type:boolean;default:false" json:"can_delete"`
 	CreatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (FieldPermission) TableName() string {
@@ -405,7 +405,7 @@ type GovernanceTask struct {
 	LastCommentAt *time.Time `gorm:"type:timestamp" json:"last_comment_at,omitempty"`
 	CreatedAt     time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt     time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt     *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt     gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (GovernanceTask) TableName() string {
@@ -438,7 +438,7 @@ type GovernanceReview struct {
 	AppliedAt       *time.Time `gorm:"type:timestamp" json:"applied_at,omitempty"`
 	CreatedAt       time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt       time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt       *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt       gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (GovernanceReview) TableName() string {
@@ -462,7 +462,7 @@ type GovernanceEvidence struct {
 	CreatedBy    string     `gorm:"type:varchar(50);not null;index" json:"created_by"`
 	CreatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt    *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt    gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (GovernanceEvidence) TableName() string {
@@ -487,7 +487,7 @@ type GovernanceExternalLink struct {
 	TargetURL    string     `gorm:"-" json:"target_url,omitempty"`
 	CreatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt    time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt    *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt    gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (GovernanceExternalLink) TableName() string {
@@ -509,7 +509,7 @@ type GovernanceComment struct {
 	CreatedBy string     `gorm:"type:varchar(50);not null;index" json:"created_by"`
 	CreatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt time.Time  `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
-	DeletedAt *time.Time `gorm:"type:timestamp" json:"deleted_at,omitempty"`
+	DeletedAt gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
 }
 
 func (GovernanceComment) TableName() string {

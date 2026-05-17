@@ -3,14 +3,46 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
+	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"github.com/jiangfire/cornerstone/backend/internal/services"
 	"github.com/jiangfire/cornerstone/backend/internal/types"
 	"github.com/jiangfire/cornerstone/backend/pkg/db"
+	"go.uber.org/zap"
 )
+
+// decodeRecordData 将 Record.Data(JSON 字符串)解码为可序列化值。
+// 解析失败时记录 Warn 日志,返回空对象 + corrupted=true 供调用方在响应里打标记,
+// 避免历史脏数据让整个接口 500,但客户端仍能感知到需要修复。
+func decodeRecordData(record *models.Record) (any, bool) {
+	if record == nil || record.Data == "" {
+		return map[string]any{}, false
+	}
+	var data any
+	if err := json.Unmarshal([]byte(record.Data), &data); err != nil {
+		zap.L().Warn("record data corrupted",
+			zap.String("id", record.ID),
+			zap.String("table_id", record.TableID),
+			zap.Error(err),
+		)
+		return map[string]any{}, true
+	}
+	return data, false
+}
+
+func recordResponseWithData(record *models.Record, extra gin.H) gin.H {
+	data, corrupted := decodeRecordData(record)
+	resp := gin.H{"data": data}
+	maps.Copy(resp, extra)
+	if corrupted {
+		resp["_corrupted"] = true
+	}
+	return resp
+}
 
 // CreateRecord 创建记录
 func CreateRecord(c *gin.Context) {
@@ -29,19 +61,12 @@ func CreateRecord(c *gin.Context) {
 		return
 	}
 
-	// 解析数据返回
-	var data interface{}
-	if record.Data != "" {
-		_ = json.Unmarshal([]byte(record.Data), &data)
-	}
-
-	types.Success(c, gin.H{
+	types.Success(c, recordResponseWithData(record, gin.H{
 		"id":         record.ID,
 		"table_id":   record.TableID,
-		"data":       data,
 		"version":    record.Version,
 		"created_at": record.CreatedAt,
-	})
+	}))
 }
 
 // ExportRecords 导出记录
@@ -125,18 +150,11 @@ func UpdateRecord(c *gin.Context) {
 		return
 	}
 
-	// 解析数据返回
-	var data interface{}
-	if record.Data != "" {
-		_ = json.Unmarshal([]byte(record.Data), &data)
-	}
-
-	types.Success(c, gin.H{
+	types.Success(c, recordResponseWithData(record, gin.H{
 		"id":         record.ID,
-		"data":       data,
 		"version":    record.Version,
 		"updated_at": record.UpdatedAt,
-	})
+	}))
 }
 
 // DeleteRecord 删除记录
@@ -183,15 +201,10 @@ func BatchCreateRecords(c *gin.Context) {
 	// 解析数据返回
 	result := make([]interface{}, len(records))
 	for i, record := range records {
-		var data interface{}
-		if record.Data != "" {
-			_ = json.Unmarshal([]byte(record.Data), &data)
-		}
-		result[i] = gin.H{
+		result[i] = recordResponseWithData(record, gin.H{
 			"id":      record.ID,
-			"data":    data,
 			"version": record.Version,
-		}
+		})
 	}
 
 	types.Success(c, gin.H{

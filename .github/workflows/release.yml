@@ -5,6 +5,10 @@ on:
     tags:
       - 'v*.*.*'
 
+# 默认最小权限；具体 job 显式提权。
+permissions:
+  contents: read
+
 jobs:
   build:
     name: Build Cross-Platform Binaries
@@ -73,6 +77,10 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # cosign 无密钥模式需要 OIDC 颁发 token
+      id-token: write
+      # syft 写 release attestation
+      attestations: write
 
     steps:
       - name: Checkout code
@@ -96,6 +104,37 @@ jobs:
             fi
           done
 
+      - name: Generate SBOM (SPDX)
+        uses: anchore/sbom-action@v0
+        with:
+          path: ./release
+          format: spdx-json
+          output-file: release/cornerstone-${{ github.ref_name }}.spdx.json
+          upload-artifact: false
+
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+        with:
+          cosign-release: 'v2.4.1'
+
+      - name: Sign release blobs (keyless)
+        env:
+          COSIGN_EXPERIMENTAL: "true"
+        run: |
+          cd release
+          for file in *.tar.gz *.zip *.spdx.json; do
+            [ -f "$file" ] || continue
+            cosign sign-blob --yes \
+              --bundle "${file}.cosign.bundle" \
+              "$file"
+          done
+
+      - name: Generate checksums
+        run: |
+          cd release
+          sha256sum *.tar.gz *.zip *.spdx.json > SHA256SUMS
+          cosign sign-blob --yes --bundle SHA256SUMS.cosign.bundle SHA256SUMS
+
       - name: Generate changelog
         id: changelog
         run: |
@@ -115,6 +154,20 @@ jobs:
           - **macOS AMD64**: cornerstone-darwin-amd64.tar.gz
           - **macOS ARM64 (Apple Silicon)**: cornerstone-darwin-arm64.tar.gz
 
+          ## Verification
+
+          每个 artifact 附带 \`*.cosign.bundle\`,用 cosign keyless 验证:
+
+          \`\`\`bash
+          cosign verify-blob \\
+            --bundle cornerstone-linux-amd64.tar.gz.cosign.bundle \\
+            --certificate-identity-regexp 'https://github.com/${{ github.repository }}/' \\
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \\
+            cornerstone-linux-amd64.tar.gz
+          \`\`\`
+
+          SBOM (SPDX JSON): \`cornerstone-${{ github.ref_name }}.spdx.json\`,描述本次发布所含组件。
+
           ## Usage
 
           1. Extract the archive
@@ -125,6 +178,8 @@ jobs:
 
           Docker image is available at:
           - \`ghcr.io/${{ github.repository }}:${{ github.ref_name }}\`
+
+          镜像同样由 cosign 签名,验证方式见仓库 README。
 
           **Full Changelog**: https://github.com/${{ github.repository }}/compare/...
           EOF
@@ -137,7 +192,12 @@ jobs:
           if [[ "${{ github.ref_name }}" == *beta* || "${{ github.ref_name }}" == *alpha* ]]; then
             prerelease_flag="--prerelease"
           fi
-          gh release create "${{ github.ref_name }}" release/*.tar.gz release/*.zip \
+          gh release create "${{ github.ref_name }}" \
+            release/*.tar.gz \
+            release/*.zip \
+            release/*.spdx.json \
+            release/*.cosign.bundle \
+            release/SHA256SUMS \
             --title "${{ github.ref_name }}" \
             --notes-file RELEASE_NOTES.md \
             --verify-tag \

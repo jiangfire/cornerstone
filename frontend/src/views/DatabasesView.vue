@@ -171,6 +171,7 @@ import { useRouter } from 'vue-router'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { databaseAPI, userAPI } from '@/services/api'
+import type { DatabaseUser } from '@/types/api'
 import { formatDate } from '@/utils/format'
 
 interface Database {
@@ -182,14 +183,6 @@ interface Database {
   created_at: string
   role?: string
   is_public?: boolean
-}
-
-interface SharedUser {
-  user_id: string
-  username: string
-  email: string
-  role: 'owner' | 'admin' | 'editor' | 'viewer'
-  joined_at: string
 }
 
 interface ShareCandidate {
@@ -205,7 +198,7 @@ const isEditMode = ref(false)
 const databases = ref<Database[]>([])
 const shareDialogVisible = ref(false)
 const selectedDatabase = ref<Database | null>(null)
-const sharedUsers = ref<SharedUser[]>([])
+const sharedUsers = ref<DatabaseUser[]>([])
 const sharedUsersLoading = ref(false)
 const shareCandidates = ref<ShareCandidate[]>([])
 const sharingCandidatesLoading = ref(false)
@@ -422,7 +415,7 @@ const handleShareSubmit = async () => {
 }
 
 const handleSharedRoleChange = async (
-  row: SharedUser,
+  row: DatabaseUser,
   role: 'admin' | 'editor' | 'viewer',
 ) => {
   if (!selectedDatabase.value || row.role === 'owner') return
@@ -439,7 +432,7 @@ const handleSharedRoleChange = async (
   }
 }
 
-const handleRemoveSharedUser = async (row: SharedUser) => {
+const handleRemoveSharedUser = async (row: DatabaseUser) => {
   if (!selectedDatabase.value || row.role === 'owner') return
 
   try {

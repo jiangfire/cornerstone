@@ -109,8 +109,14 @@ func DeleteUserAccount(c *gin.Context) {
 		return
 	}
 
+	// 取出当前会话 token 以便服务层在同事务里加入黑名单
+	currentToken := c.GetHeader("Authorization")
+	if len(currentToken) > 7 && currentToken[:7] == "Bearer " {
+		currentToken = currentToken[7:]
+	}
+
 	authService := services.NewAuthService(db.DB())
-	if err := authService.DeleteAccount(userID, req); err != nil {
+	if err := authService.DeleteAccount(userID, currentToken, req); err != nil {
 		types.Error(c, 400, err.Error())
 		return
 	}

@@ -17,7 +17,9 @@ import (
 	"github.com/jiangfire/cornerstone/backend/internal/handlers"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	"github.com/jiangfire/cornerstone/backend/internal/services"
+	"github.com/jiangfire/cornerstone/backend/pkg/asyncworker"
 	applog "github.com/jiangfire/cornerstone/backend/pkg/log"
+	"github.com/jiangfire/cornerstone/backend/pkg/utils"
 )
 
 // Version is set at build time via -ldflags="-X main.Version=..."
@@ -38,6 +40,11 @@ func main() {
 	logger := applog.GetLogger()
 	logger.Info("Starting Cornerstone server...")
 
+	// 2.5 显式注入 JWT 配置，确保签发/验证使用同一密钥（避免 dev 模式下 lazy load 二次随机）。
+	if err := utils.InitJWT(cfg.JWT.Secret, cfg.JWT.Expiration); err != nil {
+		applog.Fatalf("Failed to init JWT: %v", err)
+	}
+
 	// 3. 初始化数据库
 	if err := retryOperation(func() error {
 		return db.InitDB(cfg.Database)
@@ -53,6 +60,10 @@ func main() {
 	// 5. 设置定时任务（物化视图刷新和token清理）
 	taskCtx, cancelTasks := context.WithCancel(context.Background())
 	periodicTaskWG := db.SetupPeriodicTasks(taskCtx, cfg.Integrations)
+
+	// 5.5 注入插件异步任务池（提供 panic 兜底 + 关停时的等待边界）
+	pluginPool := asyncworker.New(context.Background())
+	services.SetDefaultPluginPool(pluginPool)
 
 	// 6. 创建Gin引擎
 	gin.SetMode(cfg.Server.Mode)
@@ -100,7 +111,10 @@ func main() {
 
 		// 系统集成事件（使用集成 token）
 		integrations := api.Group("/integrations")
-		integrations.Use(middleware.IntegrationTokenAuth())
+		integrations.Use(middleware.IntegrationTokenAuth(middleware.IntegrationAuthConfig{
+			InboundTokens: cfg.Integrations.InboundTokens,
+			SharedToken:   cfg.Integrations.SharedToken,
+		}))
 		{
 			integrations.POST("/events", handlers.ReceiveIntegrationEvent)
 		}
@@ -277,6 +291,13 @@ func main() {
 
 	if err := srv.Shutdown(ctx); err != nil {
 		applog.Fatalf("Server forced to shutdown: %v", err)
+	}
+
+	// 关停插件池：取消 ctx 让 in-flight 插件感知，并最多再等 5s 给当前脚本收尾。
+	// 必须发生在 srv.Shutdown 之后（已无新 HTTP 触发）、CloseDB 之前（任务可能还在写执行记录）。
+	services.SetDefaultPluginPool(nil)
+	if err := pluginPool.Stop(5 * time.Second); err != nil {
+		applog.Errorf("Plugin worker pool shutdown timed out: %v", err)
 	}
 
 	if err := db.CloseDB(); err != nil {

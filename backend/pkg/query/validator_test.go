@@ -424,7 +424,7 @@ func TestValidator_ValidateRequestRejectsAliasedNestedNonJSONField(t *testing.T)
 		From:   "tables",
 		Select: []string{"tables.id", "db.name.extra"},
 		Join: []JoinClause{
-			{Type: "left", Table: "databases", As: "db", On: "db.id = tables.database_id"},
+			{Type: "left", Table: "databases", As: "db", On: JoinCondition{Left: "db.id", Op: "=", Right: "tables.database_id"}},
 		},
 		Page: 1,
 		Size: 20,

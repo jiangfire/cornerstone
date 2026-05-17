@@ -54,6 +54,15 @@ func createResourceUser(t *testing.T, db *gorm.DB, username string) models.User 
 	return user
 }
 
+func createResourceAdminUser(t *testing.T, db *gorm.DB, username string) models.User {
+	t.Helper()
+
+	user := createResourceUser(t, db, username)
+	require.NoError(t, db.Model(&models.User{}).Where("id = ?", user.ID).Update("is_system_admin", true).Error)
+	user.IsSystemAdmin = true
+	return user
+}
+
 func createResourceDatabase(t *testing.T, db *gorm.DB, ownerID, name string) models.Database {
 	t.Helper()
 

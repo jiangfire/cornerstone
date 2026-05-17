@@ -31,5 +31,15 @@ export default defineConfigWithVueTs(
     files: ['src/**/__tests__/*'],
   },
 
+  {
+    // 测试文件大量用 `any` 收敛 mock 形状,业务代码已禁用 any。
+    // 这里在 vitest 覆盖之后追加,作用域只限测试与 e2e。
+    name: 'app/tests-allow-any',
+    files: ['src/**/__tests__/**/*.{ts,tsx,js,jsx}', 'e2e/**/*.{ts,tsx,js,jsx}'],
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
+    },
+  },
+
   skipFormatting,
 )

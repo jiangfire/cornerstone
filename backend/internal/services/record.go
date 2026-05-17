@@ -517,40 +517,79 @@ func marshalRecordPayload(payload map[string]interface{}) (string, error) {
 	return string(dataJSON), nil
 }
 
-func (s *RecordService) applyRecordFilter(query *gorm.DB, filter string) (*gorm.DB, error) {
+// recordFilterClause 是一个可复用的 WHERE 片段,既用于分页查询,也用于 COUNT。
+type recordFilterClause struct {
+	sql  string
+	args []interface{}
+}
+
+// tryParseStructuredFilter 把 filter 字符串当作 JSON 对象解析。
+// 仅当返回 true 时调用方应走结构化下推路径;否则按关键字处理。
+func tryParseStructuredFilter(filter string) (map[string]interface{}, bool) {
 	filter = strings.TrimSpace(filter)
 	if filter == "" {
-		return query, nil
+		return nil, false
 	}
+	var structured map[string]interface{}
+	if err := json.Unmarshal([]byte(filter), &structured); err != nil {
+		return nil, false
+	}
+	if len(structured) == 0 {
+		return nil, false
+	}
+	return structured, true
+}
 
-	var structuredFilter map[string]interface{}
-	if err := json.Unmarshal([]byte(filter), &structuredFilter); err == nil && len(structuredFilter) > 0 {
-		dialectorName := s.db.Dialector.Name()
-		isSQLite := dialectorName == "sqlite"
+// buildStructuredFilterClauses 根据可见字段把 JSON 过滤条件翻译为可下推 SQL WHERE 片段。
+//
+// 返回:
+//   clauses          : 应用到 GORM 查询的 (sql, args);字段名通过参数化传给驱动,不直接拼入 SQL 串
+//   refsHiddenField  : 任一过滤键引用了隐藏/未知字段 → true,调用方应直接返回空结果(与 in-memory
+//                     权限感知过滤的可观察行为对齐,避免通过 200 vs 400 做侧信道探测)
+//   err              : value 序列化失败等结构性错误,作为 4xx 抛给客户端
+func (s *RecordService) buildStructuredFilterClauses(
+	fields []models.Field,
+	readableFields map[string]models.Field,
+	structured map[string]interface{},
+) ([]recordFilterClause, bool, error) {
+	isSQLite := s.db.Dialector.Name() == "sqlite"
+	clauses := make([]recordFilterClause, 0, len(structured))
 
-		for fieldID, value := range structuredFilter {
-			jsonValue, _ := json.Marshal(value)
-			if isSQLite {
-				var scalar interface{}
-				if err := json.Unmarshal(jsonValue, &scalar); err != nil {
-					return nil, fmt.Errorf("过滤条件格式错误: %w", err)
-				}
-				query = query.Where("JSON_EXTRACT(data, ?) = ?", fmt.Sprintf("$.%s", fieldID), scalar)
-			} else {
-				query = query.Where("data @> ?", fmt.Sprintf(`{"%s":%s}`, fieldID, string(jsonValue)))
-			}
+	for key, value := range structured {
+		fieldName, ok := resolveReadableFilterField(fields, readableFields, key)
+		if !ok {
+			return nil, true, nil
 		}
-		return query, nil
-	}
 
-	// 回退到关键字搜索
-	keyword := "%" + filter + "%"
-	if s.db.Dialector.Name() == "sqlite" {
-		query = query.Where("CAST(data AS TEXT) LIKE ?", keyword)
-	} else {
-		query = query.Where("CAST(data AS TEXT) ILIKE ?", keyword)
+		jsonValue, err := json.Marshal(value)
+		if err != nil {
+			return nil, false, fmt.Errorf("过滤值序列化失败: %w", err)
+		}
+
+		if isSQLite {
+			var scalar interface{}
+			if err := json.Unmarshal(jsonValue, &scalar); err != nil {
+				return nil, false, fmt.Errorf("过滤值格式错误: %w", err)
+			}
+			// JSON path 与字段值都走参数化绑定,字段名只出现在第一个 ? 内,不会与 SQL 字面量混。
+			clauses = append(clauses, recordFilterClause{
+				sql:  "JSON_EXTRACT(data, ?) = ?",
+				args: []interface{}{"$." + fieldName, scalar},
+			})
+		} else {
+			// PG: 构造 {"<field>":<value>} 字面量后整体作为 jsonb 参数传入,
+			// 字段名经过 json.Marshal 转义,既能安全表达 Unicode,也不与 SQL 占位符混。
+			filterDoc, err := json.Marshal(map[string]interface{}{fieldName: value})
+			if err != nil {
+				return nil, false, fmt.Errorf("过滤条件序列化失败: %w", err)
+			}
+			clauses = append(clauses, recordFilterClause{
+				sql:  "data @> ?",
+				args: []interface{}{string(filterDoc)},
+			})
+		}
 	}
-	return query, nil
+	return clauses, false, nil
 }
 
 func jsonValuesEqual(actual, expected interface{}) bool {
@@ -704,6 +743,11 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 	return &record, nil
 }
 
+// maxKeywordScanRecords 为关键字回退路径在内存中检查的最大行数上限。
+// 超过该上限时拒绝查询并提示走 /query 接口,避免一次性把整张表加载到内存。
+// 声明为 var 以便测试中替换,生产代码不应改写。
+var maxKeywordScanRecords = 5000
+
 // ListRecords 获取记录列表（支持查询和分页）
 func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResponse, error) {
 	// 1. 检查表访问权限
@@ -725,42 +769,76 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 		req.Limit = 20
 	}
 
-	// 3. 构建查询
-	query := s.db.Where("table_id = ? AND deleted_at IS NULL", req.TableID)
-
 	var records []models.Record
 	var total int64
 	filter := strings.TrimSpace(req.Filter)
-	if filter == "" {
-		// 4. 无过滤条件时维持数据库分页
-		query = query.Order("created_at DESC").Limit(req.Limit).Offset(req.Offset)
-		if err := query.Find(&records).Error; err != nil {
+
+	switch {
+	case filter == "":
+		// 3a. 无过滤: SQL 分页 + COUNT
+		listQ := s.db.Where("table_id = ? AND deleted_at IS NULL", req.TableID).
+			Order("created_at DESC").Limit(req.Limit).Offset(req.Offset)
+		if err := listQ.Find(&records).Error; err != nil {
 			return nil, fmt.Errorf("查询记录失败: %w", err)
 		}
-
-		countQuery := s.db.Model(&models.Record{}).Where("table_id = ? AND deleted_at IS NULL", req.TableID)
-		countQuery.Count(&total)
-	} else {
-		// 4. 有过滤条件时，基于可见字段做权限感知过滤，避免通过隐藏字段做侧信道探测
-		var allRecords []models.Record
-		if err := query.Order("created_at DESC").Find(&allRecords).Error; err != nil {
-			return nil, fmt.Errorf("查询记录失败: %w", err)
+		countQ := s.db.Model(&models.Record{}).Where("table_id = ? AND deleted_at IS NULL", req.TableID)
+		if err := countQ.Count(&total).Error; err != nil {
+			return nil, fmt.Errorf("统计记录失败: %w", err)
 		}
 
-		filteredRecords, err := s.filterRecordsByReadablePayload(allRecords, fields, readableFields, filter)
-		if err != nil {
-			return nil, err
-		}
-
-		total = int64(len(filteredRecords))
-		if req.Offset >= len(filteredRecords) {
-			records = []models.Record{}
-		} else {
-			end := req.Offset + req.Limit
-			if end > len(filteredRecords) {
-				end = len(filteredRecords)
+	default:
+		structured, isStructured := tryParseStructuredFilter(filter)
+		if isStructured {
+			// 3b. 结构化 JSON 过滤: 翻译为参数化 WHERE 子句,下推到 SQL,COUNT 同步下推
+			clauses, refsHidden, err := s.buildStructuredFilterClauses(fields, readableFields, structured)
+			if err != nil {
+				return nil, err
 			}
-			records = filteredRecords[req.Offset:end]
+			if refsHidden {
+				// 引用隐藏/未知字段时直接返回空结果,
+				// 避免通过 200 vs 400 做侧信道探测隐藏字段值
+				return &QueryResponse{Records: []RecordResponse{}, Total: 0, HasMore: false}, nil
+			}
+
+			listQ := s.db.Where("table_id = ? AND deleted_at IS NULL", req.TableID)
+			countQ := s.db.Model(&models.Record{}).Where("table_id = ? AND deleted_at IS NULL", req.TableID)
+			for _, c := range clauses {
+				listQ = listQ.Where(c.sql, c.args...)
+				countQ = countQ.Where(c.sql, c.args...)
+			}
+			if err := listQ.Order("created_at DESC").Limit(req.Limit).Offset(req.Offset).Find(&records).Error; err != nil {
+				return nil, fmt.Errorf("查询记录失败: %w", err)
+			}
+			if err := countQ.Count(&total).Error; err != nil {
+				return nil, fmt.Errorf("统计记录失败: %w", err)
+			}
+		} else {
+			// 3c. 关键字回退: 先用 SQL LIKE 预筛(限上限+1 行用于检测溢出),
+			// 再做权限感知 in-memory 过滤,确保隐藏字段不能通过模糊匹配泄漏
+			likePattern := "%" + filter + "%"
+			narrowQ := s.db.Where("table_id = ? AND deleted_at IS NULL AND data LIKE ?", req.TableID, likePattern).
+				Order("created_at DESC").Limit(maxKeywordScanRecords + 1)
+			var narrowed []models.Record
+			if err := narrowQ.Find(&narrowed).Error; err != nil {
+				return nil, fmt.Errorf("查询记录失败: %w", err)
+			}
+			if len(narrowed) > maxKeywordScanRecords {
+				return nil, fmt.Errorf("关键字过滤匹配过多记录(>%d),请使用更精确的过滤条件或 /query 接口", maxKeywordScanRecords)
+			}
+			filtered, err := s.filterRecordsByReadablePayload(narrowed, fields, readableFields, filter)
+			if err != nil {
+				return nil, err
+			}
+			total = int64(len(filtered))
+			if req.Offset >= len(filtered) {
+				records = []models.Record{}
+			} else {
+				end := req.Offset + req.Limit
+				if end > len(filtered) {
+					end = len(filtered)
+				}
+				records = filtered[req.Offset:end]
+			}
 		}
 	}
 

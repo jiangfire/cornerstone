@@ -251,10 +251,10 @@
                   class="link-item"
                 >
                   <el-link
-                    v-if="link.target_url"
+                    v-if="safeHttpUrl(link.target_url)"
                     class="link-main"
                     data-testid="governance-external-link"
-                    :href="link.target_url"
+                    :href="safeHttpUrl(link.target_url) || '#'"
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -506,6 +506,7 @@ import { ElMessage } from 'element-plus'
 import { governanceAPI, userAPI } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { formatDate } from '@/utils/format'
+import { safeHttpUrl } from '@/utils/safeUrl'
 import type { GovernanceTask, GovernanceTaskDetail, GovernanceReview, User } from '@/types/api'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 

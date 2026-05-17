@@ -6,13 +6,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
+	"github.com/jiangfire/cornerstone/backend/pkg/asyncworker"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -26,6 +29,44 @@ type PluginService struct {
 // NewPluginService 创建插件服务实例
 func NewPluginService(db *gorm.DB) *PluginService {
 	return &PluginService{db: db}
+}
+
+var (
+	pluginPoolMu sync.RWMutex
+	pluginPool   *asyncworker.Pool
+)
+
+// SetDefaultPluginPool 注入进程级异步任务池。
+// 由 cmd/server/main.go 在启动时调用一次；测试可在 setup 中注入临时池。
+// 传入 nil 表示清除（不再有池）。
+func SetDefaultPluginPool(p *asyncworker.Pool) {
+	pluginPoolMu.Lock()
+	pluginPool = p
+	pluginPoolMu.Unlock()
+}
+
+func currentPluginPool() *asyncworker.Pool {
+	pluginPoolMu.RLock()
+	defer pluginPoolMu.RUnlock()
+	return pluginPool
+}
+
+// ensureSystemAdmin 验证调用方是否为系统管理员。
+// 插件可以执行任意脚本进程，必须限制在系统管理员才能创建/更新；
+// 否则任何注册用户都能上传脚本到服务端运行（RCE 风险）。
+func (s *PluginService) ensureSystemAdmin(userID string) error {
+	if userID == "" {
+		return errors.New("仅系统管理员可管理插件")
+	}
+	authService := NewAuthService(s.db)
+	isAdmin, err := authService.IsSystemAdmin(userID)
+	if err != nil {
+		return err
+	}
+	if !isAdmin {
+		return errors.New("仅系统管理员可管理插件")
+	}
+	return nil
 }
 
 // CreatePluginRequest 创建插件请求
@@ -58,6 +99,10 @@ type ExecutePluginRequest struct {
 
 // CreatePlugin 创建插件
 func (s *PluginService) CreatePlugin(req CreatePluginRequest, userID string) (*models.Plugin, error) {
+	if err := s.ensureSystemAdmin(userID); err != nil {
+		return nil, err
+	}
+
 	// 检查插件名称是否已存在
 	var existing models.Plugin
 	if err := s.db.Where("name = ? AND created_by = ?", req.Name, userID).First(&existing).Error; err == nil {
@@ -109,6 +154,10 @@ func (s *PluginService) GetPlugin(pluginID, userID string) (*models.Plugin, erro
 
 // UpdatePlugin 更新插件
 func (s *PluginService) UpdatePlugin(pluginID string, req UpdatePluginRequest, userID string) error {
+	if err := s.ensureSystemAdmin(userID); err != nil {
+		return err
+	}
+
 	plugin, err := s.getOwnedPlugin(pluginID, userID)
 	if err != nil {
 		return err
@@ -133,7 +182,9 @@ func (s *PluginService) DeletePlugin(pluginID, userID string) error {
 		return err
 	}
 
-	result := s.db.Where("id = ? AND created_by = ?", pluginID, userID).Delete(&models.Plugin{})
+	// 硬删：Plugin 有 uk_plugin_creator_name 唯一约束，软删会让用户无法用同名重建。
+	// 插件本体是用户资源（同 created_by），删除后用户应能用相同 name 重新注册。
+	result := s.db.Unscoped().Where("id = ? AND created_by = ?", pluginID, userID).Delete(&models.Plugin{})
 	if result.Error != nil {
 		return fmt.Errorf("删除插件失败: %w", result.Error)
 	}
@@ -179,7 +230,8 @@ func (s *PluginService) UnbindPlugin(pluginID, tableID, userID string) error {
 		return err
 	}
 
-	result := s.db.Where("plugin_id = ? AND table_id = ?", pluginID, tableID).Delete(&models.PluginBinding{})
+	// 关系表硬删：PluginBinding 有 uk_plugin_table_trigger 唯一约束，软删会让"重新绑定"撞上残留约束
+	result := s.db.Unscoped().Where("plugin_id = ? AND table_id = ?", pluginID, tableID).Delete(&models.PluginBinding{})
 	if result.Error != nil {
 		return fmt.Errorf("解绑插件失败: %w", result.Error)
 	}
@@ -278,6 +330,27 @@ func isUnsafeAbsolutePluginPath(path string) bool {
 	return strings.HasPrefix(path, `\\`) || strings.HasPrefix(path, "//")
 }
 
+// sensitivePluginBasenames 入口文件名禁用列表（大小写不敏感）。
+// 这些名字常用于凭据/密钥/版本控制元数据，绝对不应该作为脚本入口暴露在 ./plugins 下。
+var sensitivePluginBasenames = map[string]struct{}{
+	".env":             {},
+	".env.local":       {},
+	".env.production":  {},
+	".env.development": {},
+	".git":             {},
+	".gitignore":       {},
+	".gitconfig":       {},
+	".ssh":             {},
+	"id_rsa":           {},
+	"id_dsa":           {},
+	"id_ecdsa":         {},
+	"id_ed25519":       {},
+	"authorized_keys":  {},
+	"known_hosts":      {},
+	"passwd":           {},
+	"shadow":           {},
+}
+
 func resolveScriptPath(workDir, entryFile string) (string, error) {
 	cleanEntry := filepath.Clean(strings.TrimSpace(entryFile))
 	if cleanEntry == "" || cleanEntry == "." {
@@ -289,7 +362,54 @@ func resolveScriptPath(workDir, entryFile string) (string, error) {
 	if isUnsafeAbsolutePluginPath(cleanEntry) {
 		return "", errors.New("插件入口文件不能是绝对路径")
 	}
-	return filepath.Join(workDir, cleanEntry), nil
+
+	base := strings.ToLower(filepath.Base(cleanEntry))
+	if _, blocked := sensitivePluginBasenames[base]; blocked {
+		return "", errors.New("插件入口文件名包含敏感名称，禁止使用")
+	}
+
+	scriptPath := filepath.Join(workDir, cleanEntry)
+
+	// 二次校验：确保 join 之后还在 workDir 之内（filepath.Clean 已经吃掉了 ..,
+	// 但混合分隔符 / 大小写边界等仍可能让 join 结果越界，这里用 Rel 兜底）。
+	absWork, err := filepath.Abs(workDir)
+	if err != nil {
+		return "", fmt.Errorf("解析插件工作目录失败: %w", err)
+	}
+	absScript, err := filepath.Abs(scriptPath)
+	if err != nil {
+		return "", fmt.Errorf("解析插件脚本路径失败: %w", err)
+	}
+	rel, err := filepath.Rel(absWork, absScript)
+	if err != nil {
+		return "", errors.New("插件入口文件路径非法")
+	}
+	if rel == "" || rel == "." {
+		return "", errors.New("插件入口文件不能为空")
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", errors.New("插件入口文件路径非法")
+	}
+
+	return scriptPath, nil
+}
+
+// assertScriptResolvesSafely 在执行前对解析出的脚本做文件系统层面的安全检查：
+//   - 必须存在且可访问；
+//   - 不能是符号链接（防止用符号链接逃逸 workDir 边界）；
+//   - 不能是目录。
+func assertScriptResolvesSafely(scriptPath string) error {
+	info, err := os.Lstat(scriptPath)
+	if err != nil {
+		return fmt.Errorf("插件入口文件不可访问: %w", err)
+	}
+	if info.Mode()&os.ModeSymlink != 0 {
+		return errors.New("插件入口文件不能是符号链接")
+	}
+	if info.IsDir() {
+		return errors.New("插件入口文件不能是目录")
+	}
+	return nil
 }
 
 func (s *PluginService) executePlugin(plugin models.Plugin, tableID, recordID, trigger string, payload map[string]interface{}, actorID string) (*models.PluginExecution, error) {
@@ -308,6 +428,9 @@ func (s *PluginService) executePlugin(plugin models.Plugin, tableID, recordID, t
 
 	scriptPath, err := resolveScriptPath(workDir, plugin.EntryFile)
 	if err != nil {
+		return nil, err
+	}
+	if err := assertScriptResolvesSafely(scriptPath); err != nil {
 		return nil, err
 	}
 
@@ -393,10 +516,13 @@ func (s *PluginService) executePlugin(plugin models.Plugin, tableID, recordID, t
 	return execution, nil
 }
 
-// TriggerByTable 根据表和触发器执行绑定插件（异步最佳努力）
+// TriggerByTable 根据表和触发器执行绑定插件（异步最佳努力）。
+//
+// 提交到进程级 asyncworker.Pool；如果没有注入池（典型见单元测试），
+// 退化为直接 `go func()`，行为与旧版保持兼容但失去 panic 兜底。
 func (s *PluginService) TriggerByTable(tableID, trigger, recordID, actorID string, payload map[string]interface{}) {
 	payloadCopy := clonePayload(payload)
-	go func(data map[string]interface{}) {
+	work := func(ctx context.Context) {
 		var bindings []models.PluginBinding
 		if err := s.db.Where("table_id = ? AND trigger = ?", tableID, trigger).Find(&bindings).Error; err != nil {
 			zap.L().Error("查询插件绑定失败", zap.String("table_id", tableID), zap.String("trigger", trigger), zap.Error(err))
@@ -404,13 +530,20 @@ func (s *PluginService) TriggerByTable(tableID, trigger, recordID, actorID strin
 		}
 
 		for _, binding := range bindings {
+			if ctx != nil {
+				if err := ctx.Err(); err != nil {
+					zap.L().Info("插件触发被取消", zap.String("plugin_id", binding.PluginID), zap.Error(err))
+					return
+				}
+			}
+
 			var plugin models.Plugin
 			if err := s.db.Where("id = ?", binding.PluginID).First(&plugin).Error; err != nil {
 				zap.L().Warn("读取插件信息失败", zap.String("plugin_id", binding.PluginID), zap.Error(err))
 				continue
 			}
 
-			if _, err := s.executePlugin(plugin, tableID, recordID, trigger, data, actorID); err != nil {
+			if _, err := s.executePlugin(plugin, tableID, recordID, trigger, payloadCopy, actorID); err != nil {
 				zap.L().Warn("插件触发执行失败",
 					zap.String("plugin_id", plugin.ID),
 					zap.String("table_id", tableID),
@@ -419,7 +552,21 @@ func (s *PluginService) TriggerByTable(tableID, trigger, recordID, actorID strin
 				)
 			}
 		}
-	}(payloadCopy)
+	}
+
+	if pool := currentPluginPool(); pool != nil {
+		taskName := fmt.Sprintf("plugin_trigger:%s:%s", tableID, trigger)
+		if err := pool.Submit(taskName, work); err != nil {
+			zap.L().Warn("提交插件触发任务失败，退化为内联 goroutine",
+				zap.String("table_id", tableID),
+				zap.String("trigger", trigger),
+				zap.Error(err),
+			)
+			go work(context.Background())
+		}
+		return
+	}
+	go work(context.Background())
 }
 
 // ExecutePlugin 手动执行插件

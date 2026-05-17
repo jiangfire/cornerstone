@@ -1,0 +1,64 @@
+# Project-root .dockerignore — applied because docker-compose.yml/docker.yml use
+# `context: .` while pointing `dockerfile` at backend/Dockerfile. The legacy
+# backend/.dockerignore is only read when context==backend, so this file is the
+# authoritative ignore list for the production image build.
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+backend/.env
+backend/.env.*
+!backend/.env.example
+
+# Local databases / scratch
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+backend/cornerstone.db
+backend/coverage.out
+backend/server.exe
+backend/bin/
+
+# Logs
+logs/
+backend/logs/
+*.log
+
+# VCS / IDE
+.git/
+.gitignore
+.gitattributes
+.github/
+.vscode/
+.idea/
+.claude/
+.omc/
+.playwright-mcp/
+
+# Docs / planning (not needed in image)
+docs/
+*.md
+!README.md
+LICENSE
+AGENTS.md
+CLAUDE.md
+
+# Node / frontend artifacts (re-built inside the image)
+node_modules/
+frontend/node_modules/
+frontend/dist/
+backend/internal/frontend/dist/
+
+# Go build cache leftovers
+backend/vendor/
+
+# Test artifacts
+**/__tests__/coverage/
+**/.nyc_output/
+coverage/
+
+# OS junk
+.DS_Store
+Thumbs.db

@@ -111,7 +111,7 @@ describe('RecordsView', () => {
     })
     tableAPI.getFields.mockResolvedValue({
       success: true,
-      data: { fields: defaultFields },
+      data: { items: defaultFields, total: defaultFields.length },
     })
     databaseAPI.getDetail.mockResolvedValue({
       success: true,
@@ -120,15 +120,16 @@ describe('RecordsView', () => {
     recordAPI.list.mockResolvedValue({
       success: true,
       data: {
-        records: [defaultRecord],
+        items: [defaultRecord],
         total: 1,
+        has_more: false,
       },
     })
     recordAPI.create.mockResolvedValue({ success: true })
     recordAPI.update.mockResolvedValue({ success: true })
     recordAPI.delete.mockResolvedValue({ success: true })
     fileAPI.listByRecord.mockResolvedValue({
-      data: [],
+      data: { items: [] },
     })
     fileAPI.delete.mockResolvedValue({})
     fileAPI.downloadBlob.mockResolvedValue(new Blob(['file']))
@@ -157,7 +158,7 @@ describe('RecordsView', () => {
   const openEditDialogWithFiles = async (
     files: Array<{ id: string; file_name?: string; file_size: number; created_at: string }>,
   ) => {
-    fileAPI.listByRecord.mockResolvedValueOnce({ data: files })
+    fileAPI.listByRecord.mockResolvedValueOnce({ data: { items: files } })
 
     mountView(RecordsView)
     await flushUi()
@@ -296,7 +297,7 @@ describe('RecordsView', () => {
     tableAPI.getFields.mockResolvedValueOnce({
       success: true,
       data: {
-        fields: [
+        items: [
           { id: 'fld_string', name: 'title', type: 'string', required: true, created_at: '2026-03-29 10:00:00' },
           { id: 'fld_boolean', name: 'active', type: 'boolean', required: false, created_at: '2026-03-29 10:00:00' },
           { id: 'fld_date', name: 'start_date', type: 'date', required: false, created_at: '2026-03-29 10:00:00' },
@@ -319,12 +320,13 @@ describe('RecordsView', () => {
             created_at: '2026-03-29 10:00:00',
           },
         ],
+        total: 7,
       },
     })
     recordAPI.list.mockResolvedValueOnce({
       success: true,
       data: {
-        records: [
+        items: [
           {
             id: 'rec_types',
             data: {
@@ -342,6 +344,7 @@ describe('RecordsView', () => {
           },
         ],
         total: 1,
+        has_more: false,
       },
     })
 
@@ -391,7 +394,6 @@ describe('RecordsView', () => {
       table_id: 'tbl_1',
       limit: 20,
       offset: 0,
-      filter: '',
     })
 
     vi.useRealTimers()
@@ -627,7 +629,11 @@ describe('RecordsView', () => {
     expect(vm.formatDateTime('2026-03-29 10:00:00', 'datetime')).toBe('2026-03-29 10:00:00')
     expect(vm.getFieldWidth('unknown')).toBe(150)
     expect(vm.getFieldOptions(undefined)).toEqual([])
-    expect(vm.beforeUpload()).toBe(true)
+    expect(vm.beforeUpload(new File(['ok'], 'small.txt', { type: 'text/plain' }))).toBe(true)
+    const huge = new File(['x'], 'huge.bin')
+    Object.defineProperty(huge, 'size', { value: 60 * 1024 * 1024 })
+    expect(vm.beforeUpload(huge)).toBe(false)
+    expect(vm.beforeUpload(new File(['x'], 'evil.exe'))).toBe(false)
     expect(vm.getErrorMessage(null, 'fallback')).toBe('fallback')
 
     const resetFields = vi.fn()
@@ -655,7 +661,6 @@ describe('RecordsView', () => {
       table_id: 'tbl_1',
       limit: 20,
       offset: 0,
-      filter: '',
     })
 
     vi.useRealTimers()

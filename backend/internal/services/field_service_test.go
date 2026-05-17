@@ -26,8 +26,8 @@ func TestFieldService_DeleteFieldSoftDeleteAndAllowsRecreate(t *testing.T) {
 	require.NoError(t, service.DeleteField(field.ID, owner.ID))
 
 	var stored models.Field
-	require.NoError(t, db.Where("id = ?", field.ID).First(&stored).Error)
-	require.NotNil(t, stored.DeletedAt)
+	require.NoError(t, db.Unscoped().Where("id = ?", field.ID).First(&stored).Error)
+	require.True(t, stored.DeletedAt.Valid)
 	require.Contains(t, stored.Name, "__deleted__")
 
 	_, err = service.GetField(field.ID, owner.ID)

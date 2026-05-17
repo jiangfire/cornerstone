@@ -93,8 +93,8 @@ func TestDatabaseService_DeleteDatabaseSoftDeleteAndAllowsRecreate(t *testing.T)
 	require.NoError(t, service.DeleteDatabase(database.ID, owner.ID))
 
 	var stored models.Database
-	require.NoError(t, db.Where("id = ?", database.ID).First(&stored).Error)
-	require.NotNil(t, stored.DeletedAt)
+	require.NoError(t, db.Unscoped().Where("id = ?", database.ID).First(&stored).Error)
+	require.True(t, stored.DeletedAt.Valid)
 
 	listed, err := service.ListDatabases(owner.ID)
 	require.NoError(t, err)

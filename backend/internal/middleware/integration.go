@@ -2,12 +2,18 @@ package middleware
 
 import (
 	"crypto/subtle"
-	"os"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/types"
 )
+
+// IntegrationAuthConfig 入站集成 token 配置；由 main.go 在路由注册阶段从 cfg.Integrations 注入，
+// 避免中间件在请求路径上反复读取 os.Getenv，也保证 config 与 middleware 走同一份变量来源。
+type IntegrationAuthConfig struct {
+	InboundTokens string // INTEGRATION_TOKENS：按来源系统区分，格式 sys=tok,sys2=tok2
+	SharedToken   string // INTEGRATION_SHARED_TOKEN：跨系统共享回写 token
+}
 
 func parseIntegrationTokens(raw string) map[string]string {
 	result := map[string]string{}
@@ -40,8 +46,12 @@ func secureEquals(a, b string) bool {
 	return subtle.ConstantTimeCompare([]byte(a), []byte(b)) == 1
 }
 
-// IntegrationTokenAuth 系统集成 token 认证
-func IntegrationTokenAuth() gin.HandlerFunc {
+// IntegrationTokenAuth 系统集成 token 认证。
+// cfg 在启动阶段一次性解析，运行时不再访问环境变量。
+func IntegrationTokenAuth(cfg IntegrationAuthConfig) gin.HandlerFunc {
+	allowed := parseIntegrationTokens(cfg.InboundTokens)
+	sharedToken := strings.TrimSpace(cfg.SharedToken)
+
 	return func(c *gin.Context) {
 		sourceSystem := strings.TrimSpace(c.GetHeader("X-Source-System"))
 		if sourceSystem == "" {
@@ -65,7 +75,6 @@ func IntegrationTokenAuth() gin.HandlerFunc {
 			return
 		}
 
-		sharedToken := strings.TrimSpace(os.Getenv("INTEGRATION_SHARED_TOKEN"))
 		if secureEquals(token, sharedToken) {
 			c.Set("integration_source", sourceSystem)
 			c.Set("integration_token_scope", "shared")
@@ -73,7 +82,6 @@ func IntegrationTokenAuth() gin.HandlerFunc {
 			return
 		}
 
-		allowed := parseIntegrationTokens(os.Getenv("INTEGRATION_TOKENS"))
 		expected, ok := allowed[sourceSystem]
 		if !ok || !secureEquals(token, expected) {
 			types.Unauthorized(c, "无效的集成令牌")

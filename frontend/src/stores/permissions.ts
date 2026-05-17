@@ -26,21 +26,23 @@ interface UserFieldPermission {
 
 export const usePermissionStore = defineStore('permissions', () => {
   // State
-  const fieldPermissions = ref<Map<string, FieldPermission[]>>(new Map())
-  const userPermissions = ref<Map<string, UserFieldPermission>>(new Map())
+  // 用普通对象而非 Map：Vue 3 的 ref 对 Map 的 .set/.clear 不触发依赖更新，
+  // computed 在 FieldsView 等视图中需要随权限加载完成立即重算。
+  const fieldPermissions = ref<Record<string, FieldPermission[]>>({})
+  const userPermissions = ref<Record<string, UserFieldPermission>>({})
   const loading = ref(false)
   const currentRole = ref<string>('viewer')
 
   // Getters
   const permissionsByTable = computed(() => {
-    return (tableId: string) => fieldPermissions.value.get(tableId) || []
+    return (tableId: string) => fieldPermissions.value[tableId] || []
   })
 
   const getFieldPermission = computed(() => {
     return (fieldId: string, role?: string) => {
       const effectiveRole = role || currentRole.value
       const key = `${fieldId}_${effectiveRole}`
-      return userPermissions.value.get(key)
+      return userPermissions.value[key]
     }
   })
 
@@ -51,7 +53,10 @@ export const usePermissionStore = defineStore('permissions', () => {
     try {
       const response = await fieldAPI.getPermissions(tableId)
       if (response.success && response.data?.permissions) {
-        fieldPermissions.value.set(tableId, response.data.permissions)
+        fieldPermissions.value = {
+          ...fieldPermissions.value,
+          [tableId]: response.data.permissions,
+        }
         // 更新用户权限缓存
         updateUserPermissionCache(response.data.permissions)
         return response.data.permissions
@@ -67,15 +72,17 @@ export const usePermissionStore = defineStore('permissions', () => {
 
   // 更新用户权限缓存
   const updateUserPermissionCache = (permissions: FieldPermission[]) => {
+    const next: Record<string, UserFieldPermission> = { ...userPermissions.value }
     permissions.forEach((perm) => {
       const key = `${perm.field_id}_${perm.role}`
-      userPermissions.value.set(key, {
+      next[key] = {
         fieldId: perm.field_id,
         canRead: perm.can_read,
         canWrite: perm.can_write,
         canDelete: perm.can_delete,
-      })
+      }
     })
+    userPermissions.value = next
   }
 
   // 检查字段权限
@@ -86,7 +93,7 @@ export const usePermissionStore = defineStore('permissions', () => {
   ): boolean => {
     const effectiveRole = role || currentRole.value
     const key = `${fieldId}_${effectiveRole}`
-    const perm = userPermissions.value.get(key)
+    const perm = userPermissions.value[key]
 
     // 如果没有配置字段级权限，使用默认权限
     if (!perm) {
@@ -163,15 +170,15 @@ export const usePermissionStore = defineStore('permissions', () => {
 
   // 清空权限缓存
   const clearPermissions = () => {
-    fieldPermissions.value.clear()
-    userPermissions.value.clear()
+    fieldPermissions.value = {}
+    userPermissions.value = {}
   }
 
   // 获取用户对特定字段的所有权限
   const getFieldPermissions = (fieldId: string, role?: string) => {
     const effectiveRole = role || currentRole.value
     const key = `${fieldId}_${effectiveRole}`
-    return userPermissions.value.get(key)
+    return userPermissions.value[key]
   }
 
   // 过滤有权限的字段

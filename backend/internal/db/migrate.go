@@ -5,6 +5,9 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -216,31 +219,35 @@ func Migrate() error {
 	return nil
 }
 
-// createDefaultAdminUser 创建默认管理员用户
+// createDefaultAdminUser 创建默认管理员用户。
+//
+// 凭据来源优先级：
+//  1. 环境变量 BOOTSTRAP_ADMIN_PASSWORD（推荐用于容器化部署）
+//  2. crypto/rand 生成 16 位随机密码
+//
+// 凭据**仅**通过以下方式输出，绝不写入 zap 日志（防止随 lumberjack 归档泄漏）：
+//   - 写入 data/initial-admin.txt（权限 0600，已存在则跳过覆盖）
+//   - 同步打印一次到 stderr 供 TTY 启动场景查看
 func createDefaultAdminUser(database *gorm.DB) error {
 	var count int64
 	if err := database.Model(&models.User{}).Where("deleted_at IS NULL").Count(&count).Error; err != nil {
 		return fmt.Errorf("检查用户数量失败: %w", err)
 	}
 
-	// 如果已有用户，跳过创建
 	if count > 0 {
 		return nil
 	}
 
-	// 生成随机密码（crypto/rand）
-	randomPassword, err := generateRandomPassword(16)
+	password, source, err := resolveBootstrapPassword()
 	if err != nil {
-		return fmt.Errorf("生成随机密码失败: %w", err)
+		return fmt.Errorf("获取管理员初始密码失败: %w", err)
 	}
 
-	// 哈希密码
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(randomPassword), bcrypt.DefaultCost)
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
 	if err != nil {
 		return fmt.Errorf("密码哈希失败: %w", err)
 	}
 
-	// 创建默认管理员
 	admin := models.User{
 		ID:            "usr_admin",
 		Username:      "admin",
@@ -253,18 +260,74 @@ func createDefaultAdminUser(database *gorm.DB) error {
 		return fmt.Errorf("创建管理员用户失败: %w", err)
 	}
 
-	// 在控制台显示默认管理员凭据
-	zap.L().Info("============================================")
-	zap.L().Info("🔐 默认管理员账户已创建")
-	zap.L().Info("============================================")
-	zap.L().Info("用户名: admin")
-	zap.L().Info("密码:   " + randomPassword)
-	zap.L().Info("邮箱:   admin@cornerstone.local")
-	zap.L().Info("============================================")
-	zap.L().Warn("⚠️  请在首次登录后立即修改密码！")
-	zap.L().Info("============================================")
+	credentialFile, writeErr := writeBootstrapCredentialsFile(admin.Username, password)
+
+	// 同步打印到 stderr 一次（TTY 启动可见，容器日志收集器一般也会捕获 stderr 但仅此一行）。
+	fmt.Fprintln(os.Stderr, "============================================")
+	fmt.Fprintln(os.Stderr, "🔐 默认管理员账户已创建")
+	fmt.Fprintln(os.Stderr, "用户名: admin")
+	fmt.Fprintln(os.Stderr, "密码:   "+password)
+	if writeErr == nil {
+		fmt.Fprintln(os.Stderr, "凭据已同步写入: "+credentialFile)
+	} else {
+		fmt.Fprintln(os.Stderr, "⚠️  写入凭据文件失败: "+writeErr.Error())
+	}
+	fmt.Fprintln(os.Stderr, "⚠️  请在首次登录后立即修改密码")
+	fmt.Fprintln(os.Stderr, "============================================")
+
+	// 结构化日志仅记录元信息，绝不包含密码本身。
+	fields := []zap.Field{
+		zap.String("username", admin.Username),
+		zap.String("source", source),
+	}
+	if writeErr == nil {
+		fields = append(fields, zap.String("credential_file", credentialFile))
+	} else {
+		fields = append(fields, zap.NamedError("credential_file_error", writeErr))
+	}
+	zap.L().Info("默认管理员账户已创建，凭据已写入 data/initial-admin.txt（密码不会出现在日志中）", fields...)
 
 	return nil
+}
+
+// resolveBootstrapPassword 解析初始密码：优先环境变量，否则 crypto/rand 随机。
+// 返回 (password, sourceLabel, error)。
+func resolveBootstrapPassword() (string, string, error) {
+	if env := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_PASSWORD")); env != "" {
+		if len(env) < 8 {
+			return "", "", fmt.Errorf("BOOTSTRAP_ADMIN_PASSWORD 长度需 ≥ 8")
+		}
+		return env, "env:BOOTSTRAP_ADMIN_PASSWORD", nil
+	}
+	password, err := generateRandomPassword(16)
+	if err != nil {
+		return "", "", err
+	}
+	return password, "crypto/rand", nil
+}
+
+// writeBootstrapCredentialsFile 把初始凭据写入 data/initial-admin.txt（0600）。
+// 若文件已存在，不覆盖，返回现有路径（caller 视为成功，避免重复创建管理员场景下被误读）。
+func writeBootstrapCredentialsFile(username, password string) (string, error) {
+	dir := "data"
+	if v := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_FILE_DIR")); v != "" {
+		dir = v
+	}
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("创建凭据目录 %s 失败: %w", dir, err)
+	}
+
+	path := filepath.Join(dir, "initial-admin.txt")
+	if _, err := os.Stat(path); err == nil {
+		return path, nil
+	}
+
+	content := fmt.Sprintf("username: %s\npassword: %s\ncreated_at: %s\nnote: 首次登录后请立即修改密码并删除本文件\n",
+		username, password, time.Now().Format(time.RFC3339))
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		return path, fmt.Errorf("写入凭据文件失败: %w", err)
+	}
+	return path, nil
 }
 
 // generateRandomPassword 使用 crypto/rand 生成密码，长度至少为 12。

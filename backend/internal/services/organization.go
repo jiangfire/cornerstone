@@ -396,7 +396,8 @@ func (s *OrganizationService) RemoveMember(orgID, memberID, operatorID string) e
 	}
 
 	// 4. 移除成员
-	if err := s.db.Delete(&targetMember).Error; err != nil {
+	// 关系表硬删：OrganizationMember 有 uk_org_user 唯一约束，软删会让"重新加入"撞上残留约束
+	if err := s.db.Unscoped().Delete(&targetMember).Error; err != nil {
 		return fmt.Errorf("移除成员失败: %w", err)
 	}
 

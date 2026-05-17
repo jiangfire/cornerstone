@@ -1,5 +1,12 @@
 package query
 
+import (
+	"bytes"
+	"encoding/json"
+	"errors"
+	"fmt"
+)
+
 // QueryRequest 查询请求 - 支持完整语法和简化语法
 type QueryRequest struct {
 	// 完整语法
@@ -38,11 +45,46 @@ type Condition struct {
 
 // JoinClause JOIN 子句
 type JoinClause struct {
-	Type   string   `json:"type"`              // join 类型: left, right, inner
-	Table  string   `json:"table"`             // 关联表
-	As     string   `json:"as,omitempty"`      // 别名
-	On     string   `json:"on"`                // 关联条件
-	Select []string `json:"select,omitempty"`  // 关联表查询字段
+	Type   string        `json:"type"`             // join 类型: left, right, inner
+	Table  string        `json:"table"`            // 关联表
+	As     string        `json:"as,omitempty"`     // 别名
+	On     JoinCondition `json:"on"`               // 关联条件（必须为结构体，旧字符串形式已废弃）
+	Select []string      `json:"select,omitempty"` // 关联表查询字段
+}
+
+// JoinCondition 描述 JOIN ... ON 的等值/不等值比较条件。
+// 历史版本里 On 是裸字符串，直接拼进 SQL 导致注入面；现在固定为结构体并要求两侧
+// 是合法限定字段。任何外部调用方都必须迁移到这个形态——旧字符串通过 UnmarshalJSON
+// 直接报错为 `invalid_join_condition`，详见 docs/REVIEW-FIX-PLAN-2026-05.md P1-3。
+type JoinCondition struct {
+	Left  string `json:"left"`  // 例：`tables.database_id`
+	Op    string `json:"op"`    // 仅允许 "=" / "<>"，详见 ValidateJoinOp
+	Right string `json:"right"` // 例：`db.id`
+}
+
+// IsZero 判断 JoinCondition 是否为零值（用于 parser 的非空校验）。
+func (jc JoinCondition) IsZero() bool {
+	return jc.Left == "" && jc.Op == "" && jc.Right == ""
+}
+
+// UnmarshalJSON 显式区分"老的字符串形式"（拒绝）与"新的对象形式"（解析）。
+// 这样调用方拿到的是带语义的 400 错误，而不是 GORM/Gin 默认那种生疏的 JSON 类型错。
+func (jc *JoinCondition) UnmarshalJSON(data []byte) error {
+	trimmed := bytes.TrimSpace(data)
+	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
+		return nil
+	}
+	if trimmed[0] == '"' {
+		return errors.New("invalid_join_condition: 'on' 字段必须是 {left, op, right} 对象，旧字符串形式已不支持")
+	}
+	// 借助一次性 alias 类型避免无限递归。
+	type rawJoinCondition JoinCondition
+	var raw rawJoinCondition
+	if err := json.Unmarshal(trimmed, &raw); err != nil {
+		return fmt.Errorf("invalid_join_condition: %w", err)
+	}
+	*jc = JoinCondition(raw)
+	return nil
 }
 
 // AggregateFunc 聚合函数

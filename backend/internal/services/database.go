@@ -490,7 +490,8 @@ func (s *DatabaseService) RemoveDatabaseUser(dbID, removeUserID, operatorID stri
 	}
 
 	// 4. 移除用户权限
-	if err := s.db.Delete(&targetAccess).Error; err != nil {
+	// 关系表硬删：DatabaseAccess 有 uk_db_user 唯一约束，软删会让"重新分享"撞上残留约束
+	if err := s.db.Unscoped().Delete(&targetAccess).Error; err != nil {
 		return fmt.Errorf("移除用户失败: %w", err)
 	}
 

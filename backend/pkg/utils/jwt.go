@@ -5,11 +5,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/jiangfire/cornerstone/backend/internal/config"
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"github.com/jiangfire/cornerstone/backend/pkg/db"
 	"golang.org/x/crypto/bcrypt"
@@ -31,6 +33,36 @@ var (
 	jwtExpiration int
 )
 
+// InitJWT 显式注入 JWT 配置；推荐由 main.go 在启动早期调用一次。
+// 重复调用会覆盖现有配置（便于测试 setup/teardown）。
+func InitJWT(secret string, expirationHours int) error {
+	if strings.TrimSpace(secret) == "" {
+		return errors.New("JWT secret 不能为空")
+	}
+	if expirationHours <= 0 {
+		expirationHours = 24
+	}
+	jwtConfigMu.Lock()
+	defer jwtConfigMu.Unlock()
+	jwtSecret = secret
+	jwtExpiration = expirationHours
+	jwtCfgLoaded = true
+	return nil
+}
+
+// ResetJWTForTests 清空全局 JWT 配置，仅用于测试。
+func ResetJWTForTests() {
+	jwtConfigMu.Lock()
+	defer jwtConfigMu.Unlock()
+	jwtSecret = ""
+	jwtExpiration = 0
+	jwtCfgLoaded = false
+}
+
+// loadJWTConfig 返回 JWT 配置；若尚未通过 InitJWT 显式注入，则降级读取环境变量。
+//
+// 注意：严禁在此处调用 config.Load()——历史上这样做会在 dev 模式下生成与 main.go
+// 不同的临时密钥，导致签发/验证不一致；详见 docs/REVIEW-FIX-PLAN-2026-05.md P1-2。
 func loadJWTConfig() (string, int, error) {
 	jwtConfigMu.RLock()
 	if jwtCfgLoaded {
@@ -47,13 +79,19 @@ func loadJWTConfig() (string, int, error) {
 		return jwtSecret, jwtExpiration, nil
 	}
 
-	cfg, err := config.Load()
-	if err != nil {
-		return "", 0, fmt.Errorf("加载JWT配置失败: %w", err)
+	secret := strings.TrimSpace(os.Getenv("JWT_SECRET"))
+	if secret == "" {
+		return "", 0, errors.New("JWT 未初始化：请先调用 utils.InitJWT 或设置 JWT_SECRET 环境变量")
+	}
+	expiration := 24
+	if v := strings.TrimSpace(os.Getenv("JWT_EXPIRATION")); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			expiration = n
+		}
 	}
 
-	jwtSecret = cfg.JWT.Secret
-	jwtExpiration = cfg.JWT.Expiration
+	jwtSecret = secret
+	jwtExpiration = expiration
 	jwtCfgLoaded = true
 
 	return jwtSecret, jwtExpiration, nil
@@ -170,7 +208,7 @@ func ParseToken(tokenString string) (*JWTClaims, error) {
 
 func CheckPassword(password, hash string) error {
 	if !CheckPasswordHash(password, hash) {
-		return errors.New("密码错误")
+		return fmt.Errorf("密码错误")
 	}
 	return nil
 }

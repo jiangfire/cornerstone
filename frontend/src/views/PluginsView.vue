@@ -233,6 +233,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { pluginAPI, databaseAPI } from '@/services/api'
+import type { PluginExecution } from '@/types/api'
 import { formatDate } from '@/utils/format'
 
 interface Plugin {
@@ -281,7 +282,7 @@ const bindingsList = ref<
 const loadingBindings = ref(false)
 const executionsLoading = ref(false)
 const executing = ref(false)
-const executionsList = ref<Array<Record<string, unknown>>>([])
+const executionsList = ref<PluginExecution[]>([])
 const configItems = ref<Array<{ name: string; type: string; default: string; required: boolean }>>(
   [],
 )

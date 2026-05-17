@@ -121,8 +121,8 @@ func TestRecordService_DeleteRecordSoftDeleteAndHidesRecord(t *testing.T) {
 	require.NoError(t, service.DeleteRecord(record.ID, owner.ID))
 
 	var stored models.Record
-	require.NoError(t, db.Where("id = ?", record.ID).First(&stored).Error)
-	require.NotNil(t, stored.DeletedAt)
+	require.NoError(t, db.Unscoped().Where("id = ?", record.ID).First(&stored).Error)
+	require.True(t, stored.DeletedAt.Valid)
 	require.Equal(t, owner.ID, stored.UpdatedBy)
 	require.Equal(t, 2, stored.Version)
 

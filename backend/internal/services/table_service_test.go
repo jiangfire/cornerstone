@@ -25,8 +25,8 @@ func TestTableService_DeleteTableSoftDeleteAndAllowsRecreate(t *testing.T) {
 	require.NoError(t, service.DeleteTable(table.ID, admin.ID))
 
 	var stored models.Table
-	require.NoError(t, db.Where("id = ?", table.ID).First(&stored).Error)
-	require.NotNil(t, stored.DeletedAt)
+	require.NoError(t, db.Unscoped().Where("id = ?", table.ID).First(&stored).Error)
+	require.True(t, stored.DeletedAt.Valid)
 	require.Contains(t, stored.Name, "__deleted__")
 
 	_, err = service.GetTable(table.ID, owner.ID)

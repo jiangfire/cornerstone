@@ -429,7 +429,11 @@ func (s *AuthService) ChangePassword(userID string, req ChangePasswordRequest) e
 }
 
 // DeleteAccount 删除账户
-func (s *AuthService) DeleteAccount(userID string, req DeleteAccountRequest) error {
+//
+// 用户软删除：保留 created_by 等外键引用（前端展示为"已注销用户"）。
+// currentToken 用于在同事务里把发起删除的会话 token 加入黑名单。
+// 注意：其他设备上同用户的 token 仍按 JWT TTL 自然过期，全量会话注销需要在中间件加 user 存在性检查（已记为 P1-5 后续）。
+func (s *AuthService) DeleteAccount(userID string, currentToken string, req DeleteAccountRequest) error {
 	return s.db.Transaction(func(tx *gorm.DB) error {
 		var user models.User
 		if err := tx.Where("id = ?", userID).First(&user).Error; err != nil {
@@ -463,14 +467,16 @@ func (s *AuthService) DeleteAccount(userID string, req DeleteAccountRequest) err
 			return errors.New("当前账户仍拥有数据库，请先转移或删除数据库后再删除账户")
 		}
 
-		if err := tx.Where("user_id = ?", userID).Delete(&models.OrganizationMember{}).Error; err != nil {
+		// 关系表硬删：保证唯一约束 (org_id, user_id) / (db_id, user_id) 可被未来重新使用
+		if err := tx.Unscoped().Where("user_id = ?", userID).Delete(&models.OrganizationMember{}).Error; err != nil {
 			return fmt.Errorf("清理组织成员关系失败: %w", err)
 		}
 
-		if err := tx.Where("user_id = ?", userID).Delete(&models.DatabaseAccess{}).Error; err != nil {
+		if err := tx.Unscoped().Where("user_id = ?", userID).Delete(&models.DatabaseAccess{}).Error; err != nil {
 			return fmt.Errorf("清理数据库权限失败: %w", err)
 		}
 
+		// PluginExecution 模型无 DeletedAt，本身就是硬删（执行记录是审计/可视化数据，跟随用户清理）
 		if err := tx.Where("created_by = ?", userID).Delete(&models.PluginExecution{}).Error; err != nil {
 			return fmt.Errorf("清理插件执行记录失败: %w", err)
 		}
@@ -481,18 +487,36 @@ func (s *AuthService) DeleteAccount(userID string, req DeleteAccountRequest) err
 			return fmt.Errorf("查询用户插件失败: %w", err)
 		}
 		if len(pluginIDs) > 0 {
-			if err := tx.Where("plugin_id IN ?", pluginIDs).Delete(&models.PluginBinding{}).Error; err != nil {
+			// 关系/资源硬删：用户即将注销，残留软删行会让相同 (plugin,table,trigger) / plugin name 永久占位
+			if err := tx.Unscoped().Where("plugin_id IN ?", pluginIDs).Delete(&models.PluginBinding{}).Error; err != nil {
 				return fmt.Errorf("清理插件绑定失败: %w", err)
 			}
 			if err := tx.Where("plugin_id IN ?", pluginIDs).Delete(&models.PluginExecution{}).Error; err != nil {
 				return fmt.Errorf("清理插件执行结果失败: %w", err)
 			}
-			if err := tx.Where("id IN ?", pluginIDs).Delete(&models.Plugin{}).Error; err != nil {
+			if err := tx.Unscoped().Where("id IN ?", pluginIDs).Delete(&models.Plugin{}).Error; err != nil {
 				return fmt.Errorf("删除用户插件失败: %w", err)
 			}
 		}
 
-		if err := tx.Unscoped().Delete(&user).Error; err != nil {
+		// 当前会话 token 加入黑名单（同事务，保证不会出现"删除已提交但 token 仍有效"窗口）
+		if currentToken != "" {
+			if claims, parseErr := utils.ParseToken(currentToken); parseErr == nil {
+				blacklist := models.TokenBlacklist{
+					TokenHash: utils.HashToken(currentToken),
+					ExpiredAt: claims.ExpiresAt.Time,
+				}
+				if err := tx.Clauses(clause.OnConflict{
+					Columns:   []clause.Column{{Name: "token_hash"}},
+					DoNothing: true,
+				}).Create(&blacklist).Error; err != nil {
+					return fmt.Errorf("注销当前会话失败: %w", err)
+				}
+			}
+		}
+
+		// 用户软删：保留 created_by 等外键引用语义；username/email 唯一约束会被该 deleted_at 行继续占位（已记为已知约束）
+		if err := tx.Delete(&user).Error; err != nil {
 			return fmt.Errorf("删除用户失败: %w", err)
 		}
 

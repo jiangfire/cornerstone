@@ -22,7 +22,7 @@ func TestParser_Parse(t *testing.T) {
 		},
 		{
 			name: "query with join",
-			json: `{"from": "records", "join": [{"type": "left", "table": "users", "on": "records.created_by = users.id"}]}`,
+			json: `{"from": "records", "join": [{"type": "left", "table": "users", "on": {"left":"records.created_by", "op":"=", "right":"users.id"}}]}`,
 		},
 		{
 			name: "query with aggregate",
@@ -256,10 +256,10 @@ func TestParser_Validate(t *testing.T) {
 			req: &QueryRequest{
 				From: "records",
 				Join: []JoinClause{
-					{Type: "left", Table: "users", On: "a=b"},
-					{Type: "left", Table: "users", On: "a=b"},
-					{Type: "left", Table: "users", On: "a=b"},
-					{Type: "left", Table: "users", On: "a=b"},
+					{Type: "left", Table: "users", On: JoinCondition{Left: "records.id", Op: "=", Right: "users.id"}},
+					{Type: "left", Table: "users", On: JoinCondition{Left: "records.id", Op: "=", Right: "users.id"}},
+					{Type: "left", Table: "users", On: JoinCondition{Left: "records.id", Op: "=", Right: "users.id"}},
+					{Type: "left", Table: "users", On: JoinCondition{Left: "records.id", Op: "=", Right: "users.id"}},
 				},
 			},
 			wantErr: true,

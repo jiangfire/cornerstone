@@ -1,6 +1,9 @@
 package services
 
 import (
+	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -10,10 +13,10 @@ func TestPluginService_RestrictsOwnershipAndTableAccess(t *testing.T) {
 	db := setupResourceTestDB(t)
 	service := NewPluginService(db)
 
-	owner := createResourceUser(t, db, "plugin_owner")
+	owner := createResourceAdminUser(t, db, "plugin_owner")
 	outsider := createResourceUser(t, db, "plugin_outsider")
-	viewer := createResourceUser(t, db, "plugin_viewer")
-	editor := createResourceUser(t, db, "plugin_editor")
+	viewer := createResourceAdminUser(t, db, "plugin_viewer")
+	editor := createResourceAdminUser(t, db, "plugin_editor")
 
 	database := createResourceDatabase(t, db, owner.ID, "PluginPermissionDB")
 	grantResourceDatabaseAccess(t, db, database.ID, viewer.ID, "viewer")
@@ -79,7 +82,7 @@ func TestPluginService_ExecutePluginRejectsUnsafeEntryPathWithoutCreatingExecuti
 	db := setupResourceTestDB(t)
 	service := NewPluginService(db)
 
-	owner := createResourceUser(t, db, "plugin_owner_unsafe_entry")
+	owner := createResourceAdminUser(t, db, "plugin_owner_unsafe_entry")
 	database := createResourceDatabase(t, db, owner.ID, "PluginUnsafeEntryDB")
 	table := createResourceTable(t, db, database.ID, "Orders")
 
@@ -142,6 +145,24 @@ func TestResolveScriptPathRejectsUnsafeEntryFileVariants(t *testing.T) {
 			entryFile: "\\\\server\\share\\escape.sh",
 			wantErr:   "绝对路径",
 		},
+		{
+			name:      "sensitive env",
+			workDir:   "./plugins",
+			entryFile: ".env",
+			wantErr:   "敏感名称",
+		},
+		{
+			name:      "sensitive nested env",
+			workDir:   "./plugins",
+			entryFile: "sub/.env.production",
+			wantErr:   "敏感名称",
+		},
+		{
+			name:      "sensitive ssh key",
+			workDir:   "./plugins",
+			entryFile: "id_rsa",
+			wantErr:   "敏感名称",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -151,4 +172,77 @@ func TestResolveScriptPathRejectsUnsafeEntryFileVariants(t *testing.T) {
 			require.Contains(t, err.Error(), tc.wantErr)
 		})
 	}
+}
+
+func TestPluginService_CreatePluginRequiresSystemAdmin(t *testing.T) {
+	db := setupResourceTestDB(t)
+	service := NewPluginService(db)
+
+	nonAdmin := createResourceUser(t, db, "plugin_non_admin_creator")
+
+	_, err := service.CreatePlugin(CreatePluginRequest{
+		Name:      "non-admin-plugin",
+		Language:  "bash",
+		EntryFile: "main.sh",
+		Timeout:   30,
+	}, nonAdmin.ID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "系统管理员")
+}
+
+func TestPluginService_UpdatePluginRequiresSystemAdmin(t *testing.T) {
+	db := setupResourceTestDB(t)
+	service := NewPluginService(db)
+
+	admin := createResourceAdminUser(t, db, "plugin_admin_for_update")
+	nonAdmin := createResourceUser(t, db, "plugin_non_admin_updater")
+
+	plugin, err := service.CreatePlugin(CreatePluginRequest{
+		Name:      "admin-plugin",
+		Language:  "bash",
+		EntryFile: "main.sh",
+		Timeout:   30,
+	}, admin.ID)
+	require.NoError(t, err)
+
+	err = service.UpdatePlugin(plugin.ID, UpdatePluginRequest{
+		Name:    "renamed",
+		Timeout: 30,
+	}, nonAdmin.ID)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "系统管理员")
+}
+
+func TestAssertScriptResolvesSafelyRejectsSymlink(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("symlink creation requires elevated permissions on Windows; covered by Linux runner")
+	}
+
+	tmp := t.TempDir()
+	realFile := filepath.Join(tmp, "real.sh")
+	require.NoError(t, os.WriteFile(realFile, []byte("#!/bin/sh\necho ok\n"), 0o644))
+
+	linkPath := filepath.Join(tmp, "link.sh")
+	require.NoError(t, os.Symlink(realFile, linkPath))
+
+	err := assertScriptResolvesSafely(linkPath)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "符号链接")
+}
+
+func TestAssertScriptResolvesSafelyRejectsMissingFile(t *testing.T) {
+	tmp := t.TempDir()
+	err := assertScriptResolvesSafely(filepath.Join(tmp, "does_not_exist.sh"))
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "不可访问")
+}
+
+func TestAssertScriptResolvesSafelyRejectsDirectory(t *testing.T) {
+	tmp := t.TempDir()
+	dirAsScript := filepath.Join(tmp, "i_am_a_dir")
+	require.NoError(t, os.Mkdir(dirAsScript, 0o755))
+
+	err := assertScriptResolvesSafely(dirAsScript)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "目录")
 }

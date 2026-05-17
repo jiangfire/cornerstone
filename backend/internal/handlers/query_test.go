@@ -1516,7 +1516,7 @@ func TestQueryHandlerExplainJoinAliasAndNestedWherePreservesPermissionScoping(t 
 				"type":"left",
 				"table":"databases",
 				"as":"db",
-				"on":"db.id = tables.database_id"
+				"on":{"left":"db.id","op":"=","right":"tables.database_id"}
 			}
 		],
 		"where":{
@@ -1548,7 +1548,7 @@ func TestQueryHandlerExplainJoinAliasAndNestedWherePreservesPermissionScoping(t 
 	sqlText := data["sql"].(string)
 	params := data["params"].([]interface{})
 
-	require.Contains(t, sqlText, `JOIN "databases" AS "db" ON db.id = tables.database_id`)
+	require.Contains(t, sqlText, `JOIN "databases" AS "db" ON "db"."id" = "tables"."database_id"`)
 	require.Contains(t, sqlText, `"tables"."database_id"`)
 	require.Contains(t, sqlText, `"db"."name"`)
 	require.Contains(t, sqlText, `"tables"."name"`)

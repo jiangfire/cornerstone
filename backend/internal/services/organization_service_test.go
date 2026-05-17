@@ -81,8 +81,8 @@ func TestOrganizationService_DeleteOrganizationSoftDeleteAndAllowsRecreate(t *te
 	require.NoError(t, service.DeleteOrganization(org.ID, owner.ID))
 
 	var stored models.Organization
-	require.NoError(t, db.Where("id = ?", org.ID).First(&stored).Error)
-	require.NotNil(t, stored.DeletedAt)
+	require.NoError(t, db.Unscoped().Where("id = ?", org.ID).First(&stored).Error)
+	require.True(t, stored.DeletedAt.Valid)
 
 	listed, err := service.ListOrganizations(owner.ID)
 	require.NoError(t, err)

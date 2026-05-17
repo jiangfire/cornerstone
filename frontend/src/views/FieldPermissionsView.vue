@@ -189,7 +189,7 @@ const loadFields = async () => {
   try {
     const response = await tableAPI.getFields(tableId)
     if (response.success && response.data) {
-      fields.value = response.data.fields || []
+      fields.value = response.data.items || []
       initPermissionMatrix()
       // 加载现有权限配置
       await loadExistingPermissions()

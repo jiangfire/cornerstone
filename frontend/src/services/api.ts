@@ -1,6 +1,35 @@
 import axios, { type AxiosInstance, type AxiosResponse, type AxiosError } from 'axios'
-import type { ApiResponse } from '@/types/api'
-import type { GovernanceTask, GovernanceTaskDetail, GovernanceReview } from '@/types/api'
+import type {
+  ApiResponse,
+  LoginResponseData,
+  UserProfile,
+  UserListResponse,
+  Database,
+  DatabaseListResponse,
+  DatabaseDetail,
+  DatabaseUserListResponse,
+  Table,
+  TableListResponse,
+  TableDetail,
+  Field,
+  FieldListResponse,
+  FieldPermissionListResponse,
+  RecordListResponse,
+  Organization,
+  OrganizationListResponse,
+  OrganizationMemberListResponse,
+  FileListResponse,
+  Plugin,
+  PluginBinding,
+  PluginExecution,
+  StatsSummary,
+  Activity,
+  SystemSettings,
+  GovernanceTask,
+  GovernanceTaskDetail,
+  GovernanceTaskListResponse,
+  GovernanceReview,
+} from '@/types/api'
 
 // API 配置
 const API_CONFIG = {
@@ -51,23 +80,21 @@ api.interceptors.response.use(
   },
 )
 
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
-// 通用请求方法
+// 通用请求方法 (T 描述 ApiResponse.data 的内部形状)
 export const request = {
-  get<T = any>(url: string, params?: Record<string, unknown>): Promise<ApiResponse<T>> {
+  get<T = unknown>(url: string, params?: Record<string, unknown>): Promise<ApiResponse<T>> {
     return api.get(url, { params })
   },
 
-  post<T = any>(url: string, data?: unknown): Promise<ApiResponse<T>> {
+  post<T = unknown>(url: string, data?: unknown): Promise<ApiResponse<T>> {
     return api.post(url, data)
   },
 
-  put<T = any>(url: string, data?: unknown): Promise<ApiResponse<T>> {
+  put<T = unknown>(url: string, data?: unknown): Promise<ApiResponse<T>> {
     return api.put(url, data)
   },
 
-  delete<T = any>(url: string, data?: unknown): Promise<ApiResponse<T>> {
+  delete<T = unknown>(url: string, data?: unknown): Promise<ApiResponse<T>> {
     return data ? api.delete(url, { data }) : api.delete(url)
   },
 }
@@ -75,7 +102,7 @@ export const request = {
 // 认证 API
 export const authAPI = {
   login(data: { username: string; password: string }) {
-    return request.post<{ token: string }>('/auth/login', data)
+    return request.post<LoginResponseData>('/auth/login', data)
   },
   register(data: { username: string; email: string; password: string }) {
     return request.post('/auth/register', data)
@@ -88,16 +115,7 @@ export const authAPI = {
 // 用户 API
 export const userAPI = {
   getProfile() {
-    return request.get<{
-      id: string
-      username: string
-      email: string
-      role?: string
-      is_system_admin?: boolean
-      phone?: string
-      bio?: string
-      avatar?: string
-    }>('/users/me')
+    return request.get<UserProfile>('/users/me')
   },
   updateProfile(data: {
     username: string
@@ -115,38 +133,35 @@ export const userAPI = {
     return request.delete('/users/me', data)
   },
   list(params?: Record<string, unknown>) {
-    return request.get<{ users: Array<{ id: string; username: string; email: string }> }>(
-      '/users',
-      params,
-    )
+    return request.get<UserListResponse>('/users', params)
   },
 }
 
 // 数据库 API
 export const databaseAPI = {
   list() {
-    return request.get<{ databases: any[] }>('/databases')
+    return request.get<DatabaseListResponse>('/databases')
   },
   create(data: Record<string, unknown>) {
-    return request.post('/databases', data)
+    return request.post<Database>('/databases', data)
   },
   update(id: string, data: Record<string, unknown>) {
-    return request.put(`/databases/${id}`, data)
+    return request.put<Database>(`/databases/${id}`, data)
   },
   delete(id: string) {
     return request.delete(`/databases/${id}`)
   },
   getDetail(id: string) {
-    return request.get<{ name: string; role: string }>(`/databases/${id}`)
+    return request.get<DatabaseDetail>(`/databases/${id}`)
   },
   getTables(databaseId: string) {
-    return request.get<{ tables: any[] }>(`/databases/${databaseId}/tables`)
+    return request.get<TableListResponse>(`/databases/${databaseId}/tables`)
   },
   share(id: string, data: { user_id: string; role: 'admin' | 'editor' | 'viewer' }) {
     return request.post(`/databases/${id}/share`, data)
   },
   listUsers(id: string) {
-    return request.get<{ users: any[] }>(`/databases/${id}/users`)
+    return request.get<DatabaseUserListResponse>(`/databases/${id}/users`)
   },
   updateUserRole(id: string, userId: string, role: 'admin' | 'editor' | 'viewer') {
     return request.put(`/databases/${id}/users/${userId}/role`, { role })
@@ -159,32 +174,32 @@ export const databaseAPI = {
 // 表 API
 export const tableAPI = {
   get(id: string) {
-    return request.get<{ name: string; database_id: string }>(`/tables/${id}`)
+    return request.get<TableDetail>(`/tables/${id}`)
   },
   create(data: Record<string, unknown>) {
-    return request.post('/tables', data)
+    return request.post<Table>('/tables', data)
   },
   delete(id: string) {
     return request.delete(`/tables/${id}`)
   },
   getFields(tableId: string) {
-    return request.get<{ fields: any[] }>(`/tables/${tableId}/fields`)
+    return request.get<FieldListResponse>(`/tables/${tableId}/fields`)
   },
 }
 
 // 字段 API
 export const fieldAPI = {
   create(data: Record<string, unknown>) {
-    return request.post('/fields', data)
+    return request.post<Field>('/fields', data)
   },
   update(id: string, data: Record<string, unknown>) {
-    return request.put(`/fields/${id}`, data)
+    return request.put<Field>(`/fields/${id}`, data)
   },
   delete(id: string) {
     return request.delete(`/fields/${id}`)
   },
   getPermissions(tableId: string) {
-    return request.get<{ permissions: any[] }>(`/tables/${tableId}/field-permissions`)
+    return request.get<FieldPermissionListResponse>(`/tables/${tableId}/field-permissions`)
   },
   setPermission(tableId: string, permission: unknown) {
     return request.put(`/tables/${tableId}/field-permissions`, permission)
@@ -197,7 +212,7 @@ export const fieldAPI = {
 // 记录 API
 export const recordAPI = {
   list(params: Record<string, unknown>) {
-    return request.get<{ records: any[]; total: number }>('/records', params)
+    return request.get<RecordListResponse>('/records', params)
   },
   create(data: Record<string, unknown>) {
     return request.post('/records', data)
@@ -213,7 +228,7 @@ export const recordAPI = {
 // 文件 API
 export const fileAPI = {
   listByRecord(recordId: string) {
-    return request.get<any[]>(`/records/${recordId}/files`)
+    return request.get<FileListResponse>(`/records/${recordId}/files`)
   },
   download(fileId: string): string {
     return `${API_CONFIG.baseURL}/files/${fileId}/download`
@@ -229,19 +244,19 @@ export const fileAPI = {
 // 组织 API
 export const organizationAPI = {
   list() {
-    return request.get<{ organizations: any[] }>('/organizations')
+    return request.get<OrganizationListResponse>('/organizations')
   },
   create(data: Record<string, unknown>) {
-    return request.post('/organizations', data)
+    return request.post<Organization>('/organizations', data)
   },
   update(id: string, data: Record<string, unknown>) {
-    return request.put(`/organizations/${id}`, data)
+    return request.put<Organization>(`/organizations/${id}`, data)
   },
   delete(id: string) {
     return request.delete(`/organizations/${id}`)
   },
   getMembers(orgId: string) {
-    return request.get<{ members: any[] }>(`/organizations/${orgId}/members`)
+    return request.get<OrganizationMemberListResponse>(`/organizations/${orgId}/members`)
   },
   addMember(orgId: string, data: unknown) {
     return request.post(`/organizations/${orgId}/members`, data)
@@ -254,16 +269,16 @@ export const organizationAPI = {
   },
 }
 
-// 插件 API
+// 插件 API (后端直接返回数组,不包成 {items,total})
 export const pluginAPI = {
   list() {
-    return request.get<any[]>('/plugins')
+    return request.get<Plugin[]>('/plugins')
   },
   get(id: string) {
-    return request.get<any>(`/plugins/${id}`)
+    return request.get<Plugin>(`/plugins/${id}`)
   },
   create(data: Record<string, unknown>) {
-    return request.post('/plugins', data)
+    return request.post<Plugin>('/plugins', data)
   },
   update(id: string, data: Record<string, unknown>) {
     return request.put(`/plugins/${id}`, data)
@@ -275,34 +290,23 @@ export const pluginAPI = {
     return request.post(`/plugins/${pluginId}/bind`, data)
   },
   getBindings(pluginId: string) {
-    return request.get<any[]>(`/plugins/${pluginId}/bindings`)
+    return request.get<PluginBinding[]>(`/plugins/${pluginId}/bindings`)
   },
   unbind(pluginId: string, data: Record<string, unknown>) {
     return request.delete(`/plugins/${pluginId}/unbind`, data)
   },
   execute(pluginId: string, data: Record<string, unknown>) {
-    return request.post(`/plugins/${pluginId}/execute`, data)
+    return request.post<PluginExecution>(`/plugins/${pluginId}/execute`, data)
   },
   listExecutions(pluginId: string, limit = 50) {
-    return request.get<any[]>(`/plugins/${pluginId}/executions`, { limit })
+    return request.get<PluginExecution[]>(`/plugins/${pluginId}/executions`, { limit })
   },
 }
 
 // 系统设置 API
 export const settingsAPI = {
   get() {
-    return request.get<{
-      system_name: string
-      system_description: string
-      allow_registration: boolean
-      max_file_size: number
-      db_type: string
-      db_pool_size: number
-      db_timeout: number
-      plugin_timeout: number
-      plugin_work_dir: string
-      plugin_auto_update: boolean
-    }>('/settings')
+    return request.get<SystemSettings>('/settings')
   },
   update(data: Record<string, unknown>) {
     return request.put('/settings', data)
@@ -326,17 +330,17 @@ export const exportAPI = {
 // 统计 API
 export const statsAPI = {
   getSummary() {
-    return request.get('/stats/summary')
+    return request.get<StatsSummary>('/stats/summary')
   },
   getActivities(limit: number) {
-    return request.get<any[]>('/stats/activities', { limit })
+    return request.get<Activity[]>('/stats/activities', { limit })
   },
 }
 
 // 治理域 API
 export const governanceAPI = {
   list(params?: Record<string, unknown>) {
-    return request.get<{ tasks: GovernanceTask[]; total: number }>('/governance/tasks', params)
+    return request.get<GovernanceTaskListResponse>('/governance/tasks', params)
   },
   getDetail(id: string) {
     return request.get<GovernanceTaskDetail>(`/governance/tasks/${id}`)
@@ -369,8 +373,6 @@ export const governanceAPI = {
     return request.post(`/governance/reviews/${id}/apply`)
   },
 }
-
-/* eslint-enable @typescript-eslint/no-explicit-any */
 
 // 默认导出 axios 实例（用于直接调用，如文件上传）
 export default api
