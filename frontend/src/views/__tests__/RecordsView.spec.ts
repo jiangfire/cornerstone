@@ -179,7 +179,7 @@ describe('RecordsView', () => {
     if (originalClientWidthDescriptor) {
       Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidthDescriptor)
     } else {
-      delete (HTMLElement.prototype as Partial<HTMLElement>).clientWidth
+      Reflect.deleteProperty(HTMLElement.prototype, 'clientWidth')
     }
   })
 

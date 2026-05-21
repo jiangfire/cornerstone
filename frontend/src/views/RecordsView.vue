@@ -266,6 +266,7 @@ import { ref, onMounted, onUnmounted, computed, watch, h, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Refresh, Search, Upload, Document, Download } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
+import { FixedDir } from 'element-plus/es/components/table-v2/src/constants'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tableAPI, recordAPI, fileAPI, databaseAPI, exportAPI } from '@/services/api'
 import { formatDate, formatFileSize } from '@/utils/format'
@@ -353,7 +354,7 @@ const createFieldCellRenderer = (field: Field) => {
 }
 
 const tableColumns = computed(() => {
-  const cols: any[] = fields.value.map((field) => ({
+  const cols = fields.value.map((field) => ({
     key: field.id,
     dataKey: field.name,
     title: field.name,
@@ -366,7 +367,7 @@ const tableColumns = computed(() => {
     dataKey: 'created_at',
     title: '创建时间',
     width: 180,
-    fixed: 'right',
+    fixed: FixedDir.RIGHT,
     cellRenderer: ({ rowData }: { rowData: RecordData }) => h('span', formatDate(rowData.created_at)),
   })
 
@@ -375,7 +376,7 @@ const tableColumns = computed(() => {
     dataKey: 'actions',
     title: '操作',
     width: 150,
-    fixed: 'right',
+    fixed: FixedDir.RIGHT,
     cellRenderer: ({ rowData }: { rowData: RecordData }) => {
       const buttons: ReturnType<typeof h>[] = []
       if (canEdit.value) {
