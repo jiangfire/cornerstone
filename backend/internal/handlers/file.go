@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	"github.com/jiangfire/cornerstone/backend/internal/services"
-	"github.com/jiangfire/cornerstone/backend/internal/types"
 	"github.com/jiangfire/cornerstone/backend/pkg/db"
+	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
 // UploadFile 上传文件
@@ -15,13 +15,13 @@ func UploadFile(c *gin.Context) {
 	fieldID := c.PostForm("field_id")
 
 	if recordID == "" && fieldID == "" {
-		types.Error(c, 400, "记录ID或字段ID不能为空")
+		dto.Error(c, 400, "记录ID或字段ID不能为空")
 		return
 	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		types.Error(c, 400, "请选择要上传的文件")
+		dto.Error(c, 400, "请选择要上传的文件")
 		return
 	}
 
@@ -34,11 +34,11 @@ func UploadFile(c *gin.Context) {
 	fileService := services.NewFileService(db.DB())
 	uploadedFile, err := fileService.UploadFile(req, userID)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
-	types.Success(c, uploadedFile)
+	dto.Success(c, uploadedFile)
 }
 
 // GetFile 获取文件信息
@@ -49,11 +49,11 @@ func GetFile(c *gin.Context) {
 	fileService := services.NewFileService(db.DB())
 	file, err := fileService.GetFile(fileID, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, file)
+	dto.Success(c, file)
 }
 
 // DownloadFile 下载文件
@@ -64,7 +64,7 @@ func DownloadFile(c *gin.Context) {
 	fileService := services.NewFileService(db.DB())
 	file, err := fileService.GetFile(fileID, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
@@ -72,7 +72,7 @@ func DownloadFile(c *gin.Context) {
 	// 防止数据被篡改时直接读取任意文件。
 	safePath, err := services.ResolveSecureStoragePath(file.StorageURL)
 	if err != nil {
-		types.Error(c, 403, "文件路径不合法")
+		dto.Error(c, 403, "文件路径不合法")
 		return
 	}
 	c.FileAttachment(safePath, file.FileName)
@@ -85,11 +85,11 @@ func DeleteFile(c *gin.Context) {
 
 	fileService := services.NewFileService(db.DB())
 	if err := fileService.DeleteFile(fileID, userID); err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, "文件删除成功")
+	dto.Success(c, "文件删除成功")
 }
 
 // ListRecordFiles 列出记录的所有文件
@@ -100,9 +100,9 @@ func ListRecordFiles(c *gin.Context) {
 	fileService := services.NewFileService(db.DB())
 	files, err := fileService.ListRecordFiles(recordID, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{"items": files})
+	dto.Success(c, gin.H{"items": files})
 }

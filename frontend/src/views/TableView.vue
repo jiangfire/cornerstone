@@ -118,7 +118,7 @@ const loadTables = async () => {
   loading.value = true
   try {
     const response = await databaseAPI.getTables(databaseId)
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       tables.value = response.data.tables || []
     }
   } catch {
@@ -131,7 +131,7 @@ const loadTables = async () => {
 const loadDatabaseInfo = async () => {
   try {
     const response = await databaseAPI.getDetail(databaseId)
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       databaseName.value = response.data.name || ''
       userRole.value = response.data.role || 'viewer'
     }
@@ -162,7 +162,7 @@ const handleDelete = async (row: Table) => {
       cancelButtonText: '取消',
     })
     const response = await tableAPI.delete(row.id)
-    if (response.success) {
+    if (response.code === 0) {
       ElMessage.success('删除成功')
       await loadTables()
     }
@@ -188,7 +188,7 @@ const handleSubmit = async () => {
       description: form.value.description,
     })
 
-    if (response.success) {
+    if (response.code === 0) {
       ElMessage.success('创建成功')
       dialogVisible.value = false
       await loadTables()

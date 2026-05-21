@@ -276,7 +276,7 @@ const loadOrganizations = async () => {
       page: currentPage.value,
       page_size: pageSize.value,
     })
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       organizations.value = response.data.organizations || []
       total.value = response.data.total || 0
     }
@@ -340,7 +340,7 @@ const handleDelete = async (row: Organization) => {
     })
 
     const response = await organizationAPI.delete(row.id)
-    if (response.success) {
+    if (response.code === 0) {
       ElMessage.success('删除成功')
       currentPage.value = 1
       await loadOrganizations()
@@ -379,7 +379,7 @@ const handleSubmit = async () => {
       })
     }
 
-    if (response.success) {
+    if (response.code === 0) {
       ElMessage.success(isEditMode.value ? '更新成功' : '创建成功')
       dialogVisible.value = false
       currentPage.value = 1
@@ -413,7 +413,7 @@ const loadMembers = async () => {
   membersLoading.value = true
   try {
     const response = await organizationAPI.getMembers(selectedOrg.value.id)
-    if (response.success) {
+    if (response.code === 0) {
       members.value = response.data.members || []
     }
   } catch {
@@ -435,7 +435,7 @@ const loadAvailableUsers = async () => {
   userLoading.value = true
   try {
     const response = await userAPI.list({ org_id: selectedOrg.value.id })
-    if (response.success) {
+    if (response.code === 0) {
       availableUsers.value = response.data.users || []
     }
   } catch {
@@ -472,7 +472,7 @@ const submitAddMember = async () => {
     submitting.value = true
     const response = await organizationAPI.addMember(selectedOrg.value.id, addMemberForm.value)
 
-    if (response.success) {
+    if (response.code === 0) {
       ElMessage.success('添加成员成功')
       addMemberDialogVisible.value = false
       await loadMembers()

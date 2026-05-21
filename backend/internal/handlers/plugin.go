@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	"github.com/jiangfire/cornerstone/backend/internal/services"
-	"github.com/jiangfire/cornerstone/backend/internal/types"
 	"github.com/jiangfire/cornerstone/backend/pkg/db"
+	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
 // CreatePlugin 创建插件
@@ -16,18 +16,18 @@ func CreatePlugin(c *gin.Context) {
 
 	var req services.CreatePluginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	pluginService := services.NewPluginService(db.DB())
 	plugin, err := pluginService.CreatePlugin(req, userID)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
-	types.Success(c, plugin)
+	dto.Success(c, plugin)
 }
 
 // ListPlugins 列出插件
@@ -46,11 +46,11 @@ func ListPlugins(c *gin.Context) {
 		PageSize: pageSize,
 	})
 	if err != nil {
-		types.Error(c, 500, err.Error())
+		dto.Error(c, 500, err.Error())
 		return
 	}
 
-	types.Success(c, result)
+	dto.Success(c, result)
 }
 
 // GetPlugin 获取插件详情
@@ -61,11 +61,11 @@ func GetPlugin(c *gin.Context) {
 	pluginService := services.NewPluginService(db.DB())
 	plugin, err := pluginService.GetPlugin(pluginID, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, plugin)
+	dto.Success(c, plugin)
 }
 
 // UpdatePlugin 更新插件
@@ -75,17 +75,17 @@ func UpdatePlugin(c *gin.Context) {
 
 	var req services.UpdatePluginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	pluginService := services.NewPluginService(db.DB())
 	if err := pluginService.UpdatePlugin(pluginID, req, userID); err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, "更新成功")
+	dto.Success(c, "更新成功")
 }
 
 // DeletePlugin 删除插件
@@ -95,11 +95,11 @@ func DeletePlugin(c *gin.Context) {
 
 	pluginService := services.NewPluginService(db.DB())
 	if err := pluginService.DeletePlugin(pluginID, userID); err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, "删除成功")
+	dto.Success(c, "删除成功")
 }
 
 // BindPlugin 绑定插件
@@ -113,17 +113,17 @@ func BindPlugin(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	pluginService := services.NewPluginService(db.DB())
 	if err := pluginService.BindPlugin(pluginID, req.TableID, req.Trigger, userID); err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, "绑定成功")
+	dto.Success(c, "绑定成功")
 }
 
 // UnbindPlugin 解绑插件
@@ -136,17 +136,17 @@ func UnbindPlugin(c *gin.Context) {
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	pluginService := services.NewPluginService(db.DB())
 	if err := pluginService.UnbindPlugin(pluginID, req.TableID, userID); err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, "解绑成功")
+	dto.Success(c, "解绑成功")
 }
 
 // ListPluginBindings 列出插件的所有绑定
@@ -157,11 +157,11 @@ func ListPluginBindings(c *gin.Context) {
 	pluginService := services.NewPluginService(db.DB())
 	bindings, err := pluginService.ListBindings(pluginID, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, bindings)
+	dto.Success(c, bindings)
 }
 
 // ExecutePlugin 手动执行插件
@@ -171,18 +171,18 @@ func ExecutePlugin(c *gin.Context) {
 
 	var req services.ExecutePluginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	pluginService := services.NewPluginService(db.DB())
 	execution, err := pluginService.ExecutePlugin(pluginID, userID, req)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
-	types.Success(c, execution)
+	dto.Success(c, execution)
 }
 
 // ListPluginExecutions 查询插件执行记录
@@ -194,9 +194,9 @@ func ListPluginExecutions(c *gin.Context) {
 	pluginService := services.NewPluginService(db.DB())
 	executions, err := pluginService.ListExecutions(pluginID, userID, limit)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
-	types.Success(c, executions)
+	dto.Success(c, executions)
 }

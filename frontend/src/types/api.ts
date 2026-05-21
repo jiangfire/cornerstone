@@ -3,13 +3,12 @@
  *
  * 本文件是后端 JSON 响应的单一真相. `api.ts` 里的 `request.get<T>(...)`
  * 通过 `ApiResponse<T>` 包装,所以 T 只描述 `data:` 字段内部的形状.
- * 历史上有些类型里平铺了 `success`/`message`,新代码请避免:那两个字段属于
- * 信封 (`ApiResponse`),不属于 data.
+ * 信封字段 (`code`/`message`) 不属于 data.
  */
 
 // 通用 API 响应信封 (ApiResponse.data 类型由具体接口指定)
 export interface ApiResponse<T = unknown> {
-  success: boolean
+  code: number
   message: string
   data: T
 }

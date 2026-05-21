@@ -81,10 +81,30 @@ type MCPConfig struct {
 	SSEReplayBuffer int
 }
 
+// loadEnvFiles 尝试从多个常见位置加载 .env 文件。
+// 优先级：可执行文件同级目录 > 当前工作目录 > 当前工作目录/backend 子目录。
+func loadEnvFiles() {
+	paths := []string{".env"}
+
+	// 可执行文件所在目录
+	if exe, err := os.Executable(); err == nil {
+		paths = append(paths, filepath.Join(filepath.Dir(exe), ".env"))
+	}
+
+	// 当前工作目录/backend 子目录（从项目根目录运行 Go 程序时的常见布局）
+	if cwd, err := os.Getwd(); err == nil {
+		paths = append(paths, filepath.Join(cwd, "backend", ".env"))
+	}
+
+	for _, p := range paths {
+		_ = godotenv.Load(p)
+	}
+}
+
 // Load 加载配置从环境变量
 func Load() (*Config, error) {
-	// 尝试加载 .env 文件（如果存在）
-	_ = godotenv.Load()
+	// 尝试从多个位置加载 .env 文件
+	loadEnvFiles()
 
 	// 检查是否缺少必要的环境变量
 	needsDefaults := os.Getenv("DB_TYPE") == "" && os.Getenv("DATABASE_URL") == ""
@@ -197,12 +217,20 @@ func (c *Config) validateDatabase() error {
 		}
 	case "sqlite":
 		url := strings.TrimSpace(c.Database.URL)
-		// 处理内存数据库
-		if url == "" || url == ":memory:" {
-			c.Database.URL = ":memory:"
+		// 空字符串默认使用文件数据库，避免 :memory: 在部分平台/驱动下的稳定性问题
+		if url == "" {
+			c.Database.URL = "./cornerstone.db"
 			return nil
 		}
-		// 处理文件数据库 - 如果已经配置了，不做修改
+		// 处理内存数据库
+		if url == ":memory:" {
+			return nil
+		}
+		// 如果 URL 明显是 PostgreSQL 连接串但 DB_TYPE 误配为 sqlite，给出明确提示
+		if strings.HasPrefix(url, "postgres://") || strings.HasPrefix(url, "postgresql://") {
+			return fmt.Errorf("DATABASE_URL 看起来是 PostgreSQL 连接串，但 DB_TYPE 配置为 sqlite；请检查 DB_TYPE 或 DATABASE_URL")
+		}
+		// 处理文件数据库
 		if strings.HasPrefix(url, "file://") {
 			return nil
 		}

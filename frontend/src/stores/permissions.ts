@@ -52,7 +52,7 @@ export const usePermissionStore = defineStore('permissions', () => {
     loading.value = true
     try {
       const response = await fieldAPI.getPermissions(tableId)
-      if (response.success && response.data?.permissions) {
+      if (response.code === 0 && response.data?.permissions) {
         fieldPermissions.value = {
           ...fieldPermissions.value,
           [tableId]: response.data.permissions,
@@ -128,7 +128,7 @@ export const usePermissionStore = defineStore('permissions', () => {
     loading.value = true
     try {
       const response = await fieldAPI.setPermission(tableId, permission)
-      if (response.success) {
+      if (response.code === 0) {
         ElMessage.success('权限设置成功')
         // 重新加载权限
         await loadFieldPermissions(tableId)
@@ -148,7 +148,7 @@ export const usePermissionStore = defineStore('permissions', () => {
     loading.value = true
     try {
       const response = await fieldAPI.batchSetPermissions(tableId, permissions)
-      if (response.success) {
+      if (response.code === 0) {
         ElMessage.success(`成功设置 ${permissions.length} 条权限`)
         // 重新加载权限
         await loadFieldPermissions(tableId)

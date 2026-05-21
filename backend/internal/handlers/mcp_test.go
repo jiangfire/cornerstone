@@ -631,6 +631,7 @@ func TestHandleMCPRealHTTPReplayUnavailableAfterBufferEviction(t *testing.T) {
 	defer server.Close()
 
 	conn := openSSEConnection(t, server.URL, authHeaderForUser(t, user), "")
+	defer closeSSEConnection(conn)
 	firstConnected := readNextSSEEvent(t, conn.reader)
 	require.Contains(t, firstConnected.Data, "\"method\":\"notifications/stream/connected\"")
 
@@ -661,6 +662,7 @@ func TestHandleMCPRealHTTPReplayAtHeadReturnsResumedWithoutReplay(t *testing.T) 
 	defer server.Close()
 
 	conn := openSSEConnection(t, server.URL, authHeaderForUser(t, user), "")
+	defer closeSSEConnection(conn)
 	connected := readNextSSEEvent(t, conn.reader)
 	require.Contains(t, connected.Data, "\"method\":\"notifications/stream/connected\"")
 
@@ -816,7 +818,7 @@ func TestHandleMCPRealHTTPRESTTableAndFieldChangesEmitNotifications(t *testing.T
 	fieldResp := performJSONRequest(t, http.MethodPost, server.URL+"/api/fields", authHeaderForUser(t, user), map[string]interface{}{
 		"table_id": tableID,
 		"name":     "status",
-		"type":     "select",
+		"type":     "string",
 		"required": false,
 		"config": map[string]interface{}{
 			"options": []string{"draft", "published"},
@@ -832,7 +834,7 @@ func TestHandleMCPRealHTTPRESTTableAndFieldChangesEmitNotifications(t *testing.T
 
 	updateFieldResp := performJSONRequest(t, http.MethodPut, server.URL+"/api/fields/"+fieldID, authHeaderForUser(t, user), map[string]interface{}{
 		"name":     "status_v2",
-		"type":     "multiselect",
+		"type":     "text",
 		"required": true,
 		"config": map[string]interface{}{
 			"options": []string{"draft", "published", "archived"},
@@ -845,7 +847,7 @@ func TestHandleMCPRealHTTPRESTTableAndFieldChangesEmitNotifications(t *testing.T
 	require.Contains(t, fieldUpdatedEvent.Data, "\"action\":\"updated\"")
 	require.Contains(t, fieldUpdatedEvent.Data, "\"name\":\"status_v2\"")
 	require.Contains(t, fieldUpdatedEvent.Data, "\"required\":true")
-	require.Contains(t, fieldUpdatedEvent.Data, "\"type\":\"multiselect\"")
+	require.Contains(t, fieldUpdatedEvent.Data, "\"type\":\"text\"")
 }
 
 func TestHandleMCPRealHTTPGovernanceWorkflowBroadcastsToParticipants(t *testing.T) {
@@ -1079,6 +1081,7 @@ func TestHandleMCPRealHTTPReplayPreservesMixedBusinessEventOrder(t *testing.T) {
 
 	database := createOwnedDatabaseForUser(t, user.ID, "mixed-replay-db")
 	conn := openSSEConnection(t, server.URL, authHeaderForUser(t, user), "")
+	defer closeSSEConnection(conn)
 	require.Contains(t, readNextSSEEvent(t, conn.reader).Data, "\"method\":\"notifications/stream/connected\"")
 
 	tableResp := performJSONRequest(t, http.MethodPost, server.URL+"/api/tables", authHeaderForUser(t, user), map[string]interface{}{
@@ -1095,7 +1098,7 @@ func TestHandleMCPRealHTTPReplayPreservesMixedBusinessEventOrder(t *testing.T) {
 	fieldResp := performJSONRequest(t, http.MethodPost, server.URL+"/api/fields", authHeaderForUser(t, user), map[string]interface{}{
 		"table_id": tableID,
 		"name":     "stage",
-		"type":     "select",
+		"type":     "string",
 		"config": map[string]interface{}{
 			"options": []string{"a", "b"},
 		},
@@ -1108,7 +1111,7 @@ func TestHandleMCPRealHTTPReplayPreservesMixedBusinessEventOrder(t *testing.T) {
 
 	updateResp := performJSONRequest(t, http.MethodPut, server.URL+"/api/fields/"+fieldID, authHeaderForUser(t, user), map[string]interface{}{
 		"name":     "stage_v2",
-		"type":     "multiselect",
+		"type":     "text",
 		"required": true,
 		"config": map[string]interface{}{
 			"options": []string{"a", "b", "c"},
@@ -1258,6 +1261,7 @@ func TestHandleMCPRealHTTPMixedReplayBufferEvictsOldestBoundary(t *testing.T) {
 
 	database := createOwnedDatabaseForUser(t, user.ID, "mixed-evict-db")
 	conn := openSSEConnection(t, server.URL, authHeaderForUser(t, user), "")
+	defer closeSSEConnection(conn)
 	require.Contains(t, readNextSSEEvent(t, conn.reader).Data, "\"method\":\"notifications/stream/connected\"")
 
 	tableResp := performJSONRequest(t, http.MethodPost, server.URL+"/api/tables", authHeaderForUser(t, user), map[string]interface{}{
@@ -1274,7 +1278,7 @@ func TestHandleMCPRealHTTPMixedReplayBufferEvictsOldestBoundary(t *testing.T) {
 	fieldResp := performJSONRequest(t, http.MethodPost, server.URL+"/api/fields", authHeaderForUser(t, user), map[string]interface{}{
 		"table_id": tableID,
 		"name":     "evict_stage",
-		"type":     "select",
+		"type":     "string",
 		"config": map[string]interface{}{
 			"options": []string{"x", "y"},
 		},
@@ -1287,7 +1291,7 @@ func TestHandleMCPRealHTTPMixedReplayBufferEvictsOldestBoundary(t *testing.T) {
 
 	updateResp := performJSONRequest(t, http.MethodPut, server.URL+"/api/fields/"+fieldID, authHeaderForUser(t, user), map[string]interface{}{
 		"name":     "evict_stage_v2",
-		"type":     "multiselect",
+		"type":     "text",
 		"required": true,
 		"config": map[string]interface{}{
 			"options": []string{"x", "y", "z"},
@@ -1340,7 +1344,12 @@ func openSSEConnection(t *testing.T, baseURL, authHeader, lastEventID string) *s
 		req.Header.Set("Last-Event-ID", lastEventID)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	client := &http.Client{
+		Transport: &http.Transport{
+			DisableKeepAlives: true,
+		},
+	}
+	resp, err := client.Do(req)
 	require.NoError(t, err)
 	require.Equal(t, http.StatusOK, resp.StatusCode)
 
@@ -1494,9 +1503,14 @@ func readNextSSEEvent(t *testing.T, reader *bufio.Reader) sseEvent {
 		line, err := reader.ReadString('\n')
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				continue
+				if line == "" {
+					time.Sleep(10 * time.Millisecond)
+					continue
+				}
+				// EOF with partial data; process it below
+			} else {
+				t.Fatalf("failed to read SSE stream: %v", err)
 			}
-			t.Fatalf("failed to read SSE stream: %v", err)
 		}
 
 		line = strings.TrimRight(line, "\r\n")

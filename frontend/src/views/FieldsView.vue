@@ -255,7 +255,7 @@ const loadFields = async () => {
   loading.value = true
   try {
     const response = await tableAPI.getFields(tableId)
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       fields.value = response.data.items || []
     }
     // 加载字段权限配置
@@ -270,11 +270,11 @@ const loadFields = async () => {
 const loadTableInfo = async () => {
   try {
     const response = await tableAPI.get(tableId)
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       tableName.value = response.data.name || ''
       if (response.data.database_id) {
         const dbResponse = await databaseAPI.getDetail(response.data.database_id)
-        if (dbResponse.success && dbResponse.data?.role) {
+        if (dbResponse.code === 0 && dbResponse.data?.role) {
           permissionStore.setCurrentRole(dbResponse.data.role)
         }
       }
@@ -325,7 +325,7 @@ const handleDelete = async (row: Field) => {
       cancelButtonText: '取消',
     })
     const response = await fieldAPI.delete(row.id)
-    if (response.success) {
+    if (response.code === 0) {
       ElMessage.success('删除成功')
       await loadFields()
     }
@@ -352,7 +352,7 @@ const handleSubmit = async () => {
         required: form.value.required,
         config: buildFieldConfig(form.value.type, form.value.options),
       })
-      if (response.success) {
+      if (response.code === 0) {
         ElMessage.success('更新成功')
         dialogVisible.value = false
         await loadFields()
@@ -365,7 +365,7 @@ const handleSubmit = async () => {
         required: form.value.required,
         config: buildFieldConfig(form.value.type, form.value.options),
       })
-      if (response.success) {
+      if (response.code === 0) {
         ElMessage.success('添加成功')
         dialogVisible.value = false
         await loadFields()

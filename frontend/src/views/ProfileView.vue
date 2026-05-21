@@ -142,7 +142,7 @@ const passwordForm = ref({
 const loadProfile = async () => {
   try {
     const response = await userAPI.getProfile()
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       const user = response.data
       profileForm.value = {
         username: user.username || '',
@@ -167,7 +167,7 @@ const updateProfile = async () => {
       bio: profileForm.value.bio,
       avatar: profileForm.value.avatar,
     })
-    if (!response.success) {
+    if (response.code !== 0) {
       throw new Error(response.message || '更新失败')
     }
     ElMessage.success('个人资料更新成功')
@@ -201,7 +201,7 @@ const handleAvatarChange = async (file: UploadFile) => {
 
   try {
     const response = await avatarAPI.upload(raw)
-    if (!response.success || !response.data?.avatar_url) {
+    if (response.code !== 0 || !response.data?.avatar_url) {
       throw new Error(response.message || '上传失败')
     }
     profileForm.value.avatar = response.data.avatar_url
@@ -223,7 +223,7 @@ const removeAvatar = async () => {
       bio: profileForm.value.bio,
       avatar: '',
     })
-    if (!response.success) {
+    if (response.code !== 0) {
       throw new Error(response.message || '移除失败')
     }
     ElMessage.success('头像已移除')
@@ -245,7 +245,7 @@ const changePassword = async () => {
       current_password: passwordForm.value.currentPassword,
       new_password: passwordForm.value.newPassword,
     })
-    if (!response.success) {
+    if (response.code !== 0) {
       throw new Error(response.message || '密码修改失败')
     }
     ElMessage.success('密码修改成功')
@@ -285,7 +285,7 @@ const deleteAccount = async () => {
     })
 
     const response = await userAPI.deleteAccount({ password: value })
-    if (!response.success) {
+    if (response.code !== 0) {
       throw new Error(response.message || '删除账户失败')
     }
 

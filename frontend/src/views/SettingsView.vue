@@ -114,7 +114,7 @@ const loadSettings = async () => {
   loading.value = true
   try {
     const response = await settingsAPI.get()
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       systemForm.value = {
         name: response.data.system_name || 'Cornerstone',
         description: response.data.system_description || '',
@@ -156,7 +156,7 @@ const saveSettings = async (successMessage: string) => {
       plugin_work_dir: pluginForm.value.workDir,
       plugin_auto_update: pluginForm.value.autoUpdate,
     })
-    if (!response.success) {
+    if (response.code !== 0) {
       throw new Error(response.message || '保存配置失败')
     }
 

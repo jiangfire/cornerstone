@@ -69,7 +69,7 @@ describe('DatabasesView', () => {
     vi.clearAllMocks()
     confirmMock.mockResolvedValue(true)
     databaseAPI.list.mockResolvedValue({
-      success: true,
+      code: 0,
       data: {
         databases: [
           {
@@ -107,14 +107,14 @@ describe('DatabasesView', () => {
         ],
       },
     })
-    databaseAPI.update.mockResolvedValue({ success: true })
-    databaseAPI.create.mockResolvedValue({ success: true })
-    databaseAPI.delete.mockResolvedValue({ success: true })
-    databaseAPI.share.mockResolvedValue({ success: true })
-    databaseAPI.updateUserRole.mockResolvedValue({ success: true })
-    databaseAPI.removeUser.mockResolvedValue({ success: true })
+    databaseAPI.update.mockResolvedValue({ code: 0 })
+    databaseAPI.create.mockResolvedValue({ code: 0 })
+    databaseAPI.delete.mockResolvedValue({ code: 0 })
+    databaseAPI.share.mockResolvedValue({ code: 0 })
+    databaseAPI.updateUserRole.mockResolvedValue({ code: 0 })
+    databaseAPI.removeUser.mockResolvedValue({ code: 0 })
     databaseAPI.listUsers.mockResolvedValue({
-      success: true,
+      code: 0,
       data: {
         users: [
           {
@@ -135,7 +135,7 @@ describe('DatabasesView', () => {
       },
     })
     userAPI.list.mockResolvedValue({
-      success: true,
+      code: 0,
       data: {
         users: [{ id: 'user_viewer', username: 'viewer', email: 'viewer@example.com' }],
       },

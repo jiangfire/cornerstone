@@ -188,7 +188,7 @@ const loadFields = async () => {
   loading.value = true
   try {
     const response = await tableAPI.getFields(tableId)
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       fields.value = response.data.items || []
       initPermissionMatrix()
       // 加载现有权限配置
@@ -205,7 +205,7 @@ const loadFields = async () => {
 const loadTableInfo = async () => {
   try {
     const response = await tableAPI.get(tableId)
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       tableName.value = response.data.name || ''
     }
   } catch (error) {

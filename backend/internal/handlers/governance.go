@@ -7,8 +7,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	"github.com/jiangfire/cornerstone/backend/internal/services"
-	"github.com/jiangfire/cornerstone/backend/internal/types"
 	"github.com/jiangfire/cornerstone/backend/pkg/db"
+	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
 // CreateGovernanceTask godoc
@@ -19,28 +19,28 @@ import (
 // @Produce json
 // @Security BearerAuth
 // @Param request body services.CreateGovernanceTaskRequest true "Governance task request"
-// @Success 200 {object} types.Response{data=models.GovernanceTask}
-// @Failure 400 {object} types.Response
+// @Success 200 {object} dto.Response{data=models.GovernanceTask}
+// @Failure 400 {object} dto.Response
 // @Router /governance/tasks [post]
 func CreateGovernanceTask(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 
 	var req services.CreateGovernanceTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	governanceService := services.NewGovernanceService(db.DB())
 	task, err := governanceService.CreateTask(req, userID)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
 	publishGovernanceTaskChanged(governanceTaskAudience(task, userID), "created", task)
 
-	types.Success(c, task)
+	dto.Success(c, task)
 }
 
 // ListGovernanceTasks godoc
@@ -58,8 +58,8 @@ func CreateGovernanceTask(c *gin.Context) {
 // @Param resource_id query string false "Filter by resource ID"
 // @Param page query int false "Page number (1-based, default 1)"
 // @Param page_size query int false "Items per page (default 20, max 200)"
-// @Success 200 {object} types.Response{data=services.GovernanceTaskList}
-// @Failure 500 {object} types.Response
+// @Success 200 {object} dto.Response{data=services.GovernanceTaskList}
+// @Failure 500 {object} dto.Response
 // @Router /governance/tasks [get]
 func ListGovernanceTasks(c *gin.Context) {
 	userID := middleware.GetUserID(c)
@@ -81,11 +81,11 @@ func ListGovernanceTasks(c *gin.Context) {
 	governanceService := services.NewGovernanceService(db.DB())
 	result, err := governanceService.ListTasks(userID, filter)
 	if err != nil {
-		types.Error(c, 500, err.Error())
+		dto.Error(c, 500, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"tasks":     result.Items,
 		"total":     result.Total,
 		"page":      result.Page,
@@ -101,11 +101,11 @@ func GetGovernanceTask(c *gin.Context) {
 	governanceService := services.NewGovernanceService(db.DB())
 	detail, err := governanceService.GetTask(taskID, userID)
 	if err != nil {
-		types.Error(c, 404, err.Error())
+		dto.Error(c, 404, err.Error())
 		return
 	}
 
-	types.Success(c, detail)
+	dto.Success(c, detail)
 }
 
 // UpdateGovernanceTask 更新治理任务
@@ -115,20 +115,20 @@ func UpdateGovernanceTask(c *gin.Context) {
 
 	var req services.UpdateGovernanceTaskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	governanceService := services.NewGovernanceService(db.DB())
 	task, err := governanceService.UpdateTask(taskID, req, userID)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
 	publishGovernanceTaskChanged(governanceTaskAudience(task, userID), "updated", task)
 
-	types.Success(c, task)
+	dto.Success(c, task)
 }
 
 // CreateGovernanceEvidence 创建治理证据
@@ -138,18 +138,18 @@ func CreateGovernanceEvidence(c *gin.Context) {
 
 	var req services.CreateGovernanceEvidenceRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	governanceService := services.NewGovernanceService(db.DB())
 	evidence, err := governanceService.AddEvidence(taskID, req, userID)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
-	types.Success(c, evidence)
+	dto.Success(c, evidence)
 }
 
 // CreateGovernanceComment 创建治理评论
@@ -159,18 +159,18 @@ func CreateGovernanceComment(c *gin.Context) {
 
 	var req services.CreateGovernanceCommentRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	governanceService := services.NewGovernanceService(db.DB())
 	comment, err := governanceService.AddComment(taskID, req, userID)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
-	types.Success(c, comment)
+	dto.Success(c, comment)
 }
 
 // CreateGovernanceReview 创建治理审核
@@ -179,14 +179,14 @@ func CreateGovernanceReview(c *gin.Context) {
 
 	var req services.CreateGovernanceReviewRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	governanceService := services.NewGovernanceService(db.DB())
 	review, err := governanceService.CreateReview(req, userID)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
@@ -195,7 +195,7 @@ func CreateGovernanceReview(c *gin.Context) {
 	publishGovernanceReviewChanged(audience, "created", review)
 	publishGovernanceTaskChanged(audience, "entered_review", task)
 
-	types.Success(c, review)
+	dto.Success(c, review)
 }
 
 // GetGovernanceReview 获取治理审核详情
@@ -206,11 +206,11 @@ func GetGovernanceReview(c *gin.Context) {
 	governanceService := services.NewGovernanceService(db.DB())
 	review, err := governanceService.GetReview(reviewID, userID)
 	if err != nil {
-		types.Error(c, 404, err.Error())
+		dto.Error(c, 404, err.Error())
 		return
 	}
 
-	types.Success(c, review)
+	dto.Success(c, review)
 }
 
 // ApproveGovernanceReview 审核通过
@@ -220,14 +220,14 @@ func ApproveGovernanceReview(c *gin.Context) {
 
 	var req services.ReviewDecisionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	governanceService := services.NewGovernanceService(db.DB())
 	review, err := governanceService.DecideReview(reviewID, userID, "approved", req.DecisionPayload)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
@@ -236,7 +236,7 @@ func ApproveGovernanceReview(c *gin.Context) {
 	publishGovernanceReviewChanged(audience, "approved", review)
 	publishGovernanceTaskChanged(audience, "review_decided", task)
 
-	types.Success(c, review)
+	dto.Success(c, review)
 }
 
 // RejectGovernanceReview 审核拒绝
@@ -246,14 +246,14 @@ func RejectGovernanceReview(c *gin.Context) {
 
 	var req services.ReviewDecisionRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	governanceService := services.NewGovernanceService(db.DB())
 	review, err := governanceService.DecideReview(reviewID, userID, "rejected", req.DecisionPayload)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
@@ -262,7 +262,7 @@ func RejectGovernanceReview(c *gin.Context) {
 	publishGovernanceReviewChanged(audience, "rejected", review)
 	publishGovernanceTaskChanged(audience, "review_decided", task)
 
-	types.Success(c, review)
+	dto.Success(c, review)
 }
 
 // ApplyGovernanceReview 执行或重试审核回写
@@ -273,7 +273,7 @@ func ApplyGovernanceReview(c *gin.Context) {
 	governanceService := services.NewGovernanceService(db.DB())
 	outbox, err := governanceService.EnqueueReviewApply(reviewID, userID, true)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
@@ -283,7 +283,7 @@ func ApplyGovernanceReview(c *gin.Context) {
 	publishGovernanceReviewChanged(audience, "apply_requested", review)
 	publishGovernanceTaskChanged(audience, "apply_requested", task)
 
-	types.Success(c, outbox)
+	dto.Success(c, outbox)
 }
 
 // GenerateAIRecommendation 生成 AI 建议
@@ -292,7 +292,7 @@ func GenerateAIRecommendation(c *gin.Context) {
 
 	var req services.GenerateAIRecommendationRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
@@ -303,13 +303,13 @@ func GenerateAIRecommendation(c *gin.Context) {
 		if isValidationError(err) {
 			status = 400
 		}
-		types.Error(c, status, err.Error())
+		dto.Error(c, status, err.Error())
 		return
 	}
 
 	publishGovernanceReviewChanged(governanceReviewAudience(review, loadGovernanceTask(review.TaskID), userID), "created", review)
 
-	types.Success(c, review)
+	dto.Success(c, review)
 }
 
 // isValidationError 判断错误是否为用户输入/配置/权限类错误（应返回 4xx）

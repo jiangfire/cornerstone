@@ -50,6 +50,7 @@
           native-type="submit"
           :loading="authStore.loading"
           class="submit-btn"
+          @click="handleSubmit"
         >
           登录
         </el-button>

@@ -6,8 +6,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	"github.com/jiangfire/cornerstone/backend/internal/services"
-	"github.com/jiangfire/cornerstone/backend/internal/types"
 	"github.com/jiangfire/cornerstone/backend/pkg/db"
+	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
 // CreateOrganization 创建组织
@@ -16,18 +16,18 @@ func CreateOrganization(c *gin.Context) {
 
 	var req services.CreateOrgRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	orgService := services.NewOrganizationService(db.DB())
 	org, err := orgService.CreateOrganization(req, userID)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"id":          org.ID,
 		"name":        org.Name,
 		"description": org.Description,
@@ -52,11 +52,11 @@ func ListOrganizations(c *gin.Context) {
 		PageSize: pageSize,
 	})
 	if err != nil {
-		types.Error(c, 500, err.Error())
+		dto.Error(c, 500, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"organizations": orgs.Items,
 		"total":         orgs.Total,
 		"page":          orgs.Page,
@@ -72,11 +72,11 @@ func GetOrganization(c *gin.Context) {
 	orgService := services.NewOrganizationService(db.DB())
 	org, err := orgService.GetOrganization(orgID, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, org)
+	dto.Success(c, org)
 }
 
 // UpdateOrganization 更新组织信息
@@ -86,18 +86,18 @@ func UpdateOrganization(c *gin.Context) {
 
 	var req services.UpdateOrgRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	orgService := services.NewOrganizationService(db.DB())
 	org, err := orgService.UpdateOrganization(orgID, req, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"id":          org.ID,
 		"name":        org.Name,
 		"description": org.Description,
@@ -112,11 +112,11 @@ func DeleteOrganization(c *gin.Context) {
 
 	orgService := services.NewOrganizationService(db.DB())
 	if err := orgService.DeleteOrganization(orgID, userID); err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"message": "组织已删除",
 	})
 }
@@ -129,11 +129,11 @@ func ListOrganizationMembers(c *gin.Context) {
 	orgService := services.NewOrganizationService(db.DB())
 	members, err := orgService.ListMembers(orgID, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"members": members,
 		"total":   len(members),
 	})
@@ -146,17 +146,17 @@ func AddOrganizationMember(c *gin.Context) {
 
 	var req services.AddMemberRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	orgService := services.NewOrganizationService(db.DB())
 	if err := orgService.AddMember(orgID, req, userID); err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"message": "成员添加成功",
 	})
 }
@@ -169,11 +169,11 @@ func RemoveOrganizationMember(c *gin.Context) {
 
 	orgService := services.NewOrganizationService(db.DB())
 	if err := orgService.RemoveMember(orgID, memberID, userID); err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"message": "成员已移除",
 	})
 }
@@ -186,17 +186,17 @@ func UpdateOrganizationMemberRole(c *gin.Context) {
 
 	var req services.UpdateMemberRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	orgService := services.NewOrganizationService(db.DB())
 	if err := orgService.UpdateMemberRole(orgID, memberID, req, userID); err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"message": "角色已更新",
 	})
 }

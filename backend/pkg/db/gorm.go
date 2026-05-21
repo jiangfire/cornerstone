@@ -57,8 +57,14 @@ func InitDB(cfg config.DatabaseConfig) error {
 		return err
 	}
 
-	sqlDB.SetMaxOpenConns(cfg.MaxOpen)
-	sqlDB.SetMaxIdleConns(cfg.MaxIdle)
+	// SQLite :memory: 每个连接都是独立的数据库，必须限制为单连接
+	if cfg.Type == "sqlite" && cfg.URL == ":memory:" {
+		sqlDB.SetMaxOpenConns(1)
+		sqlDB.SetMaxIdleConns(1)
+	} else {
+		sqlDB.SetMaxOpenConns(cfg.MaxOpen)
+		sqlDB.SetMaxIdleConns(cfg.MaxIdle)
+	}
 	if cfg.MaxLifetime > 0 {
 		sqlDB.SetConnMaxLifetime(time.Duration(cfg.MaxLifetime) * time.Second)
 	}

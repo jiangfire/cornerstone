@@ -258,7 +258,7 @@ const loadDatabases = async () => {
   loading.value = true
   try {
     const response = await databaseAPI.list()
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       databases.value = response.data.databases || []
     }
   } catch {
@@ -299,7 +299,7 @@ const handleDelete = async (row: Database) => {
       cancelButtonText: '取消',
     })
     const response = await databaseAPI.delete(row.id)
-    if (response.success) {
+    if (response.code === 0) {
       ElMessage.success('删除成功')
       await loadDatabases()
     }
@@ -325,7 +325,7 @@ const handleSubmit = async () => {
         description: form.value.description,
         is_public: form.value.isPublic,
       })
-      if (response.success) {
+      if (response.code === 0) {
         ElMessage.success('更新成功')
       }
     } else {
@@ -334,7 +334,7 @@ const handleSubmit = async () => {
         description: form.value.description,
         is_public: form.value.isPublic,
       })
-      if (response.success) {
+      if (response.code === 0) {
         ElMessage.success('创建成功')
       }
     }
@@ -354,7 +354,7 @@ const loadSharedUsers = async () => {
   sharedUsersLoading.value = true
   try {
     const response = await databaseAPI.listUsers(selectedDatabase.value.id)
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       sharedUsers.value = response.data.users || []
     }
   } catch {
@@ -370,7 +370,7 @@ const loadShareCandidates = async () => {
   sharingCandidatesLoading.value = true
   try {
     const response = await userAPI.list({ db_id: selectedDatabase.value.id })
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       shareCandidates.value = response.data.users || []
     }
   } catch {
@@ -402,7 +402,7 @@ const handleShareSubmit = async () => {
       user_id: shareForm.value.userId,
       role: shareForm.value.role,
     })
-    if (response.success) {
+    if (response.code === 0) {
       ElMessage.success('分享成功')
       shareForm.value.userId = ''
       await Promise.all([loadSharedUsers(), loadShareCandidates()])
@@ -422,7 +422,7 @@ const handleSharedRoleChange = async (
 
   try {
     const response = await databaseAPI.updateUserRole(selectedDatabase.value.id, row.user_id, role)
-    if (response.success) {
+    if (response.code === 0) {
       ElMessage.success('角色更新成功')
       await loadSharedUsers()
     }
@@ -442,7 +442,7 @@ const handleRemoveSharedUser = async (row: DatabaseUser) => {
       cancelButtonText: '取消',
     })
     const response = await databaseAPI.removeUser(selectedDatabase.value.id, row.user_id)
-    if (response.success) {
+    if (response.code === 0) {
       ElMessage.success('成员已移除')
       await Promise.all([loadSharedUsers(), loadShareCandidates()])
     }

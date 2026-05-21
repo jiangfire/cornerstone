@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	"github.com/jiangfire/cornerstone/backend/internal/services"
-	"github.com/jiangfire/cornerstone/backend/internal/types"
 	"github.com/jiangfire/cornerstone/backend/pkg/db"
+	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
 // CreateTable 创建表
@@ -14,20 +14,20 @@ func CreateTable(c *gin.Context) {
 
 	var req services.CreateTableRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	tableService := services.NewTableService(db.DB())
 	table, err := tableService.CreateTable(req, userID)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
 	publishTableChanged([]string{userID}, "created", table)
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"id":          table.ID,
 		"database_id": table.DatabaseID,
 		"name":        table.Name,
@@ -44,11 +44,11 @@ func ListTables(c *gin.Context) {
 	tableService := services.NewTableService(db.DB())
 	tables, err := tableService.ListTables(dbID, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"tables": tables,
 		"total":  len(tables),
 	})
@@ -62,11 +62,11 @@ func GetTable(c *gin.Context) {
 	tableService := services.NewTableService(db.DB())
 	table, err := tableService.GetTable(tableID, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, table)
+	dto.Success(c, table)
 }
 
 // UpdateTable 更新表信息
@@ -76,20 +76,20 @@ func UpdateTable(c *gin.Context) {
 
 	var req services.UpdateTableRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	tableService := services.NewTableService(db.DB())
 	table, err := tableService.UpdateTable(tableID, req, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
 	publishTableChanged([]string{userID}, "updated", table)
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"id":          table.ID,
 		"name":        table.Name,
 		"description": table.Description,
@@ -104,11 +104,11 @@ func DeleteTable(c *gin.Context) {
 
 	tableService := services.NewTableService(db.DB())
 	if err := tableService.DeleteTable(tableID, userID); err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"message": "表已删除",
 	})
 }

@@ -10,8 +10,8 @@ import (
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"github.com/jiangfire/cornerstone/backend/internal/services"
-	"github.com/jiangfire/cornerstone/backend/internal/types"
 	"github.com/jiangfire/cornerstone/backend/pkg/db"
+	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 	"go.uber.org/zap"
 )
 
@@ -50,18 +50,18 @@ func CreateRecord(c *gin.Context) {
 
 	var req services.CreateRecordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	recordService := services.NewRecordService(db.DB())
 	record, err := recordService.CreateRecord(req, userID)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
-	types.Success(c, recordResponseWithData(record, gin.H{
+	dto.Success(c, recordResponseWithData(record, gin.H{
 		"id":         record.ID,
 		"table_id":   record.TableID,
 		"version":    record.Version,
@@ -74,7 +74,7 @@ func ExportRecords(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 	tableID := c.Query("table_id")
 	if tableID == "" {
-		types.Error(c, 400, "table_id 不能为空")
+		dto.Error(c, 400, "table_id 不能为空")
 		return
 	}
 
@@ -84,7 +84,7 @@ func ExportRecords(c *gin.Context) {
 	recordService := services.NewRecordService(db.DB())
 	data, contentType, filename, err := recordService.ExportRecords(tableID, userID, format, filter)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
@@ -99,18 +99,18 @@ func ListRecords(c *gin.Context) {
 
 	var req services.QueryRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	recordService := services.NewRecordService(db.DB())
 	result, err := recordService.ListRecords(req, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"items":    result.Records,
 		"total":    result.Total,
 		"has_more": result.HasMore,
@@ -125,11 +125,11 @@ func GetRecord(c *gin.Context) {
 	recordService := services.NewRecordService(db.DB())
 	record, err := recordService.GetRecord(recordID, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, record)
+	dto.Success(c, record)
 }
 
 // UpdateRecord 更新记录
@@ -139,18 +139,18 @@ func UpdateRecord(c *gin.Context) {
 
 	var req services.UpdateRecordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	recordService := services.NewRecordService(db.DB())
 	record, err := recordService.UpdateRecord(recordID, req, userID)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
-	types.Success(c, recordResponseWithData(record, gin.H{
+	dto.Success(c, recordResponseWithData(record, gin.H{
 		"id":         record.ID,
 		"version":    record.Version,
 		"updated_at": record.UpdatedAt,
@@ -164,11 +164,11 @@ func DeleteRecord(c *gin.Context) {
 
 	recordService := services.NewRecordService(db.DB())
 	if err := recordService.DeleteRecord(recordID, userID); err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"message": "记录已删除",
 	})
 }
@@ -179,7 +179,7 @@ func BatchCreateRecords(c *gin.Context) {
 
 	var req services.CreateRecordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
@@ -187,14 +187,14 @@ func BatchCreateRecords(c *gin.Context) {
 	count := c.DefaultQuery("count", "1")
 	var batchCount int
 	if _, err := fmt.Sscanf(count, "%d", &batchCount); err != nil || batchCount < 1 || batchCount > 100 {
-		types.Error(c, 400, "批量数量必须在1-100之间")
+		dto.Error(c, 400, "批量数量必须在1-100之间")
 		return
 	}
 
 	recordService := services.NewRecordService(db.DB())
 	records, err := recordService.BatchCreateRecords(req, userID, batchCount)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
@@ -207,7 +207,7 @@ func BatchCreateRecords(c *gin.Context) {
 		})
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"records": result,
 		"count":   len(records),
 	})

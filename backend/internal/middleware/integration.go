@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jiangfire/cornerstone/backend/internal/types"
+	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
 // IntegrationAuthConfig 入站集成 token 配置；由 main.go 在路由注册阶段从 cfg.Integrations 注入，
@@ -55,7 +55,7 @@ func IntegrationTokenAuth(cfg IntegrationAuthConfig) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		sourceSystem := strings.TrimSpace(c.GetHeader("X-Source-System"))
 		if sourceSystem == "" {
-			types.Unauthorized(c, "缺少 X-Source-System")
+			dto.Unauthorized(c, "缺少 X-Source-System")
 			c.Abort()
 			return
 		}
@@ -63,14 +63,14 @@ func IntegrationTokenAuth(cfg IntegrationAuthConfig) gin.HandlerFunc {
 		authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || !strings.EqualFold(parts[0], "Bearer") {
-			types.Unauthorized(c, "认证令牌格式错误")
+			dto.Unauthorized(c, "认证令牌格式错误")
 			c.Abort()
 			return
 		}
 
 		token := strings.TrimSpace(parts[1])
 		if token == "" {
-			types.Unauthorized(c, "缺少认证令牌")
+			dto.Unauthorized(c, "缺少认证令牌")
 			c.Abort()
 			return
 		}
@@ -84,7 +84,7 @@ func IntegrationTokenAuth(cfg IntegrationAuthConfig) gin.HandlerFunc {
 
 		expected, ok := allowed[sourceSystem]
 		if !ok || !secureEquals(token, expected) {
-			types.Unauthorized(c, "无效的集成令牌")
+			dto.Unauthorized(c, "无效的集成令牌")
 			c.Abort()
 			return
 		}

@@ -88,7 +88,7 @@ describe('permissions store', () => {
         makePerm({ field_id: 'f2', role: 'viewer', can_read: true, can_write: true }),
       ]
       fieldAPI.getPermissions.mockResolvedValueOnce({
-        success: true,
+        code: 0,
         data: { permissions: perms },
       })
 
@@ -112,7 +112,7 @@ describe('permissions store', () => {
 
     it('returns empty array on unsuccessful response without throwing', async () => {
       const store = usePermissionStore()
-      fieldAPI.getPermissions.mockResolvedValueOnce({ success: false })
+      fieldAPI.getPermissions.mockResolvedValueOnce({ code: 400 })
 
       const result = await store.loadFieldPermissions('table-1')
 
@@ -130,7 +130,7 @@ describe('permissions store', () => {
       expect(canWriteF1.value).toBe(false) // viewer default → no write
 
       fieldAPI.getPermissions.mockResolvedValueOnce({
-        success: true,
+        code: 0,
         data: {
           permissions: [makePerm({ field_id: 'f1', role: 'viewer', can_write: true })],
         },
@@ -148,7 +148,7 @@ describe('permissions store', () => {
 
       const perms = [makePerm({ field_id: 'fx' })]
       fieldAPI.getPermissions.mockResolvedValueOnce({
-        success: true,
+        code: 0,
         data: { permissions: perms },
       })
       await store.loadFieldPermissions('table-1')
@@ -162,7 +162,7 @@ describe('permissions store', () => {
       store.setCurrentRole('viewer')
 
       fieldAPI.getPermissions.mockResolvedValueOnce({
-        success: true,
+        code: 0,
         data: {
           permissions: [makePerm({ field_id: 'f1', role: 'viewer', can_read: false })],
         },
@@ -186,7 +186,7 @@ describe('permissions store', () => {
       store.setCurrentRole('viewer')
 
       fieldAPI.getPermissions.mockResolvedValueOnce({
-        success: true,
+        code: 0,
         data: {
           permissions: [
             makePerm({ field_id: 'secret', role: 'viewer', can_read: false }),
@@ -203,7 +203,7 @@ describe('permissions store', () => {
       store.setCurrentRole('viewer')
 
       fieldAPI.getPermissions.mockResolvedValueOnce({
-        success: true,
+        code: 0,
         data: {
           permissions: [
             makePerm({
@@ -229,7 +229,7 @@ describe('permissions store', () => {
       store.setCurrentRole('viewer')
 
       fieldAPI.getPermissions.mockResolvedValueOnce({
-        success: true,
+        code: 0,
         data: {
           permissions: [
             makePerm({ field_id: 'visible', role: 'viewer', can_read: true }),

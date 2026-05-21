@@ -91,7 +91,7 @@ importers:
         specifier: ~5.9.3
         version: 5.9.3
       vite:
-        specifier: npm:rolldown-vite@latest
+        specifier: npm:rolldown-vite@7.3.0
         version: rolldown-vite@7.3.0(@types/node@24.10.4)(esbuild@0.27.2)(jiti@2.6.1)(sass-embedded@1.97.2)(sass@1.97.2)
       vite-plugin-vue-devtools:
         specifier: ^8.0.5

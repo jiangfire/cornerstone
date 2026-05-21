@@ -456,7 +456,7 @@ const getFieldOptions = (config?: { options?: string[] }) => {
 const loadFields = async () => {
   try {
     const response = await tableAPI.getFields(tableId)
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       fields.value = response.data.items || []
     }
   } catch (err) {
@@ -467,14 +467,14 @@ const loadFields = async () => {
 const loadTableInfo = async () => {
   try {
     const response = await tableAPI.get(tableId)
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       tableName.value = response.data.name || ''
       databaseId.value = response.data.database_id || ''
 
       // 获取数据库角色
       if (databaseId.value) {
         const dbResponse = await databaseAPI.getDetail(databaseId.value)
-        if (dbResponse.success && dbResponse.data) {
+        if (dbResponse.code === 0 && dbResponse.data) {
           userRole.value = dbResponse.data.role || 'viewer'
         }
       }
@@ -498,7 +498,7 @@ const loadRecords = async () => {
     }
 
     const response = await recordAPI.list(params)
-    if (response.success && response.data) {
+    if (response.code === 0 && response.data) {
       records.value = response.data.items || []
       total.value = response.data.total || 0
     }
@@ -575,7 +575,7 @@ const handleDelete = async (row: RecordData) => {
       cancelButtonText: '取消',
     })
     const response = await recordAPI.delete(row.id)
-    if (response.success) {
+    if (response.code === 0) {
       ElMessage.success('删除成功')
       await loadRecords()
     }
@@ -599,7 +599,7 @@ const handleSubmit = async () => {
       const response = await recordAPI.update(currentRecordId.value, {
         data: form.value,
       })
-      if (response.success) {
+      if (response.code === 0) {
         ElMessage.success('更新成功')
         dialogVisible.value = false
         await loadRecords()
@@ -609,7 +609,7 @@ const handleSubmit = async () => {
         table_id: tableId,
         data: form.value,
       })
-      if (response.success) {
+      if (response.code === 0) {
         ElMessage.success('创建成功')
         dialogVisible.value = false
         await loadRecords()

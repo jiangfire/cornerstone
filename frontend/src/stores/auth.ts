@@ -67,12 +67,12 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const response = await authAPI.login({ username, password })
 
-      if (response.success && response.data?.token) {
+      if (response.code === 0 && response.data?.token) {
         setToken(response.data.token)
 
         // 获取用户信息
         const profile = await userAPI.getProfile()
-        if (profile.success && profile.data) {
+        if (profile.code === 0 && profile.data) {
           setUser(profile.data)
         }
 
@@ -96,7 +96,7 @@ export const useAuthStore = defineStore('auth', () => {
     try {
       const response = await authAPI.register(userData)
 
-      if (response.success) {
+      if (response.code === 0) {
         ElMessage.success('注册成功，请登录')
         return true
       }
@@ -132,7 +132,7 @@ export const useAuthStore = defineStore('auth', () => {
 
     try {
       const response = await userAPI.getProfile()
-      if (response.success && response.data) {
+      if (response.code === 0 && response.data) {
         setUser(response.data)
       }
     } catch {

@@ -311,7 +311,10 @@ func resolveBootstrapPassword() (string, string, error) {
 func writeBootstrapCredentialsFile(username, password string) (string, error) {
 	dir := "data"
 	if v := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_FILE_DIR")); v != "" {
-		dir = v
+		dir = filepath.Clean(v)
+		if strings.Contains(dir, "..") {
+			return "", fmt.Errorf("BOOTSTRAP_ADMIN_FILE_DIR 包含非法路径遍历")
+		}
 	}
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return "", fmt.Errorf("创建凭据目录 %s 失败: %w", dir, err)

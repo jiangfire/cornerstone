@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/jiangfire/cornerstone/backend/internal/types"
+	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 	"github.com/jiangfire/cornerstone/backend/pkg/utils"
 	"go.uber.org/zap"
 )
@@ -15,7 +15,7 @@ func Auth() gin.HandlerFunc {
 		// 获取Authorization头
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
-			types.Unauthorized(c, "缺少认证令牌")
+			dto.Unauthorized(c, "缺少认证令牌")
 			c.Abort()
 			return
 		}
@@ -23,7 +23,7 @@ func Auth() gin.HandlerFunc {
 		// 检查Bearer格式
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			types.Unauthorized(c, "认证令牌格式错误")
+			dto.Unauthorized(c, "认证令牌格式错误")
 			c.Abort()
 			return
 		}
@@ -34,14 +34,14 @@ func Auth() gin.HandlerFunc {
 		claims, err := utils.ValidateJWT(tokenString)
 		if err != nil {
 			zap.L().Error("JWT验证失败", zap.Error(err))
-			types.Unauthorized(c, "无效的认证令牌")
+			dto.Unauthorized(c, "无效的认证令牌")
 			c.Abort()
 			return
 		}
 
 		// 检查token是否在黑名单中
 		if utils.IsTokenBlacklisted(tokenString) {
-			types.Unauthorized(c, "令牌已失效")
+			dto.Unauthorized(c, "令牌已失效")
 			c.Abort()
 			return
 		}

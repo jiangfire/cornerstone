@@ -4,8 +4,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	"github.com/jiangfire/cornerstone/backend/internal/services"
-	"github.com/jiangfire/cornerstone/backend/internal/types"
 	"github.com/jiangfire/cornerstone/backend/pkg/db"
+	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
 // CreateDatabase 创建数据库
@@ -14,20 +14,20 @@ func CreateDatabase(c *gin.Context) {
 
 	var req services.CreateDBRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	dbService := services.NewDatabaseService(db.DB())
 	database, err := dbService.CreateDatabase(req, userID)
 	if err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
 	publishDatabaseChanged([]string{userID, database.OwnerID}, "created", database)
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"id":          database.ID,
 		"name":        database.Name,
 		"description": database.Description,
@@ -45,11 +45,11 @@ func ListDatabases(c *gin.Context) {
 	dbService := services.NewDatabaseService(db.DB())
 	databases, err := dbService.ListDatabases(userID)
 	if err != nil {
-		types.Error(c, 500, err.Error())
+		dto.Error(c, 500, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"databases": databases,
 		"total":     len(databases),
 	})
@@ -63,11 +63,11 @@ func GetDatabase(c *gin.Context) {
 	dbService := services.NewDatabaseService(db.DB())
 	database, err := dbService.GetDatabase(dbID, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, database)
+	dto.Success(c, database)
 }
 
 // UpdateDatabase 更新数据库信息
@@ -77,20 +77,20 @@ func UpdateDatabase(c *gin.Context) {
 
 	var req services.UpdateDBRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	dbService := services.NewDatabaseService(db.DB())
 	database, err := dbService.UpdateDatabase(dbID, req, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
 	publishDatabaseChanged([]string{userID, database.OwnerID}, "updated", database)
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"id":          database.ID,
 		"name":        database.Name,
 		"description": database.Description,
@@ -106,11 +106,11 @@ func DeleteDatabase(c *gin.Context) {
 
 	dbService := services.NewDatabaseService(db.DB())
 	if err := dbService.DeleteDatabase(dbID, userID); err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"message": "数据库已删除",
 	})
 }
@@ -122,17 +122,17 @@ func ShareDatabase(c *gin.Context) {
 
 	var req services.ShareDBRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	dbService := services.NewDatabaseService(db.DB())
 	if err := dbService.ShareDatabase(dbID, req, userID); err != nil {
-		types.Error(c, 400, err.Error())
+		dto.Error(c, 400, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"message": "数据库分享成功",
 	})
 }
@@ -145,11 +145,11 @@ func ListDatabaseUsers(c *gin.Context) {
 	dbService := services.NewDatabaseService(db.DB())
 	users, err := dbService.ListDatabaseUsers(dbID, userID)
 	if err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"users": users,
 		"total": len(users),
 	})
@@ -163,11 +163,11 @@ func RemoveDatabaseUser(c *gin.Context) {
 
 	dbService := services.NewDatabaseService(db.DB())
 	if err := dbService.RemoveDatabaseUser(dbID, removeUserID, userID); err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"message": "用户已移除",
 	})
 }
@@ -180,17 +180,17 @@ func UpdateDatabaseUserRole(c *gin.Context) {
 
 	var req services.UpdateDBUserRoleRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	dbService := services.NewDatabaseService(db.DB())
 	if err := dbService.UpdateDatabaseUserRole(dbID, updateUserID, req, userID); err != nil {
-		types.Error(c, 403, err.Error())
+		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"message": "角色已更新",
 	})
 }

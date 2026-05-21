@@ -8,8 +8,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
-	"github.com/jiangfire/cornerstone/backend/internal/types"
 	"github.com/jiangfire/cornerstone/backend/pkg/db"
+	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 	"github.com/jiangfire/cornerstone/backend/pkg/query"
 )
 
@@ -38,7 +38,7 @@ func (h *QueryHandler) Query(c *gin.Context) {
 		body, err := io.ReadAll(c.Request.Body)
 		if err == nil && len(body) > 0 {
 			if err := json.Unmarshal(body, &req); err != nil {
-				types.BadRequest(c, "请求格式错误: "+err.Error())
+				dto.BadRequest(c, "请求格式错误: "+err.Error())
 				return
 			}
 		}
@@ -48,12 +48,12 @@ func (h *QueryHandler) Query(c *gin.Context) {
 	if req.From == "" && req.Table == "" {
 		q := c.Query("q")
 		if q == "" {
-			types.BadRequest(c, "缺少查询参数")
+			dto.BadRequest(c, "缺少查询参数")
 			return
 		}
 
 		if err := json.Unmarshal([]byte(q), &req); err != nil {
-			types.BadRequest(c, "查询格式错误: "+err.Error())
+			dto.BadRequest(c, "查询格式错误: "+err.Error())
 			return
 		}
 	}
@@ -63,14 +63,14 @@ func (h *QueryHandler) Query(c *gin.Context) {
 	if err != nil {
 		// 区分权限错误和其他错误
 		if isPermissionError(err) {
-			types.Forbidden(c, err.Error())
+			dto.Forbidden(c, err.Error())
 			return
 		}
-		types.BadRequest(c, err.Error())
+		dto.BadRequest(c, err.Error())
 		return
 	}
 
-	types.Success(c, result)
+	dto.Success(c, result)
 }
 
 // QueryExplain 查询解释接口（返回生成的 SQL，用于调试）
@@ -81,17 +81,17 @@ func (h *QueryHandler) QueryExplain(c *gin.Context) {
 	var req query.QueryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if !errors.Is(err, io.EOF) {
-			types.BadRequest(c, "请求格式错误: "+err.Error())
+			dto.BadRequest(c, "请求格式错误: "+err.Error())
 			return
 		}
 		// 尝试从 URL 参数解析
 		q := c.Query("q")
 		if q == "" {
-			types.BadRequest(c, "缺少查询参数")
+			dto.BadRequest(c, "缺少查询参数")
 			return
 		}
 		if err := json.Unmarshal([]byte(q), &req); err != nil {
-			types.BadRequest(c, "查询格式错误: "+err.Error())
+			dto.BadRequest(c, "查询格式错误: "+err.Error())
 			return
 		}
 	}
@@ -100,14 +100,14 @@ func (h *QueryHandler) QueryExplain(c *gin.Context) {
 	sqlQuery, err := h.executor.ExplainAuthorized(c.Request.Context(), &req, userID)
 	if err != nil {
 		if isPermissionError(err) {
-			types.Forbidden(c, err.Error())
+			dto.Forbidden(c, err.Error())
 			return
 		}
-		types.BadRequest(c, err.Error())
+		dto.BadRequest(c, err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"sql":    sqlQuery.SQL,
 		"params": sqlQuery.Params,
 	})
@@ -121,28 +121,28 @@ func (h *QueryHandler) QueryValidate(c *gin.Context) {
 	var req query.QueryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if !errors.Is(err, io.EOF) {
-			types.BadRequest(c, "请求格式错误: "+err.Error())
+			dto.BadRequest(c, "请求格式错误: "+err.Error())
 			return
 		}
 		// 尝试从 URL 参数解析
 		q := c.Query("q")
 		if q == "" {
-			types.BadRequest(c, "缺少查询参数")
+			dto.BadRequest(c, "缺少查询参数")
 			return
 		}
 		if err := json.Unmarshal([]byte(q), &req); err != nil {
-			types.BadRequest(c, "查询格式错误: "+err.Error())
+			dto.BadRequest(c, "查询格式错误: "+err.Error())
 			return
 		}
 	}
 
 	// 验证查询
 	if err := h.executor.Validate(c.Request.Context(), &req, userID); err != nil {
-		types.Forbidden(c, err.Error())
+		dto.Forbidden(c, err.Error())
 		return
 	}
 
-	types.SuccessWithMessage(c, "查询验证通过", nil)
+	dto.SuccessWithMessage(c, "查询验证通过", nil)
 }
 
 // BatchQuery 批量查询接口
@@ -152,7 +152,7 @@ func (h *QueryHandler) BatchQuery(c *gin.Context) {
 
 	var req query.BatchQueryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		types.BadRequest(c, "请求格式错误: "+err.Error())
+		dto.BadRequest(c, "请求格式错误: "+err.Error())
 		return
 	}
 
@@ -160,14 +160,14 @@ func (h *QueryHandler) BatchQuery(c *gin.Context) {
 	result, err := h.executor.ExecuteBatch(c.Request.Context(), &req, userID)
 	if err != nil {
 		if isPermissionError(err) {
-			types.Forbidden(c, err.Error())
+			dto.Forbidden(c, err.Error())
 			return
 		}
-		types.BadRequest(c, err.Error())
+		dto.BadRequest(c, err.Error())
 		return
 	}
 
-	types.Success(c, result)
+	dto.Success(c, result)
 }
 
 // ListTables 获取可访问的表列表
@@ -177,11 +177,11 @@ func (h *QueryHandler) ListTables(c *gin.Context) {
 
 	tables, err := h.executor.GetValidator().GetAllowedTables(c.Request.Context(), userID)
 	if err != nil {
-		types.InternalServerError(c, "获取表列表失败: "+err.Error())
+		dto.InternalServerError(c, "获取表列表失败: "+err.Error())
 		return
 	}
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"tables": tables,
 	})
 }
@@ -196,13 +196,13 @@ func (h *QueryHandler) GetTableSchema(c *gin.Context) {
 
 	// 检查表是否允许访问
 	if err := validator.CheckTableAccess(c.Request.Context(), userID, table); err != nil {
-		types.Forbidden(c, err.Error())
+		dto.Forbidden(c, err.Error())
 		return
 	}
 
 	fields := query.DefaultAllowedTables.GetAllowedFields(table)
 
-	types.Success(c, gin.H{
+	dto.Success(c, gin.H{
 		"table":  table,
 		"fields": fields,
 	})
@@ -215,7 +215,7 @@ func (h *QueryHandler) SimplifiedQuery(c *gin.Context) {
 
 	table := c.Query("table")
 	if table == "" {
-		types.BadRequest(c, "必须指定表名")
+		dto.BadRequest(c, "必须指定表名")
 		return
 	}
 
@@ -224,7 +224,7 @@ func (h *QueryHandler) SimplifiedQuery(c *gin.Context) {
 	filterStr := c.Query("filter")
 	if filterStr != "" {
 		if err := json.Unmarshal([]byte(filterStr), &filter); err != nil {
-			types.BadRequest(c, "filter 格式错误: "+err.Error())
+			dto.BadRequest(c, "filter 格式错误: "+err.Error())
 			return
 		}
 	}
@@ -250,14 +250,14 @@ func (h *QueryHandler) SimplifiedQuery(c *gin.Context) {
 	result, err := h.executor.SimplifiedQuery(c.Request.Context(), table, filter, sort, page, size, userID)
 	if err != nil {
 		if isPermissionError(err) {
-			types.Forbidden(c, err.Error())
+			dto.Forbidden(c, err.Error())
 			return
 		}
-		types.BadRequest(c, err.Error())
+		dto.BadRequest(c, err.Error())
 		return
 	}
 
-	types.Success(c, result)
+	dto.Success(c, result)
 }
 
 // isPermissionError 判断是否为权限错误
