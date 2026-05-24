@@ -266,6 +266,7 @@ import { ref, onMounted, onUnmounted, computed, watch, h, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ArrowLeft, Refresh, Search, Upload, Document, Download } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
+import type { Column } from 'element-plus/es/components/table-v2/src/types'
 import { FixedDir } from 'element-plus/es/components/table-v2/src/constants'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { tableAPI, recordAPI, fileAPI, databaseAPI, exportAPI } from '@/services/api'
@@ -354,7 +355,8 @@ const createFieldCellRenderer = (field: Field) => {
 }
 
 const tableColumns = computed(() => {
-  const cols = fields.value.map((field) => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const cols: Column<any>[] = fields.value.map((field) => ({
     key: field.id,
     dataKey: field.name,
     title: field.name,
