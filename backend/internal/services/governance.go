@@ -188,6 +188,12 @@ func validateEnum(value string, allowed map[string]struct{}, field, fallback str
 func sanitizeText(input string) string {
 	input = strings.TrimSpace(input)
 	input = strings.ReplaceAll(input, "\x00", "")
+	// 基础 XSS 防护：转义 HTML 特殊字符
+	input = strings.ReplaceAll(input, "&", "&amp;")
+	input = strings.ReplaceAll(input, "<", "&lt;")
+	input = strings.ReplaceAll(input, ">", "&gt;")
+	input = strings.ReplaceAll(input, "\"", "&quot;")
+	input = strings.ReplaceAll(input, "'", "&#x27;")
 	return input
 }
 
@@ -264,7 +270,10 @@ func (s *GovernanceService) getTaskManageableByUser(taskID, userID string) (*mod
 // isSystemAdmin 检查用户是否为系统管理员
 func (s *GovernanceService) isSystemAdmin(userID string) bool {
 	var count int64
-	s.db.Model(&models.User{}).Where("id = ? AND is_system_admin = ?", userID, true).Count(&count)
+	if err := s.db.Model(&models.User{}).Where("id = ? AND is_system_admin = ?", userID, true).Count(&count).Error; err != nil {
+		// 数据库查询失败时安全降级：返回 false，避免提权风险
+		return false
+	}
 	return count > 0
 }
 
@@ -500,6 +509,39 @@ func (s *GovernanceService) UpdateTask(taskID string, req UpdateGovernanceTaskRe
 	return task, nil
 }
 
+// DeleteTask 删除治理任务（软删除）
+func (s *GovernanceService) DeleteTask(taskID string, userID string) error {
+	task, err := s.getTaskManageableByUser(taskID, userID)
+	if err != nil {
+		return err
+	}
+
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		// 级联删除关联数据
+		if err := tx.Where("task_id = ?", task.ID).Delete(&models.GovernanceEvidence{}).Error; err != nil {
+			return fmt.Errorf("删除治理证据失败: %w", err)
+		}
+		if err := tx.Where("task_id = ?", task.ID).Delete(&models.GovernanceComment{}).Error; err != nil {
+			return fmt.Errorf("删除治理评论失败: %w", err)
+		}
+		if err := tx.Where("task_id = ?", task.ID).Delete(&models.GovernanceExternalLink{}).Error; err != nil {
+			return fmt.Errorf("删除治理外链失败: %w", err)
+		}
+		if err := tx.Where("task_id = ?", task.ID).Delete(&models.GovernanceReview{}).Error; err != nil {
+			return fmt.Errorf("删除治理审核失败: %w", err)
+		}
+		if err := tx.Delete(task).Error; err != nil {
+			return fmt.Errorf("删除治理任务失败: %w", err)
+		}
+
+		desc := fmt.Sprintf("删除治理任务 '%s'", task.Title)
+		if err := s.logActivity(tx, userID, "delete", "governance_task", task.ID, desc); err != nil {
+			return fmt.Errorf("记录活动日志失败: %w", err)
+		}
+		return nil
+	})
+}
+
 // AddEvidence 添加治理证据
 func (s *GovernanceService) AddEvidence(taskID string, req CreateGovernanceEvidenceRequest, userID string) (*models.GovernanceEvidence, error) {
 	task, err := s.getTaskManageableByUser(taskID, userID)
@@ -690,10 +732,12 @@ func (s *GovernanceService) DecideReview(reviewID, userID, targetStatus, decisio
 
 	taskStatus := "blocked"
 	if targetStatus == "approved" {
-		taskStatus = "open"
 		if s.shouldEnqueueApply(review) {
 			review.ApplyStatus = "pending"
 			review.ApplyTarget = s.resolveApplyTargetSystem(review)
+			taskStatus = "open" // 需要回写时保持 open，回写成功后会自动变为 done
+		} else {
+			taskStatus = "done" // 无需回写时直接完成
 		}
 	}
 
@@ -739,6 +783,7 @@ type GenerateAIRecommendationRequest struct {
 	ResourceType       string                 `json:"resource_type"`
 	ResourceID         string                 `json:"resource_id"`
 	Context            map[string]interface{} `json:"context"`
+	ReviewerID         string                 `json:"reviewer_id"` // 可选，未指定时默认使用当前用户
 }
 
 var allowedRecommendationTypes = map[string]bool{
@@ -784,9 +829,16 @@ func (s *GovernanceService) GenerateAIRecommendation(ctx context.Context, req Ge
 		return nil, fmt.Errorf("序列化建议失败: %w", err)
 	}
 
+	// AI 推荐默认由当前用户作为审核人；若请求中指定了 reviewer_id 则使用指定值
+	reviewerID := strings.TrimSpace(req.ReviewerID)
+	if reviewerID == "" {
+		reviewerID = userID
+	}
+
 	reviewReq := CreateGovernanceReviewRequest{
 		TaskID:          req.TaskID,
 		ReviewType:      mapRecommendationTypeToReviewType(req.RecommendationType),
+		ReviewerID:      reviewerID,
 		ProposalSource:  "llm-governor",
 		ProposalPayload: string(proposalJSON),
 	}

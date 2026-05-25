@@ -262,7 +262,8 @@ func TestGovernanceService_ReviewDecision(t *testing.T) {
 
 	detail, err := service.GetTask(task.ID, creator.ID)
 	require.NoError(t, err)
-	require.Equal(t, "open", detail.Task.Status)
+	// 审核通过且无需回写时，任务自动变为 done
+	require.Equal(t, "done", detail.Task.Status)
 	require.Len(t, detail.Reviews, 1)
 }
 

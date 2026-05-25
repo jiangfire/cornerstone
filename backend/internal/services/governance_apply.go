@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jiangfire/cornerstone/backend/internal/models"
@@ -572,10 +573,47 @@ func (s *GovernanceService) ProcessPendingOutbox(limit int) error {
 		return fmt.Errorf("查询待处理治理回写任务失败: %w", err)
 	}
 
+	if len(outboxes) == 0 {
+		return nil
+	}
+
+	// SQLite 并发写入能力弱，串行处理避免锁冲突；其他数据库使用 worker pool 并行。
+	isSQLite := s.db.Name() == "sqlite"
 	var dispatchErrors []string
-	for _, item := range outboxes {
-		if err := s.DispatchOutboxEvent(item.ID); err != nil {
-			dispatchErrors = append(dispatchErrors, err.Error())
+
+	if isSQLite {
+		for _, item := range outboxes {
+			if err := s.DispatchOutboxEvent(item.ID); err != nil {
+				dispatchErrors = append(dispatchErrors, err.Error())
+			}
+		}
+	} else {
+		const maxWorkers = 5
+		var (
+			wg        sync.WaitGroup
+			errChan   = make(chan string, len(outboxes))
+			semaphore = make(chan struct{}, maxWorkers)
+		)
+
+		for _, item := range outboxes {
+			wg.Add(1)
+			semaphore <- struct{}{} // 获取信号量
+
+			go func(id string) {
+				defer wg.Done()
+				defer func() { <-semaphore }() // 释放信号量
+
+				if err := s.DispatchOutboxEvent(id); err != nil {
+					errChan <- err.Error()
+				}
+			}(item.ID)
+		}
+
+		wg.Wait()
+		close(errChan)
+
+		for err := range errChan {
+			dispatchErrors = append(dispatchErrors, err)
 		}
 	}
 
