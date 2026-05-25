@@ -131,6 +131,25 @@ func UpdateGovernanceTask(c *gin.Context) {
 	dto.Success(c, task)
 }
 
+// DeleteGovernanceTask 删除治理任务
+func DeleteGovernanceTask(c *gin.Context) {
+	userID := middleware.GetUserID(c)
+	taskID := c.Param("id")
+
+	governanceService := services.NewGovernanceService(db.DB())
+	task := loadGovernanceTask(taskID)
+	if err := governanceService.DeleteTask(taskID, userID); err != nil {
+		dto.Error(c, 400, err.Error())
+		return
+	}
+
+	if task != nil {
+		publishGovernanceTaskChanged(governanceTaskAudience(task, userID), "deleted", task)
+	}
+
+	dto.Success(c, gin.H{"id": taskID})
+}
+
 // CreateGovernanceEvidence 创建治理证据
 func CreateGovernanceEvidence(c *gin.Context) {
 	userID := middleware.GetUserID(c)
