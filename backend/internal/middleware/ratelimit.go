@@ -12,16 +12,16 @@ import (
 
 // rateLimitEntry 记录单个客户端的请求计数和窗口起始时间
 type rateLimitEntry struct {
-	count      int
+	count       int
 	windowStart time.Time
 }
 
 // RateLimiter 基于固定窗口的简单限流器
 type RateLimiter struct {
-	mu       sync.RWMutex
-	clients  map[string]*rateLimitEntry
-	limit    int
-	window   time.Duration
+	mu      sync.RWMutex
+	clients map[string]*rateLimitEntry
+	limit   int
+	window  time.Duration
 }
 
 // NewRateLimiter 创建限流器
@@ -88,8 +88,7 @@ func init() {
 // RateLimit 通用 API 限流中间件
 func RateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		clientIP := c.ClientIP()
-		if !apiRateLimiter.Allow(clientIP) {
+		if !apiRateLimiter.Allow(getClientKey(c)) {
 			c.Header("Retry-After", "60")
 			dto.Error(c, http.StatusTooManyRequests, "请求过于频繁，请稍后再试")
 			c.Abort()
@@ -102,8 +101,7 @@ func RateLimit() gin.HandlerFunc {
 // AuthRateLimit 认证端点限流中间件（更严格）
 func AuthRateLimit() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		clientIP := c.ClientIP()
-		if !authRateLimiter.Allow(clientIP) {
+		if !authRateLimiter.Allow(getClientKey(c)) {
 			c.Header("Retry-After", "60")
 			dto.Error(c, http.StatusTooManyRequests, "认证请求过于频繁，请稍后再试")
 			c.Abort()
