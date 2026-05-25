@@ -104,6 +104,13 @@
             >
               重开
             </el-button>
+            <el-button
+              size="small"
+              type="danger"
+              @click="confirmDeleteTask(row)"
+            >
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -513,7 +520,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { governanceAPI, userAPI } from '@/services/api'
 import { useAuthStore } from '@/stores/auth'
 import { formatDate } from '@/utils/format'
@@ -836,6 +843,32 @@ const quickUpdateStatus = async (task: GovernanceTask, status: string) => {
   }
 }
 
+const confirmDeleteTask = async (task: GovernanceTask) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除治理任务 "${task.title}" 吗？此操作不可恢复。`,
+      '确认删除',
+      {
+        confirmButtonText: '删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+    await governanceAPI.delete(task.id)
+    ElMessage.success('治理任务已删除')
+    await loadTasks()
+    if (selectedDetail.value?.task.id === task.id) {
+      detailVisible.value = false
+      selectedDetail.value = null
+    }
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error(error)
+      ElMessage.error('删除治理任务失败')
+    }
+  }
+}
+
 const submitEvidence = async () => {
   if (!selectedDetail.value) return
   submittingEvidence.value = true
@@ -1101,14 +1134,31 @@ const prettyJson = (value: string) => {
   }
 }
 
-// 过滤条件变化时回到第一页,避免新过滤集下仍停留在空页
+// 防抖包装 loadTasks，避免输入框频繁触发请求
+let debounceTimer: ReturnType<typeof setTimeout> | null = null
+const debouncedLoadTasks = () => {
+  if (debounceTimer) clearTimeout(debounceTimer)
+  debounceTimer = setTimeout(() => {
+    currentPage.value = 1
+    loadTasks()
+  }, 300)
+}
+
+// 过滤条件变化时回到第一页，避免新过滤集下仍停留在空页
+// 对 resource_id 文本输入使用防抖，对 select 立即响应
 watch(
-  () => filters.value,
+  () => [filters.value.status, filters.value.task_type, filters.value.priority],
   () => {
     currentPage.value = 1
     loadTasks()
   },
-  { deep: true },
+)
+
+watch(
+  () => filters.value.resource_id,
+  () => {
+    debouncedLoadTasks()
+  },
 )
 
 onMounted(async () => {

@@ -400,6 +400,9 @@ export const governanceAPI = {
   update(id: string, data: Record<string, unknown>) {
     return request.put<GovernanceTask>(`/governance/tasks/${id}`, data)
   },
+  delete(id: string) {
+    return request.delete(`/governance/tasks/${id}`)
+  },
   addEvidence(taskId: string, data: Record<string, unknown>) {
     return request.post(`/governance/tasks/${taskId}/evidences`, data)
   },
