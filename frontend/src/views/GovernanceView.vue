@@ -861,8 +861,11 @@ const confirmDeleteTask = async (task: GovernanceTask) => {
       detailVisible.value = false
       selectedDetail.value = null
     }
-  } catch (error: any) {
-    if (error !== 'cancel') {
+  } catch (error: unknown) {
+    if (typeof error === 'string' && error !== 'cancel') {
+      console.error(error)
+      ElMessage.error('删除治理任务失败')
+    } else if (error instanceof Error) {
       console.error(error)
       ElMessage.error('删除治理任务失败')
     }
