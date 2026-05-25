@@ -100,15 +100,17 @@ func main() {
 	mcpRoute.POST("", handlers.HandleMCP)
 	mcpRoute.GET("", handlers.HandleMCPGet)
 
-	// 9. API路由组
+	// 9. API路由组（全局限流）
 	api := r.Group("/api")
+	api.Use(middleware.RateLimit())
 	{
-		// 认证路由（无需认证）
+		// 认证路由（无需认证，附加更严格限流）
 		auth := api.Group("/auth")
+		auth.Use(middleware.AuthRateLimit())
 		auth.POST("/register", handlers.Register)
 		auth.POST("/login", handlers.Login)
 
-		// 系统集成事件（使用集成 token）
+		// 系统集成事件（使用集成 token，已有 IntegrationTokenAuth，不叠加通用限流）
 		integrations := api.Group("/integrations")
 		integrations.Use(middleware.IntegrationTokenAuth(middleware.IntegrationAuthConfig{
 			InboundTokens: cfg.Integrations.InboundTokens,
@@ -234,6 +236,7 @@ func main() {
 			protected.GET("/governance/tasks", handlers.ListGovernanceTasks)
 			protected.GET("/governance/tasks/:id", handlers.GetGovernanceTask)
 			protected.PUT("/governance/tasks/:id", handlers.UpdateGovernanceTask)
+			protected.DELETE("/governance/tasks/:id", handlers.DeleteGovernanceTask)
 			protected.POST("/governance/tasks/:id/evidences", handlers.CreateGovernanceEvidence)
 			protected.POST("/governance/tasks/:id/comments", handlers.CreateGovernanceComment)
 			protected.POST("/governance/reviews", handlers.CreateGovernanceReview)
