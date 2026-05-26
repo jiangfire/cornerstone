@@ -46,7 +46,7 @@ func recordResponseWithData(record *models.Record, extra gin.H) gin.H {
 
 // CreateRecord 创建记录
 func CreateRecord(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 
 	var req services.CreateRecordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -71,7 +71,7 @@ func CreateRecord(c *gin.Context) {
 
 // ExportRecords 导出记录
 func ExportRecords(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 	tableID := c.Query("table_id")
 	if tableID == "" {
 		dto.Error(c, 400, "table_id 不能为空")
@@ -95,7 +95,7 @@ func ExportRecords(c *gin.Context) {
 
 // ListRecords 获取记录列表
 func ListRecords(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 
 	var req services.QueryRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -119,7 +119,7 @@ func ListRecords(c *gin.Context) {
 
 // GetRecord 获取单个记录
 func GetRecord(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 	recordID := c.Param("id")
 
 	recordService := services.NewRecordService(db.DB())
@@ -134,7 +134,7 @@ func GetRecord(c *gin.Context) {
 
 // UpdateRecord 更新记录
 func UpdateRecord(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 	recordID := c.Param("id")
 
 	var req services.UpdateRecordRequest
@@ -159,7 +159,7 @@ func UpdateRecord(c *gin.Context) {
 
 // DeleteRecord 删除记录
 func DeleteRecord(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 	recordID := c.Param("id")
 
 	recordService := services.NewRecordService(db.DB())
@@ -175,7 +175,7 @@ func DeleteRecord(c *gin.Context) {
 
 // BatchCreateRecords 批量创建记录
 func BatchCreateRecords(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 
 	var req services.CreateRecordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

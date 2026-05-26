@@ -94,8 +94,6 @@ type RecordResponse struct {
 	ID        string      `json:"id"`
 	TableID   string      `json:"table_id"`
 	Data      interface{} `json:"data"`
-	CreatedBy string      `json:"created_by"`
-	UpdatedBy string      `json:"updated_by"`
 	Version   int         `json:"version"`
 	CreatedAt string      `json:"created_at"`
 	UpdatedAt string      `json:"updated_at"`
@@ -116,7 +114,7 @@ type QueryResponse struct {
 	HasMore bool             `json:"has_more"`
 }
 
-// checkTableAccess 检查表访问权限
+// checkTableAccess 检查表是否存在
 func (s *RecordService) checkTableAccess(tableID, userID string, requiredRoles []string) error {
 	var table models.Table
 	err := s.db.Where("id = ? AND deleted_at IS NULL", tableID).First(&table).Error
@@ -124,26 +122,10 @@ func (s *RecordService) checkTableAccess(tableID, userID string, requiredRoles [
 		return errors.New("表不存在")
 	}
 
-	var access models.DatabaseAccess
-	err = s.db.Table("database_access AS da").
-		Select("da.*").
-		Joins("INNER JOIN databases d ON d.id = da.database_id").
-		Where("da.database_id = ? AND da.user_id = ? AND d.deleted_at IS NULL", table.DatabaseID, userID).
-		First(&access).Error
+	var db models.Database
+	err = s.db.Where("id = ? AND deleted_at IS NULL", table.DatabaseID).First(&db).Error
 	if err != nil {
-		return errors.New("无权访问该数据库")
-	}
-
-	roleAllowed := false
-	for _, role := range requiredRoles {
-		if access.Role == role {
-			roleAllowed = true
-			break
-		}
-	}
-
-	if !roleAllowed {
-		return fmt.Errorf("需要权限：%v，当前角色：%s", requiredRoles, access.Role)
+		return errors.New("数据库不存在")
 	}
 
 	return nil
@@ -710,11 +692,9 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 
 	// 4. 创建记录并绑定附件
 	record := models.Record{
-		TableID:   req.TableID,
-		Data:      string(dataJSON),
-		CreatedBy: userID,
-		UpdatedBy: userID,
-		Version:   1,
+		TableID: req.TableID,
+		Data:    string(dataJSON),
+		Version: 1,
 	}
 
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -728,12 +708,6 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 	}); err != nil {
 		return nil, err
 	}
-
-	NewPluginService(s.db).TriggerByTable(req.TableID, "create", record.ID, userID, map[string]interface{}{
-		"record_id": record.ID,
-		"data":      normalizedData,
-		"user_id":   userID,
-	})
 
 	filteredData := s.filterReadableData(fields, readableFields, normalizedData)
 	record.Data, err = marshalRecordPayload(filteredData)
@@ -852,8 +826,6 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 			ID:        r.ID,
 			TableID:   r.TableID,
 			Data:      data,
-			CreatedBy: r.CreatedBy,
-			UpdatedBy: r.UpdatedBy,
 			Version:   r.Version,
 			CreatedAt: r.CreatedAt.Format("2006-01-02 15:04:05"),
 			UpdatedAt: r.UpdatedAt.Format("2006-01-02 15:04:05"),
@@ -1019,8 +991,6 @@ func (s *RecordService) GetRecord(recordID, userID string) (*RecordResponse, err
 		ID:        record.ID,
 		TableID:   record.TableID,
 		Data:      data,
-		CreatedBy: record.CreatedBy,
-		UpdatedBy: record.UpdatedBy,
 		Version:   record.Version,
 		CreatedAt: record.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt: record.UpdatedAt.Format("2006-01-02 15:04:05"),
@@ -1112,12 +1082,6 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 		return nil, err
 	}
 
-	NewPluginService(s.db).TriggerByTable(record.TableID, "update", record.ID, userID, map[string]interface{}{
-		"record_id": record.ID,
-		"data":      currentData,
-		"user_id":   userID,
-	})
-
 	filteredData := s.filterReadableData(fields, readableFields, currentData)
 	record.Data, err = marshalRecordPayload(filteredData)
 	if err != nil {
@@ -1148,7 +1112,6 @@ func (s *RecordService) DeleteRecord(recordID, userID string) error {
 		Updates(map[string]interface{}{
 			"deleted_at": now,
 			"updated_at": now,
-			"updated_by": userID,
 			"version":    gorm.Expr("version + 1"),
 		})
 	if result.Error != nil {
@@ -1168,8 +1131,6 @@ func (s *RecordService) DeleteRecord(recordID, userID string) error {
 			payload["data"] = deletedData
 		}
 	}
-
-	NewPluginService(s.db).TriggerByTable(record.TableID, "delete", record.ID, userID, payload)
 
 	return nil
 }
@@ -1226,11 +1187,9 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 	records := make([]*models.Record, count)
 	for i := 0; i < count; i++ {
 		records[i] = &models.Record{
-			TableID:   req.TableID,
-			Data:      string(dataJSON),
-			CreatedBy: userID,
-			UpdatedBy: userID,
-			Version:   1,
+			TableID: req.TableID,
+			Data:    string(dataJSON),
+			Version: 1,
 		}
 	}
 

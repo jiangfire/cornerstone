@@ -225,6 +225,20 @@ func (p *Parser) validate(req *QueryRequest) error {
 		}
 	}
 
+	// 验证 HAVING 条件深度
+	if req.Having != nil {
+		if err := p.validateWhereDepth(req.Having, 0); err != nil {
+			return err
+		}
+	}
+
+	// 验证 UNION 查询
+	for i, unionReq := range req.Union {
+		if err := p.validate(&unionReq); err != nil {
+			return fmt.Errorf("union[%d]: %w", i, err)
+		}
+	}
+
 	// 验证聚合函数
 	for _, agg := range req.Aggregate {
 		if !isValidAggregateFunc(agg.Func) {
@@ -313,6 +327,11 @@ func (p *Parser) validate(req *QueryRequest) error {
 	}
 	if req.Where != nil {
 		if err := validateWhereFieldNames(req.Where); err != nil {
+			return err
+		}
+	}
+	if req.Having != nil {
+		if err := validateWhereFieldNames(req.Having); err != nil {
 			return err
 		}
 	}
@@ -458,7 +477,7 @@ func isValidOperator(op string) bool {
 
 // isValidAggregateFunc 验证聚合函数是否有效
 func isValidAggregateFunc(fn string) bool {
-	validFuncs := []string{"count", "sum", "avg", "min", "max"}
+	validFuncs := []string{"count", "sum", "avg", "min", "max", "count_distinct", "stddev", "stddev_pop", "stddev_samp", "variance", "var_pop", "var_samp"}
 	for _, valid := range validFuncs {
 		if fn == valid {
 			return true

@@ -8,9 +8,8 @@ import (
 	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
-// CreateDatabase 创建数据库
 func CreateDatabase(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 
 	var req services.CreateDBRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -19,31 +18,25 @@ func CreateDatabase(c *gin.Context) {
 	}
 
 	dbService := services.NewDatabaseService(db.DB())
-	database, err := dbService.CreateDatabase(req, userID)
+	database, err := dbService.CreateDatabase(req, tokenID)
 	if err != nil {
 		dto.Error(c, 400, err.Error())
 		return
 	}
 
-	publishDatabaseChanged([]string{userID, database.OwnerID}, "created", database)
-
 	dto.Success(c, gin.H{
 		"id":          database.ID,
 		"name":        database.Name,
 		"description": database.Description,
-		"owner_id":    database.OwnerID,
-		"is_public":   database.IsPublic,
-		"is_personal": database.IsPersonal,
 		"created_at":  database.CreatedAt,
 	})
 }
 
-// ListDatabases 获取数据库列表
 func ListDatabases(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 
 	dbService := services.NewDatabaseService(db.DB())
-	databases, err := dbService.ListDatabases(userID)
+	databases, err := dbService.ListDatabases(tokenID)
 	if err != nil {
 		dto.Error(c, 500, err.Error())
 		return
@@ -55,13 +48,12 @@ func ListDatabases(c *gin.Context) {
 	})
 }
 
-// GetDatabase 获取数据库详情
 func GetDatabase(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
 
 	dbService := services.NewDatabaseService(db.DB())
-	database, err := dbService.GetDatabase(dbID, userID)
+	database, err := dbService.GetDatabase(dbID, tokenID)
 	if err != nil {
 		dto.Error(c, 403, err.Error())
 		return
@@ -70,9 +62,8 @@ func GetDatabase(c *gin.Context) {
 	dto.Success(c, database)
 }
 
-// UpdateDatabase 更新数据库信息
 func UpdateDatabase(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
 
 	var req services.UpdateDBRequest
@@ -82,30 +73,26 @@ func UpdateDatabase(c *gin.Context) {
 	}
 
 	dbService := services.NewDatabaseService(db.DB())
-	database, err := dbService.UpdateDatabase(dbID, req, userID)
+	database, err := dbService.UpdateDatabase(dbID, req, tokenID)
 	if err != nil {
 		dto.Error(c, 403, err.Error())
 		return
 	}
 
-	publishDatabaseChanged([]string{userID, database.OwnerID}, "updated", database)
-
 	dto.Success(c, gin.H{
 		"id":          database.ID,
 		"name":        database.Name,
 		"description": database.Description,
-		"is_public":   database.IsPublic,
 		"updated_at":  database.UpdatedAt,
 	})
 }
 
-// DeleteDatabase 删除数据库
 func DeleteDatabase(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
 
 	dbService := services.NewDatabaseService(db.DB())
-	if err := dbService.DeleteDatabase(dbID, userID); err != nil {
+	if err := dbService.DeleteDatabase(dbID, tokenID); err != nil {
 		dto.Error(c, 403, err.Error())
 		return
 	}
@@ -115,82 +102,29 @@ func DeleteDatabase(c *gin.Context) {
 	})
 }
 
-// ShareDatabase 分享数据库
-func ShareDatabase(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	dbID := c.Param("id")
+func CreateDatabaseWithTables(c *gin.Context) {
+	tokenID := middleware.GetTokenID(c)
 
-	var req services.ShareDBRequest
+	var req services.CreateDBWithTablesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, 400, "参数错误: "+err.Error())
 		return
 	}
 
 	dbService := services.NewDatabaseService(db.DB())
-	if err := dbService.ShareDatabase(dbID, req, userID); err != nil {
+	result, err := dbService.CreateDatabaseWithTables(req, tokenID)
+	if err != nil {
 		dto.Error(c, 400, err.Error())
 		return
 	}
 
 	dto.Success(c, gin.H{
-		"message": "数据库分享成功",
-	})
-}
-
-// ListDatabaseUsers 获取数据库用户列表
-func ListDatabaseUsers(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	dbID := c.Param("id")
-
-	dbService := services.NewDatabaseService(db.DB())
-	users, err := dbService.ListDatabaseUsers(dbID, userID)
-	if err != nil {
-		dto.Error(c, 403, err.Error())
-		return
-	}
-
-	dto.Success(c, gin.H{
-		"users": users,
-		"total": len(users),
-	})
-}
-
-// RemoveDatabaseUser 移除数据库用户
-func RemoveDatabaseUser(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	dbID := c.Param("id")
-	removeUserID := c.Param("user_id")
-
-	dbService := services.NewDatabaseService(db.DB())
-	if err := dbService.RemoveDatabaseUser(dbID, removeUserID, userID); err != nil {
-		dto.Error(c, 403, err.Error())
-		return
-	}
-
-	dto.Success(c, gin.H{
-		"message": "用户已移除",
-	})
-}
-
-// UpdateDatabaseUserRole 更新数据库用户角色
-func UpdateDatabaseUserRole(c *gin.Context) {
-	userID := middleware.GetUserID(c)
-	dbID := c.Param("id")
-	updateUserID := c.Param("user_id")
-
-	var req services.UpdateDBUserRoleRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
-		return
-	}
-
-	dbService := services.NewDatabaseService(db.DB())
-	if err := dbService.UpdateDatabaseUserRole(dbID, updateUserID, req, userID); err != nil {
-		dto.Error(c, 403, err.Error())
-		return
-	}
-
-	dto.Success(c, gin.H{
-		"message": "角色已更新",
+		"database": result.Database,
+		"tables":   result.Tables,
+		"fields":   result.Fields,
+		"summary": gin.H{
+			"table_count": len(result.Tables),
+			"field_count": len(result.Fields),
+		},
 	})
 }

@@ -66,7 +66,6 @@ type FileResponse struct {
 	FileSize   int64  `json:"file_size"`
 	FileType   string `json:"file_type"`
 	StorageURL string `json:"storage_url"`
-	UploadedBy string `json:"uploaded_by"`
 	CreatedAt  string `json:"created_at"`
 }
 
@@ -130,11 +129,7 @@ func (s *FileService) getAccessibleFile(fileID, userID string, requiredRoles []s
 }
 
 func (s *FileService) getMaxUploadSizeBytes() int64 {
-	settings, err := NewSettingsService(s.db).GetSettings()
-	if err != nil || settings.MaxFileSize <= 0 {
-		return int64(50 * 1024 * 1024)
-	}
-	return int64(settings.MaxFileSize) * 1024 * 1024
+	return int64(50 * 1024 * 1024)
 }
 
 func parseStoredFieldConfig(options string) FieldConfig {
@@ -318,7 +313,6 @@ func (s *FileService) UploadFile(req UploadFileRequest, userID string) (*models.
 		FileSize:   req.File.Size,
 		FileType:   contentType,
 		StorageURL: targetFilepath,
-		UploadedBy: userID,
 	}
 
 	if err := s.db.Create(&file).Error; err != nil {

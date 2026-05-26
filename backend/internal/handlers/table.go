@@ -10,7 +10,7 @@ import (
 
 // CreateTable 创建表
 func CreateTable(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 
 	var req services.CreateTableRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -25,8 +25,6 @@ func CreateTable(c *gin.Context) {
 		return
 	}
 
-	publishTableChanged([]string{userID}, "created", table)
-
 	dto.Success(c, gin.H{
 		"id":          table.ID,
 		"database_id": table.DatabaseID,
@@ -38,7 +36,7 @@ func CreateTable(c *gin.Context) {
 
 // ListTables 获取表列表
 func ListTables(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
 
 	tableService := services.NewTableService(db.DB())
@@ -56,7 +54,7 @@ func ListTables(c *gin.Context) {
 
 // GetTable 获取表详情
 func GetTable(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
 
 	tableService := services.NewTableService(db.DB())
@@ -71,7 +69,7 @@ func GetTable(c *gin.Context) {
 
 // UpdateTable 更新表信息
 func UpdateTable(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
 
 	var req services.UpdateTableRequest
@@ -87,8 +85,6 @@ func UpdateTable(c *gin.Context) {
 		return
 	}
 
-	publishTableChanged([]string{userID}, "updated", table)
-
 	dto.Success(c, gin.H{
 		"id":          table.ID,
 		"name":        table.Name,
@@ -99,7 +95,7 @@ func UpdateTable(c *gin.Context) {
 
 // DeleteTable 删除表
 func DeleteTable(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
 
 	tableService := services.NewTableService(db.DB())

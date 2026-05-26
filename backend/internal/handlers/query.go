@@ -29,7 +29,7 @@ func NewQueryHandler() *QueryHandler {
 // POST /api/query
 // GET /api/query?q={json_string}
 func (h *QueryHandler) Query(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 
 	var req query.QueryRequest
 
@@ -76,7 +76,7 @@ func (h *QueryHandler) Query(c *gin.Context) {
 // QueryExplain 查询解释接口（返回生成的 SQL，用于调试）
 // POST /api/query/explain
 func (h *QueryHandler) QueryExplain(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 
 	var req query.QueryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -116,7 +116,7 @@ func (h *QueryHandler) QueryExplain(c *gin.Context) {
 // QueryValidate 查询验证接口（验证查询权限，不执行）
 // POST /api/query/validate
 func (h *QueryHandler) QueryValidate(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 
 	var req query.QueryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -148,7 +148,7 @@ func (h *QueryHandler) QueryValidate(c *gin.Context) {
 // BatchQuery 批量查询接口
 // POST /api/query/batch
 func (h *QueryHandler) BatchQuery(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 
 	var req query.BatchQueryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -173,7 +173,7 @@ func (h *QueryHandler) BatchQuery(c *gin.Context) {
 // ListTables 获取可访问的表列表
 // GET /api/query/tables
 func (h *QueryHandler) ListTables(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 
 	tables, err := h.executor.GetValidator().GetAllowedTables(c.Request.Context(), userID)
 	if err != nil {
@@ -189,7 +189,7 @@ func (h *QueryHandler) ListTables(c *gin.Context) {
 // GetTableSchema 获取表结构信息
 // GET /api/query/schema/:table
 func (h *QueryHandler) GetTableSchema(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 	table := c.Param("table")
 
 	validator := h.executor.GetValidator()
@@ -211,7 +211,7 @@ func (h *QueryHandler) GetTableSchema(c *gin.Context) {
 // SimplifiedQuery 简化查询接口（URL 参数形式）
 // GET /api/query/simple?table=records&filter={}&sort=-created_at&page=1&size=20
 func (h *QueryHandler) SimplifiedQuery(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 
 	table := c.Query("table")
 	if table == "" {

@@ -55,7 +55,7 @@ func ConfigureMCP(options MCPOptions) {
 
 // HandleMCP 处理 HTTP 版 MCP 请求
 func HandleMCP(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 	server := mcp.NewServer(mcp.NewToolServiceWithNotifier(db.DB(), userID, mcpHub), mcpServerVersion)
 
 	requests, kind, err := parseMCPPayload(c.Request.Body)
@@ -116,7 +116,7 @@ func HandleMCPGet(c *gin.Context) {
 	c.Header("X-Accel-Buffering", "no")
 	disableWriteTimeout(c)
 
-	userID := middleware.GetUserID(c)
+	userID := middleware.GetTokenID(c)
 	lastEventID := strings.TrimSpace(c.GetHeader("Last-Event-ID"))
 	streamID, stream, replay, replayStatus, cleanup := mcpHub.Register(userID, lastEventID)
 	defer cleanup()

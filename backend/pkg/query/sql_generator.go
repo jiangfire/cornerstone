@@ -21,6 +21,58 @@ func (g *SQLGenerator) Generate(req *QueryRequest) (*SQLQuery, error) {
 		return nil, fmt.Errorf("查询请求不能为空")
 	}
 
+	// 1. 生成主查询
+	mainQuery, err := g.generateSingleQuery(req)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. 处理 UNION
+	if len(req.Union) > 0 {
+		var parts []string
+		allParams := make([]interface{}, 0)
+		parts = append(parts, mainQuery.SQL)
+		allParams = append(allParams, mainQuery.Params...)
+
+		for i, unionReq := range req.Union {
+			unionQuery, err := g.generateSingleQuery(&unionReq)
+			if err != nil {
+				return nil, fmt.Errorf("union[%d]: %w", i, err)
+			}
+			parts = append(parts, unionQuery.SQL)
+			allParams = append(allParams, unionQuery.Params...)
+		}
+
+		finalSQL := strings.Join(parts, " UNION ")
+
+		// 如果有 ORDER BY 或 LIMIT，需要包裹子查询
+		if len(req.OrderBy) > 0 || req.Size > 0 {
+			orderByClause, err := g.generateOrderBy(req)
+			if err != nil {
+				return nil, err
+			}
+			limitClause, limitParams := g.generateLimit(req)
+			allParams = append(allParams, limitParams...)
+
+			wrappedSQL := "SELECT * FROM (" + finalSQL + ") AS union_result"
+			if orderByClause != "" {
+				wrappedSQL += " ORDER BY " + orderByClause
+			}
+			wrappedSQL += limitClause
+			finalSQL = wrappedSQL
+		}
+
+		return &SQLQuery{
+			SQL:    finalSQL,
+			Params: allParams,
+		}, nil
+	}
+
+	return mainQuery, nil
+}
+
+// generateSingleQuery 生成单个查询（不包含 UNION）
+func (g *SQLGenerator) generateSingleQuery(req *QueryRequest) (*SQLQuery, error) {
 	query := &SQLQuery{
 		Params: make([]interface{}, 0),
 	}
@@ -53,13 +105,20 @@ func (g *SQLGenerator) Generate(req *QueryRequest) (*SQLQuery, error) {
 		return nil, err
 	}
 
-	// 6. 生成 ORDER BY 子句
+	// 6. 生成 HAVING 子句
+	havingClause, havingParams, err := g.generateWhere(req.Having)
+	if err != nil {
+		return nil, err
+	}
+	query.Params = append(query.Params, havingParams...)
+
+	// 7. 生成 ORDER BY 子句
 	orderByClause, err := g.generateOrderBy(req)
 	if err != nil {
 		return nil, err
 	}
 
-	// 7. 生成分页子句
+	// 8. 生成分页子句
 	limitClause, limitParams := g.generateLimit(req)
 	query.Params = append(query.Params, limitParams...)
 
@@ -70,6 +129,9 @@ func (g *SQLGenerator) Generate(req *QueryRequest) (*SQLQuery, error) {
 	}
 	if groupByClause != "" {
 		sql += " GROUP BY " + groupByClause
+	}
+	if havingClause != "" {
+		sql += " HAVING " + havingClause
 	}
 	if orderByClause != "" {
 		sql += " ORDER BY " + orderByClause
@@ -154,16 +216,61 @@ func (g *SQLGenerator) generateAggregate(agg AggregateFunc) (string, error) {
 		return "", fmt.Errorf("aggregate.as %w", err)
 	}
 
-	if field == "" || field == "*" {
-		return fmt.Sprintf("%s(*) AS %s", funcName, g.quoteIdentifier(agg.As)), nil
-	}
+	// 处理特殊聚合函数
+	switch funcName {
+	case "COUNT_DISTINCT":
+		if field == "" || field == "*" {
+			return "", fmt.Errorf("count_distinct 需要指定字段")
+		}
+		fieldExpr, err := g.generateFieldExpression(field)
+		if err != nil {
+			return "", fmt.Errorf("aggregate.field %w", err)
+		}
+		return fmt.Sprintf("COUNT(DISTINCT %s) AS %s", fieldExpr, g.quoteIdentifier(agg.As)), nil
 
-	// 处理 JSON 字段路径
-	fieldExpr, err := g.generateFieldExpression(field)
-	if err != nil {
-		return "", fmt.Errorf("aggregate.field %w", err)
+	case "STDDEV", "STDDEV_POP", "STDDEV_SAMP":
+		if field == "" || field == "*" {
+			return "", fmt.Errorf("%s 需要指定数值字段", funcName)
+		}
+		fieldExpr, err := g.generateFieldExpression(field)
+		if err != nil {
+			return "", fmt.Errorf("aggregate.field %w", err)
+		}
+		if g.isSQLite {
+			// SQLite 没有原生 STDDEV，用公式计算
+			// stddev = sqrt(avg(x^2) - avg(x)^2)
+			return fmt.Sprintf("SQRT(AVG(%s * %s) - AVG(%s) * AVG(%s)) AS %s", fieldExpr, fieldExpr, fieldExpr, fieldExpr, g.quoteIdentifier(agg.As)), nil
+		}
+		return fmt.Sprintf("%s(%s) AS %s", funcName, fieldExpr, g.quoteIdentifier(agg.As)), nil
+
+	case "VARIANCE", "VAR_POP", "VAR_SAMP":
+		if field == "" || field == "*" {
+			return "", fmt.Errorf("%s 需要指定数值字段", funcName)
+		}
+		fieldExpr, err := g.generateFieldExpression(field)
+		if err != nil {
+			return "", fmt.Errorf("aggregate.field %w", err)
+		}
+		if g.isSQLite {
+			// SQLite 没有原生 VARIANCE，用公式计算
+			// variance = avg(x^2) - avg(x)^2
+			return fmt.Sprintf("(AVG(%s * %s) - AVG(%s) * AVG(%s)) AS %s", fieldExpr, fieldExpr, fieldExpr, fieldExpr, g.quoteIdentifier(agg.As)), nil
+		}
+		return fmt.Sprintf("%s(%s) AS %s", funcName, fieldExpr, g.quoteIdentifier(agg.As)), nil
+
+	default:
+		// 标准聚合函数: COUNT, SUM, AVG, MIN, MAX
+		if field == "" || field == "*" {
+			return fmt.Sprintf("%s(*) AS %s", funcName, g.quoteIdentifier(agg.As)), nil
+		}
+
+		// 处理 JSON 字段路径
+		fieldExpr, err := g.generateFieldExpression(field)
+		if err != nil {
+			return "", fmt.Errorf("aggregate.field %w", err)
+		}
+		return fmt.Sprintf("%s(%s) AS %s", funcName, fieldExpr, g.quoteIdentifier(agg.As)), nil
 	}
-	return fmt.Sprintf("%s(%s) AS %s", funcName, fieldExpr, g.quoteIdentifier(agg.As)), nil
 }
 
 // generateFrom 生成 FROM 子句

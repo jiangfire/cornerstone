@@ -8,9 +8,8 @@ import (
 	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
-// CreateField 创建字段
 func CreateField(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 
 	var req services.CreateFieldRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -19,13 +18,11 @@ func CreateField(c *gin.Context) {
 	}
 
 	fieldService := services.NewFieldService(db.DB())
-	field, err := fieldService.CreateField(req, userID)
+	field, err := fieldService.CreateField(req, tokenID)
 	if err != nil {
 		dto.Error(c, 400, err.Error())
 		return
 	}
-
-	publishFieldChanged([]string{userID}, "created", field)
 
 	dto.Success(c, gin.H{
 		"id":          field.ID,
@@ -38,13 +35,12 @@ func CreateField(c *gin.Context) {
 	})
 }
 
-// ListFields 获取字段列表
 func ListFields(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
 
 	fieldService := services.NewFieldService(db.DB())
-	fields, err := fieldService.ListFields(tableID, userID)
+	fields, err := fieldService.ListFields(tableID, tokenID)
 	if err != nil {
 		dto.Error(c, 403, err.Error())
 		return
@@ -56,13 +52,12 @@ func ListFields(c *gin.Context) {
 	})
 }
 
-// GetField 获取字段详情
 func GetField(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
 
 	fieldService := services.NewFieldService(db.DB())
-	field, err := fieldService.GetField(fieldID, userID)
+	field, err := fieldService.GetField(fieldID, tokenID)
 	if err != nil {
 		dto.Error(c, 403, err.Error())
 		return
@@ -71,9 +66,8 @@ func GetField(c *gin.Context) {
 	dto.Success(c, field)
 }
 
-// UpdateField 更新字段信息
 func UpdateField(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
 
 	var req services.UpdateFieldRequest
@@ -83,13 +77,11 @@ func UpdateField(c *gin.Context) {
 	}
 
 	fieldService := services.NewFieldService(db.DB())
-	field, err := fieldService.UpdateField(fieldID, req, userID)
+	field, err := fieldService.UpdateField(fieldID, req, tokenID)
 	if err != nil {
 		dto.Error(c, 403, err.Error())
 		return
 	}
-
-	publishFieldChanged([]string{userID}, "updated", field)
 
 	dto.Success(c, gin.H{
 		"id":          field.ID,
@@ -101,13 +93,12 @@ func UpdateField(c *gin.Context) {
 	})
 }
 
-// DeleteField 删除字段
 func DeleteField(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
 
 	fieldService := services.NewFieldService(db.DB())
-	if err := fieldService.DeleteField(fieldID, userID); err != nil {
+	if err := fieldService.DeleteField(fieldID, tokenID); err != nil {
 		dto.Error(c, 403, err.Error())
 		return
 	}
@@ -117,13 +108,12 @@ func DeleteField(c *gin.Context) {
 	})
 }
 
-// GetFieldPermissions 获取表的字段权限配置
 func GetFieldPermissions(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
 
 	fieldService := services.NewFieldService(db.DB())
-	permissions, err := fieldService.GetFieldPermissions(tableID, userID)
+	permissions, err := fieldService.GetFieldPermissions(tableID, tokenID)
 	if err != nil {
 		dto.Error(c, 403, err.Error())
 		return
@@ -135,9 +125,8 @@ func GetFieldPermissions(c *gin.Context) {
 	})
 }
 
-// SetFieldPermission 设置单个字段权限
 func SetFieldPermission(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
 
 	var req services.FieldPermissionRequest
@@ -147,7 +136,7 @@ func SetFieldPermission(c *gin.Context) {
 	}
 
 	fieldService := services.NewFieldService(db.DB())
-	if err := fieldService.SetFieldPermission(tableID, req, userID); err != nil {
+	if err := fieldService.SetFieldPermission(tableID, req, tokenID); err != nil {
 		dto.Error(c, 403, err.Error())
 		return
 	}
@@ -157,9 +146,8 @@ func SetFieldPermission(c *gin.Context) {
 	})
 }
 
-// BatchSetFieldPermissions 批量设置字段权限
 func BatchSetFieldPermissions(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
 
 	var req services.BatchFieldPermissionsRequest
@@ -169,7 +157,7 @@ func BatchSetFieldPermissions(c *gin.Context) {
 	}
 
 	fieldService := services.NewFieldService(db.DB())
-	if err := fieldService.BatchSetFieldPermissions(tableID, req, userID); err != nil {
+	if err := fieldService.BatchSetFieldPermissions(tableID, req, tokenID); err != nil {
 		dto.Error(c, 403, err.Error())
 		return
 	}
