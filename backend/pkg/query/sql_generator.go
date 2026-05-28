@@ -27,48 +27,56 @@ func (g *SQLGenerator) Generate(req *QueryRequest) (*SQLQuery, error) {
 		return nil, err
 	}
 
-	// 2. 处理 UNION
-	if len(req.Union) > 0 {
-		var parts []string
-		allParams := make([]interface{}, 0)
-		parts = append(parts, mainQuery.SQL)
-		allParams = append(allParams, mainQuery.Params...)
+	return g.combineQueries(req, mainQuery)
+}
 
-		for i, unionReq := range req.Union {
-			unionQuery, err := g.generateSingleQuery(&unionReq)
-			if err != nil {
-				return nil, fmt.Errorf("union[%d]: %w", i, err)
-			}
-			parts = append(parts, unionQuery.SQL)
-			allParams = append(allParams, unionQuery.Params...)
-		}
-
-		finalSQL := strings.Join(parts, " UNION ")
-
-		// 如果有 ORDER BY 或 LIMIT，需要包裹子查询
-		if len(req.OrderBy) > 0 || req.Size > 0 {
-			orderByClause, err := g.generateOrderBy(req)
-			if err != nil {
-				return nil, err
-			}
-			limitClause, limitParams := g.generateLimit(req)
-			allParams = append(allParams, limitParams...)
-
-			wrappedSQL := "SELECT * FROM (" + finalSQL + ") AS union_result"
-			if orderByClause != "" {
-				wrappedSQL += " ORDER BY " + orderByClause
-			}
-			wrappedSQL += limitClause
-			finalSQL = wrappedSQL
-		}
-
-		return &SQLQuery{
-			SQL:    finalSQL,
-			Params: allParams,
-		}, nil
+func (g *SQLGenerator) combineQueries(req *QueryRequest, mainQuery *SQLQuery) (*SQLQuery, error) {
+	if len(req.Union) == 0 && len(req.Intersect) == 0 {
+		return mainQuery, nil
 	}
 
-	return mainQuery, nil
+	parts := []string{mainQuery.SQL}
+	allParams := append([]interface{}{}, mainQuery.Params...)
+
+	for i, unionReq := range req.Union {
+		unionQuery, err := g.generateSingleQuery(&unionReq)
+		if err != nil {
+			return nil, fmt.Errorf("union[%d]: %w", i, err)
+		}
+		parts = append(parts, unionQuery.SQL)
+		allParams = append(allParams, unionQuery.Params...)
+	}
+
+	finalSQL := strings.Join(parts, " UNION ")
+	if len(req.Intersect) > 0 {
+		intersects := []string{finalSQL}
+		for i, intersectReq := range req.Intersect {
+			intersectQuery, err := g.generateSingleQuery(&intersectReq)
+			if err != nil {
+				return nil, fmt.Errorf("intersect[%d]: %w", i, err)
+			}
+			intersects = append(intersects, intersectQuery.SQL)
+			allParams = append(allParams, intersectQuery.Params...)
+		}
+		finalSQL = strings.Join(intersects, " INTERSECT ")
+	}
+
+	if len(req.OrderBy) > 0 || req.Size > 0 {
+		orderByClause, err := g.generateOrderBy(req)
+		if err != nil {
+			return nil, err
+		}
+		limitClause, limitParams := g.generateLimit(req)
+		allParams = append(allParams, limitParams...)
+
+		wrappedSQL := "SELECT * FROM (" + finalSQL + ") AS combined_result"
+		if orderByClause != "" {
+			wrappedSQL += " ORDER BY " + orderByClause
+		}
+		finalSQL = wrappedSQL + limitClause
+	}
+
+	return &SQLQuery{SQL: finalSQL, Params: allParams}, nil
 }
 
 // generateSingleQuery 生成单个查询（不包含 UNION）

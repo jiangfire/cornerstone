@@ -22,7 +22,7 @@ type QueryRequest struct {
 	Size      int             `json:"size"`      // 每页大小
 
 	// 集合操作
-	Union    []QueryRequest `json:"union,omitempty"`    // UNION 查询
+	Union     []QueryRequest `json:"union,omitempty"`     // UNION 查询
 	Intersect []QueryRequest `json:"intersect,omitempty"` // INTERSECT 查询
 
 	// 简化语法

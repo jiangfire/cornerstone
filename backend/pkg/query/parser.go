@@ -238,6 +238,11 @@ func (p *Parser) validate(req *QueryRequest) error {
 			return fmt.Errorf("union[%d]: %w", i, err)
 		}
 	}
+	for i, intersectReq := range req.Intersect {
+		if err := p.validate(&intersectReq); err != nil {
+			return fmt.Errorf("intersect[%d]: %w", i, err)
+		}
+	}
 
 	// 验证聚合函数
 	for _, agg := range req.Aggregate {

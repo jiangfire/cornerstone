@@ -20,8 +20,7 @@
         <tr v-for="token in tokens" :key="token.id">
           <td>{{ token.name }}</td>
           <td>
-            <code class="token-value">{{ token.is_master ? '*** MASTER ***' : maskToken(token.id) }}</code>
-            <button class="btn-link" @click="copyToken(token.id)" title="复制">📋</button>
+            <code class="token-value">{{ token.is_master ? '*** MASTER ***' : '仅创建时展示一次' }}</code>
           </td>
           <td><code>{{ token.scopes || '*' }}</code></td>
           <td>{{ token.expires_at ? new Date(token.expires_at).toLocaleString() : '永久' }}</td>
@@ -63,7 +62,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { tokenAPI, type Token, setApiKey } from '@/services/api'
+import { tokenAPI, type Token } from '@/services/api'
 
 const tokens = ref<Token[]>([])
 const showCreateModal = ref(false)
@@ -95,7 +94,6 @@ async function createToken() {
     showCreateModal.value = false
     newToken.value = { name: '', scopes: '', expires_at: '' }
     await loadTokens()
-    if (res.data.token) setApiKey(res.data.token)
   } catch (e) {
     console.error('创建令牌失败', e)
   }
@@ -113,15 +111,6 @@ async function deleteToken(token: Token) {
   } catch (e) {
     console.error('删除令牌失败', e)
   }
-}
-
-function maskToken(id: string) {
-  if (!id) return ''
-  return id.slice(0, 6) + '...' + id.slice(-4)
-}
-
-function copyToken(id: string) {
-  copyValue(id)
 }
 
 function copyValue(value: string) {
@@ -153,12 +142,6 @@ function copyValue(value: string) {
 }
 .token-value {
   margin-right: 8px;
-}
-.btn-link {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
 }
 .btn-icon {
   background: none;

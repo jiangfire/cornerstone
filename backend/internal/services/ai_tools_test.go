@@ -46,7 +46,10 @@ func TestExecuteAITool_ListDatabases(t *testing.T) {
 	db.Create(&models.Database{Name: "TestDB1", Description: "Test 1"})
 	db.Create(&models.Database{Name: "TestDB2", Description: "Test 2"})
 
-	result, err := ExecuteAITool("list_databases", map[string]any{})
+	master := &models.Token{Name: "master", Token: "cs_master", IsMaster: true}
+	require.NoError(t, db.Create(master).Error)
+
+	result, err := ExecuteAIToolForToken(db, master.ID, "list_databases", map[string]any{})
 	require.NoError(t, err)
 
 	databases, ok := result.([]DBResult)
@@ -63,7 +66,10 @@ func TestExecuteAITool_ListTables(t *testing.T) {
 	db.Create(&models.Table{DatabaseID: database.ID, Name: "users"})
 	db.Create(&models.Table{DatabaseID: database.ID, Name: "orders"})
 
-	result, err := ExecuteAITool("list_tables", map[string]any{
+	master := &models.Token{Name: "master", Token: "cs_master", IsMaster: true}
+	require.NoError(t, db.Create(master).Error)
+
+	result, err := ExecuteAIToolForToken(db, master.ID, "list_tables", map[string]any{
 		"database_id": database.ID,
 	})
 	require.NoError(t, err)
@@ -74,9 +80,11 @@ func TestExecuteAITool_ListTables(t *testing.T) {
 }
 
 func TestExecuteAITool_CreateDatabase(t *testing.T) {
-	_ = setupAIToolsTestDB(t)
+	db := setupAIToolsTestDB(t)
+	master := &models.Token{Name: "master", Token: "cs_master", IsMaster: true}
+	require.NoError(t, db.Create(master).Error)
 
-	result, err := ExecuteAITool("create_database", map[string]any{
+	result, err := ExecuteAIToolForToken(db, master.ID, "create_database", map[string]any{
 		"name":        "NewDB",
 		"description": "A new database",
 	})
@@ -93,7 +101,10 @@ func TestExecuteAITool_CreateTable(t *testing.T) {
 	database := &models.Database{Name: "TestDB"}
 	db.Create(database)
 
-	result, err := ExecuteAITool("create_table", map[string]any{
+	master := &models.Token{Name: "master", Token: "cs_master", IsMaster: true}
+	require.NoError(t, db.Create(master).Error)
+
+	result, err := ExecuteAIToolForToken(db, master.ID, "create_table", map[string]any{
 		"database_id": database.ID,
 		"name":        "users",
 		"description": "User table",
@@ -129,7 +140,13 @@ func TestExecuteAITool_InsertRecords(t *testing.T) {
 	table := &models.Table{DatabaseID: database.ID, Name: "users"}
 	db.Create(table)
 
-	result, err := ExecuteAITool("insert_records", map[string]any{
+	db.Create(&models.Field{TableID: table.ID, Name: "name", Type: "string"})
+	db.Create(&models.Field{TableID: table.ID, Name: "age", Type: "number"})
+
+	master := &models.Token{Name: "master", Token: "cs_master", IsMaster: true}
+	require.NoError(t, db.Create(master).Error)
+
+	result, err := ExecuteAIToolForToken(db, master.ID, "insert_records", map[string]any{
 		"table_id": table.ID,
 		"records": []any{
 			map[string]any{"name": "Alice", "age": float64(30)},
@@ -156,6 +173,9 @@ func TestExecuteAITool_UpdateRecord(t *testing.T) {
 	table := &models.Table{DatabaseID: database.ID, Name: "users"}
 	db.Create(table)
 
+	db.Create(&models.Field{TableID: table.ID, Name: "name", Type: "string"})
+	db.Create(&models.Field{TableID: table.ID, Name: "age", Type: "number"})
+
 	record := &models.Record{
 		TableID: table.ID,
 		Data:    `{"name": "Alice", "age": 30}`,
@@ -163,7 +183,10 @@ func TestExecuteAITool_UpdateRecord(t *testing.T) {
 	}
 	db.Create(record)
 
-	result, err := ExecuteAITool("update_record", map[string]any{
+	master := &models.Token{Name: "master", Token: "cs_master", IsMaster: true}
+	require.NoError(t, db.Create(master).Error)
+
+	result, err := ExecuteAIToolForToken(db, master.ID, "update_record", map[string]any{
 		"record_id": record.ID,
 		"data":      map[string]any{"age": float64(31)},
 	})
@@ -194,7 +217,10 @@ func TestExecuteAITool_DeleteRecord(t *testing.T) {
 	}
 	db.Create(record)
 
-	result, err := ExecuteAITool("delete_record", map[string]any{
+	master := &models.Token{Name: "master", Token: "cs_master", IsMaster: true}
+	require.NoError(t, db.Create(master).Error)
+
+	result, err := ExecuteAIToolForToken(db, master.ID, "delete_record", map[string]any{
 		"record_id": record.ID,
 	})
 	require.NoError(t, err)
@@ -209,9 +235,61 @@ func TestExecuteAITool_DeleteRecord(t *testing.T) {
 }
 
 func TestExecuteAITool_UnknownTool(t *testing.T) {
-	_, err := ExecuteAITool("unknown_tool", map[string]any{})
+	db := setupAIToolsTestDB(t)
+	master := &models.Token{Name: "master", Token: "cs_master", IsMaster: true}
+	require.NoError(t, db.Create(master).Error)
+
+	_, err := ExecuteAIToolForToken(db, master.ID, "unknown_tool", map[string]any{})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "unknown tool")
+}
+
+func TestExecuteAIToolForToken_HonorsScopesAndQueryWhitelist(t *testing.T) {
+	db := setupAIToolsTestDB(t)
+
+	allowedDB := &models.Database{Name: "allowed"}
+	blockedDB := &models.Database{Name: "blocked"}
+	require.NoError(t, db.Create(allowedDB).Error)
+	require.NoError(t, db.Create(blockedDB).Error)
+
+	allowedTable := &models.Table{DatabaseID: allowedDB.ID, Name: "allowed_records"}
+	blockedTable := &models.Table{DatabaseID: blockedDB.ID, Name: "blocked_records"}
+	require.NoError(t, db.Create(allowedTable).Error)
+	require.NoError(t, db.Create(blockedTable).Error)
+	require.NoError(t, db.Create(&models.Record{TableID: allowedTable.ID, Data: `{"name":"allowed"}`}).Error)
+	require.NoError(t, db.Create(&models.Record{TableID: blockedTable.ID, Data: `{"name":"blocked"}`}).Error)
+
+	viewer := &models.Token{
+		Name:   "viewer",
+		Token:  "cs_viewer_scope",
+		Scopes: `{"databases":{"` + allowedDB.ID + `":"viewer"}}`,
+	}
+	require.NoError(t, db.Create(viewer).Error)
+
+	result, err := ExecuteAIToolForToken(db, viewer.ID, "list_databases", map[string]any{})
+	require.NoError(t, err)
+	databases, ok := result.([]DBResult)
+	require.True(t, ok)
+	require.Len(t, databases, 1)
+	assert.Equal(t, allowedDB.ID, databases[0].ID)
+
+	result, err = ExecuteAIToolForToken(db, viewer.ID, "execute_query", map[string]any{
+		"from": "records",
+	})
+	require.NoError(t, err)
+	rows, ok := result.([]map[string]any)
+	require.True(t, ok)
+	require.Len(t, rows, 1)
+
+	_, err = ExecuteAIToolForToken(db, viewer.ID, "create_database", map[string]any{
+		"name": "should_fail",
+	})
+	require.Error(t, err)
+
+	_, err = ExecuteAIToolForToken(db, viewer.ID, "execute_query", map[string]any{
+		"from": "sqlite_master",
+	})
+	require.Error(t, err)
 }
 
 func TestGenerateFieldValue(t *testing.T) {

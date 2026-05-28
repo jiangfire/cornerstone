@@ -37,6 +37,14 @@ func setupMCPTestDB(t *testing.T) *gorm.DB {
 	)
 	require.NoError(t, err)
 
+	require.NoError(t, db.Create(&models.Token{
+		ID:       "test_user",
+		Token:    "cs_test_user_master",
+		Name:     "test_user",
+		IsMaster: true,
+		Scopes:   "{}",
+	}).Error)
+
 	return db
 }
 
@@ -209,6 +217,9 @@ func TestToolService_Call_GenerateTestData(t *testing.T) {
 	table := &models.Table{DatabaseID: database.ID, Name: "users"}
 	db.Create(table)
 
+	db.Create(&models.Field{TableID: table.ID, Name: "name", Type: "string", Required: true})
+	db.Create(&models.Field{TableID: table.ID, Name: "email", Type: "email"})
+
 	args, _ := json.Marshal(map[string]any{
 		"table_id": table.ID,
 		"count":    float64(5),
@@ -222,6 +233,12 @@ func TestToolService_Call_GenerateTestData(t *testing.T) {
 	var recordCount int64
 	db.Table("records").Count(&recordCount)
 	assert.Equal(t, int64(5), recordCount)
+
+	var records []models.Record
+	require.NoError(t, db.Where("table_id = ?", table.ID).Find(&records).Error)
+	for _, record := range records {
+		assert.Contains(t, record.Data, `"name"`)
+	}
 }
 
 func TestToolService_Call_GenerateTestData_InvalidCount(t *testing.T) {

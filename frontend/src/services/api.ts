@@ -9,6 +9,12 @@ const LONG_TIMEOUT_MS = 60000
 
 const api: AxiosInstance = axios.create(API_CONFIG)
 
+export interface ApiResponse<T> {
+  code: number
+  message: string
+  data: T
+}
+
 api.interceptors.request.use(
   (config) => {
     const apiKey = localStorage.getItem('api_key')
@@ -32,16 +38,16 @@ api.interceptors.response.use(
 )
 
 export const request = {
-  get<T = unknown>(url: string, params?: Record<string, unknown>): Promise<{ code: number; message: string; data: T }> {
+  get<T = unknown>(url: string, params?: Record<string, unknown>): Promise<ApiResponse<T>> {
     return api.get(url, { params })
   },
-  post<T = unknown>(url: string, data?: unknown): Promise<{ code: number; message: string; data: T }> {
+  post<T = unknown>(url: string, data?: unknown): Promise<ApiResponse<T>> {
     return api.post(url, data)
   },
-  put<T = unknown>(url: string, data?: unknown): Promise<{ code: number; message: string; data: T }> {
+  put<T = unknown>(url: string, data?: unknown): Promise<ApiResponse<T>> {
     return api.put(url, data)
   },
-  delete<T = unknown>(url: string): Promise<{ code: number; message: string; data: T }> {
+  delete<T = unknown>(url: string): Promise<ApiResponse<T>> {
     return api.delete(url)
   },
 }
@@ -92,6 +98,12 @@ export interface RecordItem {
   version: number
   created_at: string
   updated_at: string
+}
+
+export interface RecordListResponse {
+  items: RecordItem[]
+  total: number
+  has_more: boolean
 }
 
 export interface FileItem {
@@ -175,8 +187,8 @@ export const fieldAPI = {
 }
 
 export const recordAPI = {
-  list(params: { table_id: string; page?: number; size?: number; filter?: string }) {
-    return request.get<{ records: RecordItem[]; total: number; has_more: boolean }>('/records', params)
+  list(params: { table_id: string; limit?: number; offset?: number; filter?: string }) {
+    return request.get<RecordListResponse>('/records', params)
   },
   create(data: { table_id: string; data: Record<string, unknown> }) {
     return request.post<RecordItem>('/records', data)
@@ -193,7 +205,7 @@ export const recordAPI = {
 }
 
 export const fileAPI = {
-  upload(params: { recordId?: string; fieldId?: string; file: File }, onUploadProgress?: (progressEvent: { loaded: number; total?: number }) => void): Promise<{ code: number; message: string; data: FileItem }> {
+  upload(params: { recordId?: string; fieldId?: string; file: File }, onUploadProgress?: (progressEvent: { loaded: number; total?: number }) => void): Promise<ApiResponse<FileItem>> {
     const formData = new FormData()
     if (params.recordId) formData.append('record_id', params.recordId)
     if (params.fieldId) formData.append('field_id', params.fieldId)
@@ -223,7 +235,7 @@ export const queryAPI = {
 
 export const aiAPI = {
   chat(message: string, context?: Record<string, unknown>) {
-    return api.post<{ code: number; message: string; data: { reply: string } }>('/ai/chat', { message, context }, { timeout: LONG_TIMEOUT_MS })
+    return api.post('/ai/chat', { message, context }, { timeout: LONG_TIMEOUT_MS }) as Promise<ApiResponse<{ type?: string; reply: string; context?: Record<string, unknown> }>>
   },
 }
 

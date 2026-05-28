@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jiangfire/cornerstone/backend/internal/authz"
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -71,6 +72,14 @@ func sanitizeDatabaseInput(name, description string) (string, string) {
 }
 
 func (s *DatabaseService) CreateDatabase(req CreateDBRequest, ownerID string) (*models.Database, error) {
+	authorizer, err := authz.NewAuthorizer(s.db, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if !authorizer.CanCreateDatabase() {
+		return nil, errors.New("此操作需要 Master Token")
+	}
+
 	req.Name, req.Description = sanitizeDatabaseInput(req.Name, req.Description)
 
 	if err := validateDatabaseName(req.Name); err != nil {
@@ -82,7 +91,7 @@ func (s *DatabaseService) CreateDatabase(req CreateDBRequest, ownerID string) (*
 	}
 
 	var existingDB models.Database
-	err := s.db.Where("name = ? AND deleted_at IS NULL", req.Name).First(&existingDB).Error
+	err = s.db.Where("name = ? AND deleted_at IS NULL", req.Name).First(&existingDB).Error
 	if err == nil {
 		return nil, errors.New("已存在同名数据库")
 	}
@@ -102,8 +111,24 @@ func (s *DatabaseService) CreateDatabase(req CreateDBRequest, ownerID string) (*
 }
 
 func (s *DatabaseService) ListDatabases(userID string) ([]DBResponse, error) {
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+
 	var databases []models.Database
-	err := s.db.Where("deleted_at IS NULL").Order("created_at DESC").Find(&databases).Error
+	query := s.db.Where("deleted_at IS NULL").Order("created_at DESC")
+	if !authorizer.IsMaster() {
+		ids, err := authorizer.AccessibleDatabaseIDs()
+		if err != nil {
+			return nil, err
+		}
+		if len(ids) == 0 {
+			return []DBResponse{}, nil
+		}
+		query = query.Where("id IN ?", ids)
+	}
+	err = query.Find(&databases).Error
 	if err != nil {
 		return nil, fmt.Errorf("数据库查询失败: %w", err)
 	}
@@ -123,8 +148,16 @@ func (s *DatabaseService) ListDatabases(userID string) ([]DBResponse, error) {
 }
 
 func (s *DatabaseService) GetDatabase(dbID, userID string) (*DBResponse, error) {
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !authorizer.CanAccessDatabase(dbID, authz.ActionRead) {
+		return nil, errors.New("无权访问该数据库")
+	}
+
 	var database models.Database
-	err := s.db.Where("id = ? AND deleted_at IS NULL", dbID).First(&database).Error
+	err = s.db.Where("id = ? AND deleted_at IS NULL", dbID).First(&database).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, errors.New("数据库不存在")
@@ -142,6 +175,14 @@ func (s *DatabaseService) GetDatabase(dbID, userID string) (*DBResponse, error) 
 }
 
 func (s *DatabaseService) UpdateDatabase(dbID string, req UpdateDBRequest, userID string) (*models.Database, error) {
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !authorizer.CanAccessDatabase(dbID, authz.ActionManage) {
+		return nil, errors.New("无权修改该数据库")
+	}
+
 	req.Name, req.Description = sanitizeDatabaseInput(req.Name, req.Description)
 
 	if err := validateDatabaseName(req.Name); err != nil {
@@ -153,7 +194,7 @@ func (s *DatabaseService) UpdateDatabase(dbID string, req UpdateDBRequest, userI
 	}
 
 	var database models.Database
-	err := s.db.Where("id = ? AND deleted_at IS NULL", dbID).First(&database).Error
+	err = s.db.Where("id = ? AND deleted_at IS NULL", dbID).First(&database).Error
 	if err != nil {
 		return nil, errors.New("数据库不存在")
 	}
@@ -175,8 +216,16 @@ func (s *DatabaseService) UpdateDatabase(dbID string, req UpdateDBRequest, userI
 }
 
 func (s *DatabaseService) DeleteDatabase(dbID, userID string) error {
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return err
+	}
+	if !authorizer.CanAccessDatabase(dbID, authz.ActionManage) {
+		return errors.New("无权删除该数据库")
+	}
+
 	var database models.Database
-	err := s.db.Where("id = ? AND deleted_at IS NULL", dbID).First(&database).Error
+	err = s.db.Where("id = ? AND deleted_at IS NULL", dbID).First(&database).Error
 	if err != nil {
 		return errors.New("数据库不存在")
 	}
@@ -223,6 +272,14 @@ type CreateDBWithTablesResult struct {
 }
 
 func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest, ownerID string) (*CreateDBWithTablesResult, error) {
+	authorizer, err := authz.NewAuthorizer(s.db, ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if !authorizer.CanCreateDatabase() {
+		return nil, errors.New("此操作需要 Master Token")
+	}
+
 	req.Name, req.Description = sanitizeDatabaseInput(req.Name, req.Description)
 
 	if err := validateDatabaseName(req.Name); err != nil {
@@ -234,7 +291,7 @@ func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest
 	}
 
 	var existingDB models.Database
-	err := s.db.Where("name = ? AND deleted_at IS NULL", req.Name).First(&existingDB).Error
+	err = s.db.Where("name = ? AND deleted_at IS NULL", req.Name).First(&existingDB).Error
 	if err == nil {
 		return nil, errors.New("已存在同名数据库")
 	}

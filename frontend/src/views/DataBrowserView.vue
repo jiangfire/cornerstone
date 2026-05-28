@@ -69,6 +69,37 @@
               </tbody>
             </table>
             <p v-else class="empty-text">该表下暂无字段</p>
+
+            <div class="records-section">
+              <h3>记录列表</h3>
+              <table class="data-table records-table" v-if="records.length > 0">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>数据预览</th>
+                    <th>版本</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr
+                    v-for="record in records"
+                    :key="record.id"
+                    :class="{ active: selectedRecord?.id === record.id }"
+                    @click="selectRecord(record)"
+                  >
+                    <td>{{ record.id }}</td>
+                    <td>{{ summarizeRecord(record) }}</td>
+                    <td>{{ record.version }}</td>
+                  </tr>
+                </tbody>
+              </table>
+              <p v-else class="empty-text">该表下暂无记录</p>
+
+              <div v-if="selectedRecord" class="record-detail">
+                <h4>记录详情</h4>
+                <pre>{{ formatRecordData(selectedRecord.data) }}</pre>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -118,13 +149,15 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { databaseAPI, tableAPI, fieldAPI, type Database, type Table, type Field } from '@/services/api'
+import { databaseAPI, tableAPI, fieldAPI, recordAPI, type Database, type Table, type Field, type RecordItem } from '@/services/api'
 
 const databases = ref<Database[]>([])
 const tables = ref<Table[]>([])
 const fields = ref<Field[]>([])
+const records = ref<RecordItem[]>([])
 const selectedDb = ref<Database | null>(null)
 const selectedTable = ref<Table | null>(null)
+const selectedRecord = ref<RecordItem | null>(null)
 
 const showCreateDbModal = ref(false)
 const showBulkCreateModal = ref(false)
@@ -151,6 +184,8 @@ async function selectDb(db: Database) {
   selectedDb.value = db
   selectedTable.value = null
   fields.value = []
+  records.value = []
+  selectedRecord.value = null
   try {
     const res = await tableAPI.list(db.id)
     tables.value = res.data.tables || []
@@ -161,11 +196,20 @@ async function selectDb(db: Database) {
 
 async function selectTable(table: Table) {
   selectedTable.value = table
+  selectedRecord.value = null
   try {
     const res = await fieldAPI.list(table.id)
     fields.value = res.data.items || []
   } catch (e) {
     console.error('加载字段失败', e)
+  }
+
+  try {
+    const res = await recordAPI.list({ table_id: table.id, limit: 50, offset: 0 })
+    records.value = res.data.items || []
+  } catch (e) {
+    console.error('加载记录失败', e)
+    records.value = []
   }
 }
 
@@ -212,6 +256,9 @@ async function deleteDb(db: Database) {
     if (selectedDb.value?.id === db.id) {
       selectedDb.value = null
       tables.value = []
+      fields.value = []
+      records.value = []
+      selectedRecord.value = null
     }
     await loadDatabases()
   } catch (e) {
@@ -232,6 +279,26 @@ async function deleteField(field: Field) {
 function editDb(db: Database) {
   console.log('Edit DB:', db.name)
   alert('编辑功能待实现')
+}
+
+function selectRecord(record: RecordItem) {
+  selectedRecord.value = record
+}
+
+function summarizeRecord(record: RecordItem) {
+  const entries = Object.entries(record.data || {})
+  if (entries.length === 0) {
+    return '-'
+  }
+
+  return entries
+    .slice(0, 3)
+    .map(([key, value]) => `${key}: ${String(value)}`)
+    .join(' | ')
+}
+
+function formatRecordData(data: Record<string, unknown>) {
+  return JSON.stringify(data, null, 2)
 }
 </script>
 
@@ -317,6 +384,26 @@ function editDb(db: Database) {
 }
 .data-table th {
   background: #f9f9f9;
+}
+.records-section {
+  margin-top: 20px;
+}
+.records-table tbody tr {
+  cursor: pointer;
+}
+.records-table tbody tr.active {
+  background: #e6f7ff;
+}
+.record-detail {
+  margin-top: 16px;
+}
+.record-detail pre {
+  background: #f9f9f9;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 .modal-overlay {
   position: fixed;

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jiangfire/cornerstone/backend/internal/authz"
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -51,29 +52,30 @@ func normalizeFieldType(fieldType string) string {
 	case "single_select":
 		return "select"
 	case "multiselect", "multi_select":
-		return "list"
+		return "multiselect"
+	case "attachment":
+		return "file"
 	default:
 		return fieldType
 	}
 }
 
 func isDeprecatedFieldType(fieldType string) bool {
-	normalizedType := normalizeFieldType(fieldType)
-	return normalizedType == "select" || normalizedType == "list"
+	return false
 }
 
 func isAttachmentFieldType(fieldType string) bool {
-	return normalizeFieldType(fieldType) == "attachment"
+	return normalizeFieldType(fieldType) == "file"
 }
 
 func supportsFieldOptions(fieldType string) bool {
 	normalizedType := normalizeFieldType(fieldType)
-	return normalizedType == "select" || normalizedType == "list"
+	return normalizedType == "select" || normalizedType == "multiselect" || normalizedType == "list"
 }
 
 // validateFieldType 验证字段类型
 func validateFieldType(fieldType string) error {
-	validTypes := []string{"string", "text", "number", "boolean", "date", "datetime", "attachment", "select", "list", "multiselect", "single_select", "multi_select"}
+	validTypes := []string{"string", "text", "number", "boolean", "date", "datetime", "attachment", "file", "select", "list", "multiselect", "single_select", "multi_select", "json", "link", "email", "url", "color", "rating"}
 	for _, validType := range validTypes {
 		if fieldType == validType {
 			return nil
@@ -82,12 +84,7 @@ func validateFieldType(fieldType string) error {
 	return fmt.Errorf("无效的字段类型: %s", fieldType)
 }
 
-func validateMutableFieldType(fieldType string) error {
-	if isDeprecatedFieldType(fieldType) {
-		return fmt.Errorf("字段类型 %s 已废弃，不能再创建或更新；请改用 string 或 text", fieldType)
-	}
-	return nil
-}
+func validateMutableFieldType(fieldType string) error { return nil }
 
 // validateFieldConfig 验证字段配置
 func validateFieldConfig(config FieldConfig) error {
@@ -210,7 +207,7 @@ type FieldConfig struct {
 type CreateFieldRequest struct {
 	TableID     string      `json:"table_id" binding:"required"`
 	Name        string      `json:"name" binding:"required,min=1,max=255"`
-	Type        string      `json:"type" binding:"required,oneof=string text number boolean date datetime attachment select list multiselect single_select multi_select"`
+	Type        string      `json:"type" binding:"required"`
 	Description string      `json:"description" binding:"max=1000"`
 	Required    bool        `json:"required"`
 	Options     string      `json:"options"` // 下拉选项，逗号分隔
@@ -220,7 +217,7 @@ type CreateFieldRequest struct {
 // UpdateFieldRequest 更新字段请求
 type UpdateFieldRequest struct {
 	Name        string      `json:"name" binding:"required,min=1,max=255"`
-	Type        string      `json:"type" binding:"required,oneof=string text number boolean date datetime attachment select list multiselect single_select multi_select"`
+	Type        string      `json:"type" binding:"required"`
 	Description string      `json:"description" binding:"max=1000"`
 	Required    bool        `json:"required"`
 	Options     string      `json:"options"`
@@ -285,7 +282,31 @@ func (s *FieldService) checkTableAccess(tableID, userID string, requiredRoles []
 		return errors.New("数据库不存在")
 	}
 
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return err
+	}
+	action := authz.ActionRead
+	switch {
+	case containsRole(requiredRoles, "owner") || containsRole(requiredRoles, "admin"):
+		action = authz.ActionManage
+	case containsRole(requiredRoles, "editor"):
+		action = authz.ActionWrite
+	}
+	if !authorizer.CanAccessTable(tableID, action) {
+		return errors.New("无权访问该表")
+	}
+
 	return nil
+}
+
+func containsRole(roles []string, role string) bool {
+	for _, candidate := range roles {
+		if strings.EqualFold(candidate, role) {
+			return true
+		}
+	}
+	return false
 }
 
 // CreateField 创建字段
@@ -600,6 +621,13 @@ func isMissingTableError(err error) bool {
 
 // CheckFieldPermission 检查用户对特定字段的权限
 func (s *FieldService) CheckFieldPermission(userID, fieldID, action string) error {
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return err
+	}
+	if !authorizer.CanAccessField(fieldID, action) {
+		return errors.New("无权访问该字段")
+	}
 	return nil
 }
 

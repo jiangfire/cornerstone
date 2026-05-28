@@ -124,6 +124,25 @@ func TestSQLGenerator_UnionQuery(t *testing.T) {
 	assert.Contains(t, query.SQL, "UNION")
 }
 
+func TestSQLGenerator_IntersectQuery(t *testing.T) {
+	g := NewSQLGenerator(true)
+
+	req := &QueryRequest{
+		From:   "databases",
+		Select: []string{"id", "name"},
+		Intersect: []QueryRequest{
+			{
+				From:   "tables",
+				Select: []string{"id", "name"},
+			},
+		},
+	}
+
+	query, err := g.Generate(req)
+	require.NoError(t, err)
+	assert.Contains(t, query.SQL, "INTERSECT")
+}
+
 func TestParser_HavingValidation(t *testing.T) {
 	p := NewParser()
 
@@ -183,6 +202,36 @@ func TestParser_UnionValidation(t *testing.T) {
 			From:   "databases",
 			Select: []string{"id"},
 			Union: []QueryRequest{
+				{Select: []string{"id"}},
+			},
+		}
+
+		err := p.validate(req)
+		assert.Error(t, err)
+	})
+}
+
+func TestParser_IntersectValidation(t *testing.T) {
+	p := NewParser()
+
+	t.Run("valid intersect", func(t *testing.T) {
+		req := &QueryRequest{
+			From:   "databases",
+			Select: []string{"id", "name"},
+			Intersect: []QueryRequest{
+				{From: "tables", Select: []string{"id", "name"}},
+			},
+		}
+
+		err := p.validate(req)
+		assert.NoError(t, err)
+	})
+
+	t.Run("invalid intersect from", func(t *testing.T) {
+		req := &QueryRequest{
+			From:   "databases",
+			Select: []string{"id"},
+			Intersect: []QueryRequest{
 				{Select: []string{"id"}},
 			},
 		}

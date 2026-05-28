@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jiangfire/cornerstone/backend/internal/authz"
 	"gorm.io/gorm"
 )
 
@@ -174,6 +175,15 @@ func (v *Validator) CheckTableAccess(ctx context.Context, userID string, table s
 	switch table {
 	case "databases", "records", "tables", "fields", "files":
 		return v.checkDataAccess(ctx, userID)
+	case "tokens":
+		authorizer, err := authz.NewAuthorizer(v.db, userID)
+		if err != nil {
+			return err
+		}
+		if !authorizer.IsMaster() {
+			return errors.New("无权访问 tokens")
+		}
+		return nil
 	default:
 		return nil
 	}
@@ -204,11 +214,11 @@ func splitJSONBaseField(field string) (string, bool) {
 }
 
 func (v *Validator) checkDataAccess(ctx context.Context, userID string) error {
-	var count int64
-	if err := v.db.Table("databases").Count(&count).Error; err != nil {
+	ids, err := v.getAccessibleDatabaseIDs(userID)
+	if err != nil {
 		return fmt.Errorf("检查数据访问权限失败: %w", err)
 	}
-	if count == 0 {
+	if len(ids) == 0 {
 		return errors.New("没有可用的数据库")
 	}
 	return nil
@@ -228,7 +238,14 @@ func qualifyBaseField(table, field string) string {
 
 func (v *Validator) GetAllowedTables(ctx context.Context, userID string) ([]string, error) {
 	allowed := make([]string, 0)
+	authorizer, err := authz.NewAuthorizer(v.db, userID)
+	if err != nil {
+		return nil, err
+	}
 	for table := range v.allowedTables {
+		if table == "tokens" && !authorizer.IsMaster() {
+			continue
+		}
 		allowed = append(allowed, table)
 	}
 	return allowed, nil
@@ -241,13 +258,14 @@ func (v *Validator) AutoFilterByPermission(req *QueryRequest, userID string) err
 
 	switch req.From {
 	case "databases":
-		var count int64
-		if err := v.db.Table("databases").Count(&count).Error; err != nil {
+		dbIDs, err := v.getAccessibleDatabaseIDs(userID)
+		if err != nil {
 			return err
 		}
-		if count == 0 {
+		if len(dbIDs) == 0 {
 			return errors.New("没有可用的数据库")
 		}
+		appendInCondition(req.Where, qualifyBaseField(req.From, "id"), dbIDs)
 	case "records":
 		tableIDs, err := v.getAccessibleTableIDs(userID)
 		if err != nil {
@@ -295,44 +313,27 @@ func (v *Validator) AutoFilterByPermission(req *QueryRequest, userID string) err
 }
 
 func (v *Validator) getAccessibleDatabaseIDs(userID string) ([]string, error) {
-	var dbIDs []string
-	if err := v.db.Table("databases").Pluck("id", &dbIDs).Error; err != nil {
+	authorizer, err := authz.NewAuthorizer(v.db, userID)
+	if err != nil {
 		return nil, err
 	}
-	return dbIDs, nil
+	return authorizer.AccessibleDatabaseIDs()
 }
 
 func (v *Validator) getAccessibleTableIDs(userID string) ([]string, error) {
-	dbIDs, err := v.getAccessibleDatabaseIDs(userID)
+	authorizer, err := authz.NewAuthorizer(v.db, userID)
 	if err != nil {
 		return nil, err
 	}
-	if len(dbIDs) == 0 {
-		return []string{}, nil
-	}
-
-	var tableIDs []string
-	if err := v.db.Table("tables").Where("database_id IN ?", dbIDs).Pluck("id", &tableIDs).Error; err != nil {
-		return nil, err
-	}
-	return tableIDs, nil
+	return authorizer.AccessibleTableIDs()
 }
 
 func (v *Validator) getAccessibleRecordIDs(userID string) ([]string, error) {
-	tableIDs, err := v.getAccessibleTableIDs(userID)
+	authorizer, err := authz.NewAuthorizer(v.db, userID)
 	if err != nil {
 		return nil, err
 	}
-	if len(tableIDs) == 0 {
-		return []string{}, nil
-	}
-
-	var recordIDs []string
-	if err := v.db.Table("records").Where("table_id IN ?", tableIDs).Pluck("id", &recordIDs).Error; err != nil {
-		return nil, err
-	}
-
-	return recordIDs, nil
+	return authorizer.AccessibleRecordIDs()
 }
 
 func appendInCondition(where *WhereClause, field string, values []string) {

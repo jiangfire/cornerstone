@@ -68,7 +68,10 @@ func TestExecuteAITool_GetSchema(t *testing.T) {
 	db.Create(&models.Field{TableID: table.ID, Name: "email", Type: "string"})
 
 	t.Run("get table schema", func(t *testing.T) {
-		result, err := ExecuteAITool("get_schema", map[string]any{
+		master := &models.Token{Name: "master", Token: "cs_master", IsMaster: true}
+		require.NoError(t, db.Create(master).Error)
+
+		result, err := ExecuteAIToolForToken(db, master.ID, "get_schema", map[string]any{
 			"table_id": table.ID,
 		})
 		require.NoError(t, err)
@@ -78,13 +81,16 @@ func TestExecuteAITool_GetSchema(t *testing.T) {
 		assert.Equal(t, table.ID, resMap["table_id"])
 		assert.Equal(t, "users", resMap["table_name"])
 
-		fields, ok := resMap["fields"].([]models.Field)
+		fields, ok := resMap["fields"].([]FieldResponse)
 		require.True(t, ok)
 		assert.Len(t, fields, 2)
 	})
 
 	t.Run("get database schema", func(t *testing.T) {
-		result, err := ExecuteAITool("get_schema", map[string]any{
+		master := &models.Token{Name: "master-db", Token: "cs_master_db", IsMaster: true}
+		require.NoError(t, db.Create(master).Error)
+
+		result, err := ExecuteAIToolForToken(db, master.ID, "get_schema", map[string]any{
 			"database_id": database.ID,
 		})
 		require.NoError(t, err)
@@ -94,13 +100,16 @@ func TestExecuteAITool_GetSchema(t *testing.T) {
 		assert.Equal(t, database.ID, resMap["database_id"])
 		assert.Equal(t, "TestDB", resMap["database_name"])
 
-		tables, ok := resMap["tables"].([]models.Table)
+		tables, ok := resMap["tables"].([]TableResponse)
 		require.True(t, ok)
 		assert.Len(t, tables, 1)
 	})
 
 	t.Run("missing parameters", func(t *testing.T) {
-		_, err := ExecuteAITool("get_schema", map[string]any{})
+		master := &models.Token{Name: "master-none", Token: "cs_master_none", IsMaster: true}
+		require.NoError(t, db.Create(master).Error)
+
+		_, err := ExecuteAIToolForToken(db, master.ID, "get_schema", map[string]any{})
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "required")
 	})
@@ -115,7 +124,10 @@ func TestExecuteAITool_CreateField(t *testing.T) {
 	table := &models.Table{DatabaseID: database.ID, Name: "users"}
 	db.Create(table)
 
-	result, err := ExecuteAITool("create_field", map[string]any{
+	master := &models.Token{Name: "master", Token: "cs_master_field", IsMaster: true}
+	require.NoError(t, db.Create(master).Error)
+
+	result, err := ExecuteAIToolForToken(db, master.ID, "create_field", map[string]any{
 		"table_id":    table.ID,
 		"name":        "phone",
 		"type":        "string",
@@ -142,7 +154,10 @@ func TestExecuteAITool_ExecuteQuery(t *testing.T) {
 	db.Create(&models.Record{TableID: table.ID, Data: `{"name": "Alice"}`})
 	db.Create(&models.Record{TableID: table.ID, Data: `{"name": "Bob"}`})
 
-	result, err := ExecuteAITool("execute_query", map[string]any{
+	master := &models.Token{Name: "master", Token: "cs_master_query", IsMaster: true}
+	require.NoError(t, db.Create(master).Error)
+
+	result, err := ExecuteAIToolForToken(db, master.ID, "execute_query", map[string]any{
 		"from":  "records",
 		"limit": float64(10),
 	})

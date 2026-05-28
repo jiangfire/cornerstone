@@ -35,6 +35,21 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	)
 	require.NoError(t, err)
 
+	require.NoError(t, db.Create(&models.Token{
+		ID:       "user1",
+		Token:    "cs_user1_master",
+		Name:     "user1",
+		IsMaster: true,
+		Scopes:   "{}",
+	}).Error)
+	require.NoError(t, db.Create(&models.Token{
+		ID:       "test_user",
+		Token:    "cs_test_user_master",
+		Name:     "test_user",
+		IsMaster: true,
+		Scopes:   "{}",
+	}).Error)
+
 	return db
 }
 

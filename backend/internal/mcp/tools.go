@@ -564,30 +564,22 @@ func (s *ToolService) callGenerateTestData(args json.RawMessage) (*ToolCallResul
 	}
 
 	recordService := services.NewRecordService(s.db)
-	inserted := 0
-	for i := 0; i < req.Count; i++ {
-		_, err := recordService.CreateRecord(services.CreateRecordRequest{
-			TableID: req.TableID,
-			Data:    map[string]interface{}{},
-		}, s.userID)
-		if err != nil {
-			return &ToolCallResult{
-				Content: []TextContent{{Type: "text", Text: fmt.Sprintf("Generated %d records before error.", inserted)}},
-				StructuredContent: map[string]interface{}{
-					"error":    err.Error(),
-					"inserted": inserted,
-				},
-				IsError: true,
-			}, nil
-		}
-		inserted++
+	records, err := recordService.GenerateTestData(req.TableID, s.userID, req.Count)
+	if err != nil {
+		return &ToolCallResult{
+			Content: []TextContent{{Type: "text", Text: "Test data generation failed."}},
+			StructuredContent: map[string]interface{}{
+				"error": err.Error(),
+			},
+			IsError: true,
+		}, nil
 	}
 
 	return &ToolCallResult{
-		Content: []TextContent{{Type: "text", Text: fmt.Sprintf("Generated %d test records.", inserted)}},
+		Content: []TextContent{{Type: "text", Text: fmt.Sprintf("Generated %d test records.", len(records))}},
 		StructuredContent: map[string]interface{}{
 			"table_id": req.TableID,
-			"count":    inserted,
+			"count":    len(records),
 		},
 	}, nil
 }

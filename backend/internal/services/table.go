@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/jiangfire/cornerstone/backend/internal/authz"
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -90,6 +91,14 @@ func sanitizeTableInput(name, description string) (string, string) {
 }
 
 func (s *TableService) CreateTable(req CreateTableRequest, userID string) (*models.Table, error) {
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !authorizer.CanAccessDatabase(req.DatabaseID, authz.ActionManage) {
+		return nil, errors.New("无权在该数据库中创建表")
+	}
+
 	req.Name, req.Description = sanitizeTableInput(req.Name, req.Description)
 
 	if err := validateTableName(req.Name); err != nil {
@@ -97,7 +106,7 @@ func (s *TableService) CreateTable(req CreateTableRequest, userID string) (*mode
 	}
 
 	var existingDB models.Database
-	err := s.db.Where("id = ? AND deleted_at IS NULL", req.DatabaseID).First(&existingDB).Error
+	err = s.db.Where("id = ? AND deleted_at IS NULL", req.DatabaseID).First(&existingDB).Error
 	if err != nil {
 		return nil, errors.New("数据库不存在")
 	}
@@ -125,8 +134,16 @@ func (s *TableService) CreateTable(req CreateTableRequest, userID string) (*mode
 }
 
 func (s *TableService) ListTables(dbID, userID string) ([]TableResponse, error) {
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !authorizer.CanAccessDatabase(dbID, authz.ActionRead) {
+		return nil, errors.New("无权访问该数据库的表")
+	}
+
 	var tables []models.Table
-	err := s.db.Where("database_id = ? AND deleted_at IS NULL", dbID).Order("created_at ASC").Find(&tables).Error
+	err = s.db.Where("database_id = ? AND deleted_at IS NULL", dbID).Order("created_at ASC").Find(&tables).Error
 	if err != nil {
 		return nil, fmt.Errorf("数据库查询失败: %w", err)
 	}
@@ -147,6 +164,14 @@ func (s *TableService) ListTables(dbID, userID string) ([]TableResponse, error) 
 }
 
 func (s *TableService) GetTable(tableID, userID string) (*TableResponse, error) {
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !authorizer.CanAccessTable(tableID, authz.ActionRead) {
+		return nil, errors.New("无权访问该表")
+	}
+
 	table, err := s.getActiveTable(tableID)
 	if err != nil {
 		return nil, fmt.Errorf("表不存在: %w", err)
@@ -163,6 +188,14 @@ func (s *TableService) GetTable(tableID, userID string) (*TableResponse, error) 
 }
 
 func (s *TableService) UpdateTable(tableID string, req UpdateTableRequest, userID string) (*models.Table, error) {
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !authorizer.CanAccessTable(tableID, authz.ActionManage) {
+		return nil, errors.New("无权修改该表")
+	}
+
 	table, err := s.getActiveTable(tableID)
 	if err != nil {
 		return nil, fmt.Errorf("表不存在: %w", err)
@@ -194,6 +227,14 @@ func (s *TableService) UpdateTable(tableID string, req UpdateTableRequest, userI
 }
 
 func (s *TableService) DeleteTable(tableID, userID string) error {
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return err
+	}
+	if !authorizer.CanAccessTable(tableID, authz.ActionManage) {
+		return errors.New("无权删除该表")
+	}
+
 	table, err := s.getActiveTable(tableID)
 	if err != nil {
 		return fmt.Errorf("表不存在: %w", err)

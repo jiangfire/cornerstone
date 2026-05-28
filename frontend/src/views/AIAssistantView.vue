@@ -54,7 +54,7 @@ async function sendMessage() {
 
   try {
     const res = await aiAPI.chat(userMsg)
-    messages.value.push({ role: 'ai', content: res.data.data.reply || '暂无回复' })
+    messages.value.push({ role: 'ai', content: res.data.reply || '暂无回复' })
   } catch (e) {
     const err = e as AxiosError<{ message?: string }>
     const errorMsg = err.response?.data?.message || err.message || '请求失败'

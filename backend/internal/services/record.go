@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/jiangfire/cornerstone/backend/internal/authz"
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -126,6 +128,21 @@ func (s *RecordService) checkTableAccess(tableID, userID string, requiredRoles [
 	err = s.db.Where("id = ? AND deleted_at IS NULL", table.DatabaseID).First(&db).Error
 	if err != nil {
 		return errors.New("数据库不存在")
+	}
+
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return err
+	}
+	action := authz.ActionRead
+	switch {
+	case containsRole(requiredRoles, "owner") || containsRole(requiredRoles, "admin"):
+		action = authz.ActionManage
+	case containsRole(requiredRoles, "editor"):
+		action = authz.ActionWrite
+	}
+	if !authorizer.CanAccessTable(tableID, action) {
+		return errors.New("无权访问该表")
 	}
 
 	return nil
@@ -343,7 +360,7 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 			return errors.New("期望字符串类型（日期格式）")
 		}
 
-	case "select", "single_select":
+	case "select", "single_select", "email", "url", "color", "link":
 		if _, ok := value.(string); !ok {
 			return errors.New("期望字符串类型")
 		}
@@ -366,7 +383,7 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 			}
 		}
 
-	case "list":
+	case "multiselect", "list":
 		items, err := parseStringListValue(value)
 		if err != nil {
 			return err
@@ -392,6 +409,21 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 					}
 				}
 			}
+		}
+	case "json":
+		return nil
+	case "rating":
+		switch rating := value.(type) {
+		case float64:
+			if rating < 1 || rating > 5 {
+				return errors.New("评分必须在 1-5 之间")
+			}
+		case int:
+			if rating < 1 || rating > 5 {
+				return errors.New("评分必须在 1-5 之间")
+			}
+		default:
+			return errors.New("期望数字类型")
 		}
 	}
 
@@ -1058,9 +1090,8 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 		}
 
 		updateResult := updateQuery.Updates(map[string]interface{}{
-			"data":       string(dataJSON),
-			"updated_by": userID,
-			"version":    gorm.Expr("version + 1"),
+			"data":    string(dataJSON),
+			"version": gorm.Expr("version + 1"),
 		})
 		if updateResult.Error != nil {
 			return fmt.Errorf("更新记录失败: %w", updateResult.Error)
@@ -1213,6 +1244,39 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 	}
 	for _, record := range records {
 		record.Data = filteredJSON
+	}
+
+	return records, nil
+}
+
+func (s *RecordService) GenerateTestData(tableID, userID string, count int) ([]*models.Record, error) {
+	if count <= 0 {
+		return []*models.Record{}, nil
+	}
+	if err := s.checkTableAccess(tableID, userID, []string{"owner", "admin", "editor"}); err != nil {
+		return nil, err
+	}
+
+	fields, err := s.getTableFields(tableID)
+	if err != nil {
+		return nil, err
+	}
+
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	records := make([]*models.Record, 0, count)
+	for i := 0; i < count; i++ {
+		data := make(map[string]interface{}, len(fields))
+		for _, field := range fields {
+			data[field.Name] = generateFieldValue(rng, field.Type)
+		}
+		record, err := s.CreateRecord(CreateRecordRequest{
+			TableID: tableID,
+			Data:    data,
+		}, userID)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, record)
 	}
 
 	return records, nil
