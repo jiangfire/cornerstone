@@ -11,6 +11,16 @@ import (
 )
 
 // ListTokens 列出 Token
+//
+// @Summary      List all tokens
+// @Description  Returns all tokens visible to the current token. Master tokens see everything; client tokens see only themselves.
+// @Tags         tokens
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"tokens":[...],"total":0}}"
+// @Failure      500  {object}  map[string]any
+// @Router       /tokens [get]
 func ListTokens(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	isMaster := middleware.IsMasterToken(c)
@@ -26,6 +36,18 @@ func ListTokens(c *gin.Context) {
 }
 
 // CreateToken 创建 Token（需 Master Token）
+//
+// @Summary      Create a new token
+// @Description  Create a new API token. Requires Master Token. The token value is returned only once and cannot be retrieved again.
+// @Tags         tokens
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  object  true  "Token to create"  example({"name":"my-token","scopes":"read,write","expires_at":"2026-12-31T00:00:00Z"})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","name":"...","is_master":false,"scopes":"...","token":"cs_..."}}"
+// @Failure      400  {object}  map[string]any
+// @Failure      500  {object}  map[string]any
+// @Router       /tokens [post]
 func CreateToken(c *gin.Context) {
 	var req services.CreateTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -52,6 +74,17 @@ func CreateToken(c *gin.Context) {
 }
 
 // DeleteToken 删除 Token
+//
+// @Summary      Delete a token
+// @Description  Delete a token by ID. Requires Master Token to delete tokens other than your own.
+// @Tags         tokens
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Token ID"
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"..."}}"
+// @Failure      400  {object}  map[string]any
+// @Router       /tokens/{id} [delete]
 func DeleteToken(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	isMaster := middleware.IsMasterToken(c)
@@ -67,6 +100,18 @@ func DeleteToken(c *gin.Context) {
 }
 
 // UpdateToken 更新 Token 权限（需 Master Token）
+//
+// @Summary      Update a token
+// @Description  Update token scopes and/or expiration. Requires Master Token.
+// @Tags         tokens
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id    path  string  true  "Token ID"
+// @Param        body  body  object  true  "Token update fields"  example({"scopes":"read","expires_at":"2026-12-31T00:00:00Z"})
+// @Success      200  {object}  map[string]any
+// @Failure      400  {object}  map[string]any
+// @Router       /tokens/{id} [put]
 func UpdateToken(c *gin.Context) {
 	targetID := c.Param("id")
 

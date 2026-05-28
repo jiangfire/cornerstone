@@ -1,5 +1,30 @@
 package main
 
+// @title           Cornerstone API
+// @version         1.0
+// @description     Lightweight data asset platform with Token-based authentication and AI assistant
+// @termsOfService  http://swagger.io/terms/
+
+// @contact.name    API Support
+// @contact.url     http://www.swagger.io/support
+// @contact.email   support@swagger.io
+
+// @license.name    MIT
+// @license.url     https://opensource.org/licenses/MIT
+
+// @host            localhost:8080
+// @BasePath        /api
+
+// @securityDefinitions.apikey  ApiKeyAuth
+// @in                          header
+// @name                        X-API-Key
+// @description                 Enter your API token (Master Token or client token)
+
+// @securityDefinitions.apikey  BearerAuth
+// @in                          header
+// @name                        Authorization
+// @description                 Enter "Bearer <token>" (e.g., "Bearer cs_abc123")
+
 import (
 	"context"
 	"log"
@@ -20,6 +45,10 @@ import (
 	applog "github.com/jiangfire/cornerstone/backend/pkg/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
+
+	_ "github.com/jiangfire/cornerstone/backend/docs/swagger"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	"github.com/swaggo/files"
 )
 
 var Version = "dev"
@@ -75,6 +104,7 @@ func main() {
 	r.GET("/health", handlers.Health)
 	r.GET("/ready", handlers.Ready)
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	r.OPTIONS("/mcp", handlers.HandleMCPOptions)
 	mcpRoute := r.Group("/mcp")

@@ -8,6 +8,18 @@ import (
 	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
+// CreateDatabase
+//
+// @Summary      Create a database
+// @Description  Create a new database owned by the authenticated token.
+// @Tags         databases
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  object  true  "Database to create"  example({"name":"My DB","description":"A database"})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","name":"...","description":"...","created_at":"..."}}"
+// @Failure      400  {object}  map[string]any
+// @Router       /databases [post]
 func CreateDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 
@@ -32,6 +44,17 @@ func CreateDatabase(c *gin.Context) {
 	})
 }
 
+// ListDatabases
+//
+// @Summary      List databases
+// @Description  Returns all databases accessible to the authenticated token.
+// @Tags         databases
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"databases":[...],"total":0}}"
+// @Failure      500  {object}  map[string]any
+// @Router       /databases [get]
 func ListDatabases(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 
@@ -48,6 +71,18 @@ func ListDatabases(c *gin.Context) {
 	})
 }
 
+// GetDatabase
+//
+// @Summary      Get a database
+// @Description  Get database details by ID.
+// @Tags         databases
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Database ID"
+// @Success      200  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /databases/{id} [get]
 func GetDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
@@ -62,6 +97,20 @@ func GetDatabase(c *gin.Context) {
 	dto.Success(c, database)
 }
 
+// UpdateDatabase
+//
+// @Summary      Update a database
+// @Description  Update database name and/or description.
+// @Tags         databases
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id    path  string  true  "Database ID"
+// @Param        body  body  object  true  "Database update fields"  example({"name":"New Name","description":"Updated"})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","name":"...","description":"...","updated_at":"..."}}"
+// @Failure      400  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /databases/{id} [put]
 func UpdateDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
@@ -87,6 +136,18 @@ func UpdateDatabase(c *gin.Context) {
 	})
 }
 
+// DeleteDatabase
+//
+// @Summary      Delete a database
+// @Description  Delete a database by ID.
+// @Tags         databases
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Database ID"
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"message":"数据库已删除"}}"
+// @Failure      403  {object}  map[string]any
+// @Router       /databases/{id} [delete]
 func DeleteDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
@@ -102,6 +163,18 @@ func DeleteDatabase(c *gin.Context) {
 	})
 }
 
+// CreateDatabaseWithTables
+//
+// @Summary      Create database with tables and fields
+// @Description  Atomically create a database together with nested tables and fields in a single request.
+// @Tags         databases
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  object  true  "Database with nested tables/fields"  example({"name":"DB","description":"","tables":[{"name":"T1","fields":[{"name":"title","type":"string"}]}]})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"database":{...},"tables":[...],"fields":[...],"summary":{"table_count":1,"field_count":1}}}"
+// @Failure      400  {object}  map[string]any
+// @Router       /databases/with-tables [post]
 func CreateDatabaseWithTables(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 

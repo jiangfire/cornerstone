@@ -8,6 +8,20 @@ import (
 	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
+// UploadFile
+//
+// @Summary      Upload a file
+// @Description  Upload a file attachment. At least one of record_id or field_id is required.
+// @Tags         files
+// @Accept       multipart/form-data
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        file       formData  file    true  "File to upload"
+// @Param        record_id  formData  string  false "Record ID"
+// @Param        field_id   formData  string  false "Field ID"
+// @Success      200  {object}  map[string]any
+// @Failure      400  {object}  map[string]any
+// @Router       /files/upload [post]
 func UploadFile(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	recordID := c.PostForm("record_id")
@@ -40,6 +54,18 @@ func UploadFile(c *gin.Context) {
 	dto.Success(c, uploadedFile)
 }
 
+// GetFile
+//
+// @Summary      Get file metadata
+// @Description  Get file metadata by ID.
+// @Tags         files
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "File ID"
+// @Success      200  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /files/{id} [get]
 func GetFile(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fileID := c.Param("id")
@@ -54,6 +80,18 @@ func GetFile(c *gin.Context) {
 	dto.Success(c, file)
 }
 
+// DownloadFile
+//
+// @Summary      Download a file
+// @Description  Download the actual file content by ID.
+// @Tags         files
+// @Accept       json
+// @Produce      octet-stream
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "File ID"
+// @Success      200  {file}  binary
+// @Failure      403  {object}  map[string]any
+// @Router       /files/{id}/download [get]
 func DownloadFile(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fileID := c.Param("id")
@@ -73,6 +111,18 @@ func DownloadFile(c *gin.Context) {
 	c.FileAttachment(safePath, file.FileName)
 }
 
+// DeleteFile
+//
+// @Summary      Delete a file
+// @Description  Delete a file by ID.
+// @Tags         files
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "File ID"
+// @Success      200  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /files/{id} [delete]
 func DeleteFile(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fileID := c.Param("id")
@@ -86,6 +136,18 @@ func DeleteFile(c *gin.Context) {
 	dto.Success(c, "文件删除成功")
 }
 
+// ListRecordFiles
+//
+// @Summary      List files for a record
+// @Description  Returns all files attached to a record.
+// @Tags         files
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Record ID"
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"items":[...]}}"
+// @Failure      403  {object}  map[string]any
+// @Router       /records/{id}/files [get]
 func ListRecordFiles(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	recordID := c.Param("id")

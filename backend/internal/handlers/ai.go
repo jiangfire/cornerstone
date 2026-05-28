@@ -20,6 +20,19 @@ func InitAIAgent(agent *services.AIAgent) {
 	aiAgent = agent
 }
 
+// ChatWithAI
+//
+// @Summary      Chat with AI assistant
+// @Description  Send a message to the AI assistant and get a reply. The assistant can query and manage data using available tools.
+// @Tags         ai
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  object  true  "Chat request"  example({"message":"Show me all databases","context":{}})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"type":"result","reply":"...","context":{}}}"
+// @Failure      400  {object}  map[string]any
+// @Failure      500  {object}  map[string]any
+// @Router       /ai/chat [post]
 func ChatWithAI(c *gin.Context) {
 	if aiAgent == nil {
 		dto.InternalServerError(c, "AI agent not configured")

@@ -28,6 +28,18 @@ func NewQueryHandler() *QueryHandler {
 // Query 统一查询接口
 // POST /api/query
 // GET /api/query?q={json_string}
+//
+// @Summary      Execute a query
+// @Description  Execute a full Query DSL request. Supports from, select, where, order_by, limit, offset, group_by, having, aggregates, join, and union.
+// @Tags         query
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  object  true  "Query DSL body"  example({"from":"records","select":["id","data"],"where":{"and":[{"field":"table_id","op":"eq","value":"tbl-1"}]},"orderBy":[{"field":"created_at","dir":"desc"}],"page":1,"size":20})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"data":[...],"total":0,"page":1,"size":20,"has_more":false}}"
+// @Failure      400  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /query [post]
 func (h *QueryHandler) Query(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -75,6 +87,18 @@ func (h *QueryHandler) Query(c *gin.Context) {
 
 // QueryExplain 查询解释接口（返回生成的 SQL，用于调试）
 // POST /api/query/explain
+//
+// @Summary      Explain a query
+// @Description  Returns the generated SQL and parameters for a query without executing it. Useful for debugging.
+// @Tags         query
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  object  true  "Query DSL body"  example({"from":"records","select":["id"],"where":{"and":[{"field":"table_id","op":"eq","value":"tbl-1"}]}})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"sql":"SELECT ...","params":[...]}}"
+// @Failure      400  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /query/explain [post]
 func (h *QueryHandler) QueryExplain(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -115,6 +139,18 @@ func (h *QueryHandler) QueryExplain(c *gin.Context) {
 
 // QueryValidate 查询验证接口（验证查询权限，不执行）
 // POST /api/query/validate
+//
+// @Summary      Validate a query
+// @Description  Validate a query DSL and check access permissions without executing it.
+// @Tags         query
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  object  true  "Query DSL body"  example({"from":"records","select":["id"]})
+// @Success      200  {object}  map[string]any  "{"code":0,"message":"查询验证通过"}"
+// @Failure      400  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /query/validate [post]
 func (h *QueryHandler) QueryValidate(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -147,6 +183,18 @@ func (h *QueryHandler) QueryValidate(c *gin.Context) {
 
 // BatchQuery 批量查询接口
 // POST /api/query/batch
+//
+// @Summary      Batch query
+// @Description  Execute multiple named queries in a single request.
+// @Tags         query
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  object  true  "Batch query request"  example({"queries":{"q1":{"from":"records","select":["id"]},"q2":{"from":"tables","select":["id","name"]}}})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"results":{"q1":{...},"q2":{...}}}}"
+// @Failure      400  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /query/batch [post]
 func (h *QueryHandler) BatchQuery(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -172,6 +220,16 @@ func (h *QueryHandler) BatchQuery(c *gin.Context) {
 
 // ListTables 获取可访问的表列表
 // GET /api/query/tables
+//
+// @Summary      List queryable tables
+// @Description  Returns all tables the authenticated token can query.
+// @Tags         query
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"tables":[...]}}"
+// @Failure      500  {object}  map[string]any
+// @Router       /query/tables [get]
 func (h *QueryHandler) ListTables(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -188,6 +246,17 @@ func (h *QueryHandler) ListTables(c *gin.Context) {
 
 // GetTableSchema 获取表结构信息
 // GET /api/query/schema/:table
+//
+// @Summary      Get table schema for query
+// @Description  Returns the allowed fields for a queryable table.
+// @Tags         query
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        table  path  string  true  "Table name (records, tables, databases, fields, files, tokens)"
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"table":"records","fields":["id","table_id",...]}}"
+// @Failure      403  {object}  map[string]any
+// @Router       /query/schema/{table} [get]
 func (h *QueryHandler) GetTableSchema(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	table := c.Param("table")
@@ -210,6 +279,22 @@ func (h *QueryHandler) GetTableSchema(c *gin.Context) {
 
 // SimplifiedQuery 简化查询接口（URL 参数形式）
 // GET /api/query/simple?table=records&filter={}&sort=-created_at&page=1&size=20
+//
+// @Summary      Simplified query
+// @Description  Query records using simple URL parameters instead of full DSL.
+// @Tags         query
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        table   query  string  true   "Table name"
+// @Param        filter  query  string  false  "JSON filter object"
+// @Param        sort    query  string  false  "Sort expression (prefix with - for desc)"  default(-created_at)
+// @Param        page    query  int     false  "Page number"  default(1)
+// @Param        size    query  int     false  "Page size (max 1000)"  default(20)
+// @Success      200  {object}  map[string]any
+// @Failure      400  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /query/simple [get]
 func (h *QueryHandler) SimplifiedQuery(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 

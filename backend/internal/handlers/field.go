@@ -8,6 +8,18 @@ import (
 	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
+// CreateField
+//
+// @Summary      Create a field
+// @Description  Create a new field in a table. Valid types: string, text, number, boolean, date, datetime, attachment, select, list, multiselect, single_select, multi_select
+// @Tags         fields
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  object  true  "Field to create"  example({"table_id":"tbl-1","name":"Title","type":"string","description":"Title field","required":true})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","table_id":"...","name":"...","type":"...","description":"...","required":false,"created_at":"..."}}"
+// @Failure      400  {object}  map[string]any
+// @Router       /fields [post]
 func CreateField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 
@@ -35,6 +47,18 @@ func CreateField(c *gin.Context) {
 	})
 }
 
+// ListFields
+//
+// @Summary      List fields in a table
+// @Description  Returns all fields in the specified table.
+// @Tags         fields
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Table ID"
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"items":[...],"total":0}}"
+// @Failure      403  {object}  map[string]any
+// @Router       /tables/{id}/fields [get]
 func ListFields(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -52,6 +76,18 @@ func ListFields(c *gin.Context) {
 	})
 }
 
+// GetField
+//
+// @Summary      Get a field
+// @Description  Get field details by ID.
+// @Tags         fields
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Field ID"
+// @Success      200  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /fields/{id} [get]
 func GetField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
@@ -66,6 +102,20 @@ func GetField(c *gin.Context) {
 	dto.Success(c, field)
 }
 
+// UpdateField
+//
+// @Summary      Update a field
+// @Description  Update field properties. Valid types: string, text, number, boolean, date, datetime, attachment, select, list, multiselect, single_select, multi_select
+// @Tags         fields
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id    path  string  true  "Field ID"
+// @Param        body  body  object  true  "Field update fields"  example({"name":"New Name","type":"text","description":"Updated","required":false})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","name":"...","type":"...","description":"...","required":false,"updated_at":"..."}}"
+// @Failure      400  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /fields/{id} [put]
 func UpdateField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
@@ -93,6 +143,18 @@ func UpdateField(c *gin.Context) {
 	})
 }
 
+// DeleteField
+//
+// @Summary      Delete a field
+// @Description  Delete a field by ID.
+// @Tags         fields
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Field ID"
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"message":"字段已删除"}}"
+// @Failure      403  {object}  map[string]any
+// @Router       /fields/{id} [delete]
 func DeleteField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
@@ -108,6 +170,18 @@ func DeleteField(c *gin.Context) {
 	})
 }
 
+// GetFieldPermissions
+//
+// @Summary      Get field permissions
+// @Description  Get field-level permission settings for a table.
+// @Tags         fields
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Table ID"
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"permissions":[...],"total":0}}"
+// @Failure      403  {object}  map[string]any
+// @Router       /tables/{id}/fields/permissions [get]
 func GetFieldPermissions(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -125,6 +199,20 @@ func GetFieldPermissions(c *gin.Context) {
 	})
 }
 
+// SetFieldPermission
+//
+// @Summary      Set field permission
+// @Description  Set permission for a specific field in a table.
+// @Tags         fields
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id    path  string  true  "Table ID"
+// @Param        body  body  object  true  "Permission to set"  example({"field_id":"fld-1","role":"editor","can_read":true,"can_write":true,"can_delete":false})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"message":"权限设置成功"}}"
+// @Failure      400  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /tables/{id}/fields/permissions [post]
 func SetFieldPermission(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -146,6 +234,20 @@ func SetFieldPermission(c *gin.Context) {
 	})
 }
 
+// BatchSetFieldPermissions
+//
+// @Summary      Batch set field permissions
+// @Description  Set permissions for multiple fields in a table at once.
+// @Tags         fields
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id    path  string  true  "Table ID"
+// @Param        body  body  object  true  "Permissions to set"  example({"permissions":[{"field_id":"fld-1","role":"editor","can_read":true,"can_write":true}]})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"message":"批量权限设置成功","count":1}}"
+// @Failure      400  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /tables/{id}/fields/permissions/batch [put]
 func BatchSetFieldPermissions(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")

@@ -1,0 +1,1509 @@
+basePath: /api
+host: localhost:8080
+info:
+  contact:
+    email: support@swagger.io
+    name: API Support
+    url: http://www.swagger.io/support
+  description: Lightweight data asset platform with Token-based authentication and
+    AI assistant
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Cornerstone API
+  version: "1.0"
+paths:
+  /ai/chat:
+    post:
+      consumes:
+      - application/json
+      description: Send a message to the AI assistant and get a reply. The assistant
+        can query and manage data using available tools.
+      parameters:
+      - description: Chat request
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"type":"result","reply":"...","context":{}}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Chat with AI assistant
+      tags:
+      - ai
+  /databases:
+    get:
+      consumes:
+      - application/json
+      description: Returns all databases accessible to the authenticated token.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"databases":[...],"total":0}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: List databases
+      tags:
+      - databases
+    post:
+      consumes:
+      - application/json
+      description: Create a new database owned by the authenticated token.
+      parameters:
+      - description: Database to create
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"id":"...","name":"...","description":"...","created_at":"..."}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Create a database
+      tags:
+      - databases
+  /databases/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a database by ID.
+      parameters:
+      - description: Database ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"message":"数据库已删除"}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a database
+      tags:
+      - databases
+    get:
+      consumes:
+      - application/json
+      description: Get database details by ID.
+      parameters:
+      - description: Database ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get a database
+      tags:
+      - databases
+    put:
+      consumes:
+      - application/json
+      description: Update database name and/or description.
+      parameters:
+      - description: Database ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Database update fields
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"id":"...","name":"...","description":"...","updated_at":"..."}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Update a database
+      tags:
+      - databases
+  /databases/{id}/tables:
+    get:
+      consumes:
+      - application/json
+      description: Returns all tables in the specified database.
+      parameters:
+      - description: Database ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"tables":[...],"total":0}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: List tables in a database
+      tags:
+      - tables
+  /databases/with-tables:
+    post:
+      consumes:
+      - application/json
+      description: Atomically create a database together with nested tables and fields
+        in a single request.
+      parameters:
+      - description: Database with nested tables/fields
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"database":{...},"tables":[...],"fields":[...],"summary":{"table_count":1,"field_count":1}}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Create database with tables and fields
+      tags:
+      - databases
+  /fields:
+    post:
+      consumes:
+      - application/json
+      description: 'Create a new field in a table. Valid types: string, text, number,
+        boolean, date, datetime, attachment, select, list, multiselect, single_select,
+        multi_select'
+      parameters:
+      - description: Field to create
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"id":"...","table_id":"...","name":"...","type":"...","description":"...","required":false,"created_at":"..."}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Create a field
+      tags:
+      - fields
+  /fields/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a field by ID.
+      parameters:
+      - description: Field ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"message":"字段已删除"}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a field
+      tags:
+      - fields
+    get:
+      consumes:
+      - application/json
+      description: Get field details by ID.
+      parameters:
+      - description: Field ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get a field
+      tags:
+      - fields
+    put:
+      consumes:
+      - application/json
+      description: 'Update field properties. Valid types: string, text, number, boolean,
+        date, datetime, attachment, select, list, multiselect, single_select, multi_select'
+      parameters:
+      - description: Field ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Field update fields
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"id":"...","name":"...","type":"...","description":"...","required":false,"updated_at":"..."}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Update a field
+      tags:
+      - fields
+  /files/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a file by ID.
+      parameters:
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a file
+      tags:
+      - files
+    get:
+      consumes:
+      - application/json
+      description: Get file metadata by ID.
+      parameters:
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get file metadata
+      tags:
+      - files
+  /files/{id}/download:
+    get:
+      consumes:
+      - application/json
+      description: Download the actual file content by ID.
+      parameters:
+      - description: File ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Download a file
+      tags:
+      - files
+  /files/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Upload a file attachment. At least one of record_id or field_id
+        is required.
+      parameters:
+      - description: File to upload
+        in: formData
+        name: file
+        required: true
+        type: file
+      - description: Record ID
+        in: formData
+        name: record_id
+        type: string
+      - description: Field ID
+        in: formData
+        name: field_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Upload a file
+      tags:
+      - files
+  /health:
+    get:
+      description: Liveness probe. Returns 200 if the process is running. Does not
+        check external dependencies.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"status":"healthy","service":"cornerstone-backend","version":"...","time":"..."}'
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Health check
+      tags:
+      - health
+  /mcp:
+    get:
+      description: 'Opens a Server-Sent Events stream for receiving MCP notifications.
+        Requires Accept: text/event-stream header and authentication.'
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: SSE stream
+          schema:
+            type: string
+      security:
+      - ApiKeyAuth: []
+      summary: Open MCP SSE stream
+      tags:
+      - mcp
+    post:
+      consumes:
+      - application/json
+      description: Streamable HTTP MCP protocol endpoint. Accepts JSON-RPC requests
+        and can respond with JSON or SSE stream. Requires authentication.
+      parameters:
+      - description: JSON-RPC request
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Handle MCP request (SSE)
+      tags:
+      - mcp
+  /query:
+    post:
+      consumes:
+      - application/json
+      description: Execute a full Query DSL request. Supports from, select, where,
+        order_by, limit, offset, group_by, having, aggregates, join, and union.
+      parameters:
+      - description: Query DSL body
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"data":[...],"total":0,"page":1,"size":20,"has_more":false}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Execute a query
+      tags:
+      - query
+  /query/batch:
+    post:
+      consumes:
+      - application/json
+      description: Execute multiple named queries in a single request.
+      parameters:
+      - description: Batch query request
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"results":{"q1":{...},"q2":{...}}}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Batch query
+      tags:
+      - query
+  /query/explain:
+    post:
+      consumes:
+      - application/json
+      description: Returns the generated SQL and parameters for a query without executing
+        it. Useful for debugging.
+      parameters:
+      - description: Query DSL body
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"sql":"SELECT ...","params":[...]}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Explain a query
+      tags:
+      - query
+  /query/schema/{table}:
+    get:
+      consumes:
+      - application/json
+      description: Returns the allowed fields for a queryable table.
+      parameters:
+      - description: Table name (records, tables, databases, fields, files, tokens)
+        in: path
+        name: table
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"table":"records","fields":["id","table_id",...]}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get table schema for query
+      tags:
+      - query
+  /query/simple:
+    get:
+      consumes:
+      - application/json
+      description: Query records using simple URL parameters instead of full DSL.
+      parameters:
+      - description: Table name
+        in: query
+        name: table
+        required: true
+        type: string
+      - description: JSON filter object
+        in: query
+        name: filter
+        type: string
+      - default: -created_at
+        description: Sort expression (prefix with - for desc)
+        in: query
+        name: sort
+        type: string
+      - default: 1
+        description: Page number
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: Page size (max 1000)
+        in: query
+        name: size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Simplified query
+      tags:
+      - query
+  /query/tables:
+    get:
+      consumes:
+      - application/json
+      description: Returns all tables the authenticated token can query.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"tables":[...]}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: List queryable tables
+      tags:
+      - query
+  /query/validate:
+    post:
+      consumes:
+      - application/json
+      description: Validate a query DSL and check access permissions without executing
+        it.
+      parameters:
+      - description: Query DSL body
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"message":"查询验证通过"}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Validate a query
+      tags:
+      - query
+  /ready:
+    get:
+      description: Readiness probe. Returns 200 if the process is running and the
+        database is reachable. Returns 503 otherwise.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"status":"ready","service":"cornerstone-backend","version":"...","time":"..."}'
+          schema:
+            additionalProperties: true
+            type: object
+        "503":
+          description: '{"status":"unready","reason":"..."}'
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Readiness check
+      tags:
+      - health
+  /records:
+    get:
+      consumes:
+      - application/json
+      description: Query records from a table with pagination and filtering.
+      parameters:
+      - description: Table ID
+        in: query
+        name: table_id
+        required: true
+        type: string
+      - default: 20
+        description: Page size (1-100)
+        in: query
+        name: limit
+        type: integer
+      - default: 0
+        description: Offset for pagination
+        in: query
+        name: offset
+        type: integer
+      - description: JSON filter expression
+        in: query
+        name: filter
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"items":[...],"total":0,"has_more":false}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: List records
+      tags:
+      - records
+    post:
+      consumes:
+      - application/json
+      description: Create a new record in a table.
+      parameters:
+      - description: Record to create
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"id":"...","table_id":"...","version":1,"created_at":"...","data":{...}}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Create a record
+      tags:
+      - records
+  /records/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a record by ID.
+      parameters:
+      - description: Record ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"message":"记录已删除"}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a record
+      tags:
+      - records
+    get:
+      consumes:
+      - application/json
+      description: Get a single record by ID.
+      parameters:
+      - description: Record ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get a record
+      tags:
+      - records
+    put:
+      consumes:
+      - application/json
+      description: Update record data. Supports optimistic locking via version field.
+      parameters:
+      - description: Record ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Record update
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"id":"...","version":2,"updated_at":"...","data":{...}}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Update a record
+      tags:
+      - records
+  /records/{id}/files:
+    get:
+      consumes:
+      - application/json
+      description: Returns all files attached to a record.
+      parameters:
+      - description: Record ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"items":[...]}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: List files for a record
+      tags:
+      - files
+  /records/batch:
+    post:
+      consumes:
+      - application/json
+      description: Create multiple identical records in one request (1-100 records).
+      parameters:
+      - default: 1
+        description: Number of records to create (1-100)
+        in: query
+        name: count
+        required: true
+        type: integer
+      - description: Record template
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"records":[...],"count":1}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Batch create records
+      tags:
+      - records
+  /records/export:
+    get:
+      consumes:
+      - application/json
+      description: Export records from a table as CSV or JSON file.
+      parameters:
+      - description: Table ID
+        in: query
+        name: table_id
+        required: true
+        type: string
+      - default: csv
+        description: Export format (csv or json)
+        in: query
+        name: format
+        type: string
+      - description: JSON filter expression
+        in: query
+        name: filter
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: file
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Export records
+      tags:
+      - records
+  /tables:
+    post:
+      consumes:
+      - application/json
+      description: Create a new table inside a database.
+      parameters:
+      - description: Table to create
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"id":"...","database_id":"...","name":"...","description":"...","created_at":"..."}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Create a table
+      tags:
+      - tables
+  /tables/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a table by ID.
+      parameters:
+      - description: Table ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"message":"表已删除"}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a table
+      tags:
+      - tables
+    get:
+      consumes:
+      - application/json
+      description: Get table details by ID.
+      parameters:
+      - description: Table ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get a table
+      tags:
+      - tables
+    put:
+      consumes:
+      - application/json
+      description: Update table name and/or description.
+      parameters:
+      - description: Table ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Table update fields
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"id":"...","name":"...","description":"...","updated_at":"..."}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Update a table
+      tags:
+      - tables
+  /tables/{id}/fields:
+    get:
+      consumes:
+      - application/json
+      description: Returns all fields in the specified table.
+      parameters:
+      - description: Table ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"items":[...],"total":0}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: List fields in a table
+      tags:
+      - fields
+  /tables/{id}/fields/permissions:
+    get:
+      consumes:
+      - application/json
+      description: Get field-level permission settings for a table.
+      parameters:
+      - description: Table ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"permissions":[...],"total":0}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Get field permissions
+      tags:
+      - fields
+    post:
+      consumes:
+      - application/json
+      description: Set permission for a specific field in a table.
+      parameters:
+      - description: Table ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Permission to set
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"message":"权限设置成功"}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Set field permission
+      tags:
+      - fields
+  /tables/{id}/fields/permissions/batch:
+    put:
+      consumes:
+      - application/json
+      description: Set permissions for multiple fields in a table at once.
+      parameters:
+      - description: Table ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Permissions to set
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"message":"批量权限设置成功","count":1}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Batch set field permissions
+      tags:
+      - fields
+  /tokens:
+    get:
+      consumes:
+      - application/json
+      description: Returns all tokens visible to the current token. Master tokens
+        see everything; client tokens see only themselves.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"tokens":[...],"total":0}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: List all tokens
+      tags:
+      - tokens
+    post:
+      consumes:
+      - application/json
+      description: Create a new API token. Requires Master Token. The token value
+        is returned only once and cannot be retrieved again.
+      parameters:
+      - description: Token to create
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"id":"...","name":"...","is_master":false,"scopes":"...","token":"cs_..."}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Create a new token
+      tags:
+      - tokens
+  /tokens/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a token by ID. Requires Master Token to delete tokens other
+        than your own.
+      parameters:
+      - description: Token ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"code":0,"data":{"id":"..."}}'
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Delete a token
+      tags:
+      - tokens
+    put:
+      consumes:
+      - application/json
+      description: Update token scopes and/or expiration. Requires Master Token.
+      parameters:
+      - description: Token ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Token update fields
+        in: body
+        name: body
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Update a token
+      tags:
+      - tokens
+securityDefinitions:
+  ApiKeyAuth:
+    description: Enter your API token (Master Token or client token)
+    in: header
+    name: X-API-Key
+    type: apiKey
+  BearerAuth:
+    description: Enter "Bearer <token>" (e.g., "Bearer cs_abc123")
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

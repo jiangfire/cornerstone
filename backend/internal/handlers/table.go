@@ -9,6 +9,17 @@ import (
 )
 
 // CreateTable 创建表
+//
+// @Summary      Create a table
+// @Description  Create a new table inside a database.
+// @Tags         tables
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  object  true  "Table to create"  example({"database_id":"db-1","name":"Users","description":"User table"})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","database_id":"...","name":"...","description":"...","created_at":"..."}}"
+// @Failure      400  {object}  map[string]any
+// @Router       /tables [post]
 func CreateTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -35,6 +46,17 @@ func CreateTable(c *gin.Context) {
 }
 
 // ListTables 获取表列表
+//
+// @Summary      List tables in a database
+// @Description  Returns all tables in the specified database.
+// @Tags         tables
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Database ID"
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"tables":[...],"total":0}}"
+// @Failure      403  {object}  map[string]any
+// @Router       /databases/{id}/tables [get]
 func ListTables(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
@@ -53,6 +75,17 @@ func ListTables(c *gin.Context) {
 }
 
 // GetTable 获取表详情
+//
+// @Summary      Get a table
+// @Description  Get table details by ID.
+// @Tags         tables
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Table ID"
+// @Success      200  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /tables/{id} [get]
 func GetTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -68,6 +101,19 @@ func GetTable(c *gin.Context) {
 }
 
 // UpdateTable 更新表信息
+//
+// @Summary      Update a table
+// @Description  Update table name and/or description.
+// @Tags         tables
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id    path  string  true  "Table ID"
+// @Param        body  body  object  true  "Table update fields"  example({"name":"New Name","description":"Updated"})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","name":"...","description":"...","updated_at":"..."}}"
+// @Failure      400  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /tables/{id} [put]
 func UpdateTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -94,6 +140,17 @@ func UpdateTable(c *gin.Context) {
 }
 
 // DeleteTable 删除表
+//
+// @Summary      Delete a table
+// @Description  Delete a table by ID.
+// @Tags         tables
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Table ID"
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"message":"表已删除"}}"
+// @Failure      403  {object}  map[string]any
+// @Router       /tables/{id} [delete]
 func DeleteTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")

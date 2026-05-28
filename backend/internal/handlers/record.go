@@ -45,6 +45,17 @@ func recordResponseWithData(record *models.Record, extra gin.H) gin.H {
 }
 
 // CreateRecord 创建记录
+//
+// @Summary      Create a record
+// @Description  Create a new record in a table.
+// @Tags         records
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  object  true  "Record to create"  example({"table_id":"tbl-1","data":{"title":"Hello","count":42}})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","table_id":"...","version":1,"created_at":"...","data":{...}}}"
+// @Failure      400  {object}  map[string]any
+// @Router       /records [post]
 func CreateRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -70,6 +81,19 @@ func CreateRecord(c *gin.Context) {
 }
 
 // ExportRecords 导出记录
+//
+// @Summary      Export records
+// @Description  Export records from a table as CSV or JSON file.
+// @Tags         records
+// @Accept       json
+// @Produce      octet-stream
+// @Security     ApiKeyAuth
+// @Param        table_id  query  string  true   "Table ID"
+// @Param        format    query  string  false  "Export format (csv or json)"  default(csv)
+// @Param        filter    query  string  false  "JSON filter expression"
+// @Success      200  {file}  binary
+// @Failure      400  {object}  map[string]any
+// @Router       /records/export [get]
 func ExportRecords(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Query("table_id")
@@ -94,6 +118,21 @@ func ExportRecords(c *gin.Context) {
 }
 
 // ListRecords 获取记录列表
+//
+// @Summary      List records
+// @Description  Query records from a table with pagination and filtering.
+// @Tags         records
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        table_id  query  string  true   "Table ID"
+// @Param        limit     query  int     false  "Page size (1-100)"     default(20)
+// @Param        offset    query  int     false  "Offset for pagination"  default(0)
+// @Param        filter    query  string  false  "JSON filter expression"
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"items":[...],"total":0,"has_more":false}}"
+// @Failure      400  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /records [get]
 func ListRecords(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -118,6 +157,17 @@ func ListRecords(c *gin.Context) {
 }
 
 // GetRecord 获取单个记录
+//
+// @Summary      Get a record
+// @Description  Get a single record by ID.
+// @Tags         records
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Record ID"
+// @Success      200  {object}  map[string]any
+// @Failure      403  {object}  map[string]any
+// @Router       /records/{id} [get]
 func GetRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	recordID := c.Param("id")
@@ -133,6 +183,18 @@ func GetRecord(c *gin.Context) {
 }
 
 // UpdateRecord 更新记录
+//
+// @Summary      Update a record
+// @Description  Update record data. Supports optimistic locking via version field.
+// @Tags         records
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id    path  string  true  "Record ID"
+// @Param        body  body  object  true  "Record update"  example({"data":{"title":"Updated"},"version":1})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","version":2,"updated_at":"...","data":{...}}}"
+// @Failure      400  {object}  map[string]any
+// @Router       /records/{id} [put]
 func UpdateRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	recordID := c.Param("id")
@@ -158,6 +220,17 @@ func UpdateRecord(c *gin.Context) {
 }
 
 // DeleteRecord 删除记录
+//
+// @Summary      Delete a record
+// @Description  Delete a record by ID.
+// @Tags         records
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Record ID"
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"message":"记录已删除"}}"
+// @Failure      403  {object}  map[string]any
+// @Router       /records/{id} [delete]
 func DeleteRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	recordID := c.Param("id")
@@ -174,6 +247,18 @@ func DeleteRecord(c *gin.Context) {
 }
 
 // BatchCreateRecords 批量创建记录
+//
+// @Summary      Batch create records
+// @Description  Create multiple identical records in one request (1-100 records).
+// @Tags         records
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        count  query  int     true   "Number of records to create (1-100)"  default(1)
+// @Param        body   body  object  true  "Record template"  example({"table_id":"tbl-1","data":{"title":"Hello"}})
+// @Success      200  {object}  map[string]any  "{"code":0,"data":{"records":[...],"count":1}}"
+// @Failure      400  {object}  map[string]any
+// @Router       /records/batch [post]
 func BatchCreateRecords(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 

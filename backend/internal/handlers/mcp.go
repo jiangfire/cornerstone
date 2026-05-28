@@ -54,6 +54,17 @@ func ConfigureMCP(options MCPOptions) {
 }
 
 // HandleMCP 处理 HTTP 版 MCP 请求
+//
+// @Summary      Handle MCP request (SSE)
+// @Description  Streamable HTTP MCP protocol endpoint. Accepts JSON-RPC requests and can respond with JSON or SSE stream. Requires authentication.
+// @Tags         mcp
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  object  true  "JSON-RPC request"  example({"jsonrpc":"2.0","method":"tools/list","id":1})
+// @Success      200  {object}  map[string]any
+// @Failure      400  {object}  map[string]any
+// @Router       /mcp [post]
 func HandleMCP(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	server := mcp.NewServer(mcp.NewToolServiceWithNotifier(db.DB(), userID, mcpHub), mcpServerVersion)
@@ -97,6 +108,14 @@ func HandleMCP(c *gin.Context) {
 }
 
 // HandleMCPGet 返回 GET 形式的 SSE 通道
+//
+// @Summary      Open MCP SSE stream
+// @Description  Opens a Server-Sent Events stream for receiving MCP notifications. Requires Accept: text/event-stream header and authentication.
+// @Tags         mcp
+// @Produce      text/event-stream
+// @Security     ApiKeyAuth
+// @Success      200  {string}  string  "SSE stream"
+// @Router       /mcp [get]
 func HandleMCPGet(c *gin.Context) {
 	c.Header("Allow", "POST, GET, OPTIONS")
 	if !acceptsSSE(c.GetHeader("Accept")) {
