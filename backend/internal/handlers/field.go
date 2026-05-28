@@ -11,15 +11,28 @@ import (
 // CreateField
 //
 // @Summary      Create a field
-// @Description  Create a new field in a table. Valid types: string, text, number, boolean, date, datetime, attachment, select, list, multiselect, single_select, multi_select
+// @Description  Create a new field in a table.
+//
+//	Valid field types: string, text, number, boolean, date, datetime, attachment,
+//	select, list, multiselect, single_select, multi_select.
+//
+//	For select/multi_select types, use the options field (comma-separated values)
+//	or the config.options array. For number fields, config.min and config.max
+//	define the allowed range. For attachment fields, config defines allowed file
+//	types and size limits.
+//
+//	The authenticated token must own the parent database.
+//
 // @Tags         fields
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  object  true  "Field to create"  example({"table_id":"tbl-1","name":"Title","type":"string","description":"Title field","required":true})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","table_id":"...","name":"...","type":"...","description":"...","required":false,"created_at":"..."}}"
-// @Failure      400  {object}  map[string]any
-// @Router       /fields [post]
+// @Param        body  body  swagger.FieldCreateRequest  true  "Field to create"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.FieldObject}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body or field type"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to parent table"
+// @Router       /api/fields [post]
 func CreateField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 
@@ -51,14 +64,18 @@ func CreateField(c *gin.Context) {
 //
 // @Summary      List fields in a table
 // @Description  Returns all fields in the specified table.
+//
+//	The authenticated token must own the parent database or be a Master token.
+//	Each field includes its type, configuration, and whether it is required.
+//
 // @Tags         fields
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Table ID"
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"items":[...],"total":0}}"
-// @Failure      403  {object}  map[string]any
-// @Router       /tables/{id}/fields [get]
+// @Success      200  {object}  swagger.APIResponse{data=swagger.FieldListResponse}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Router       /api/tables/{id}/fields [get]
 func ListFields(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -78,16 +95,21 @@ func ListFields(c *gin.Context) {
 
 // GetField
 //
-// @Summary      Get a field
-// @Description  Get field details by ID.
+// @Summary      Get a field by ID
+// @Description  Retrieve full details of a single field by its ID.
+//
+//	Returns the field type, configuration, required flag, and other metadata.
+//	The authenticated token must own the parent database or be a Master token.
+//
 // @Tags         fields
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Field ID"
-// @Success      200  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /fields/{id} [get]
+// @Success      200  {object}  swagger.APIResponse{data=swagger.FieldObject}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this field"
+// @Failure      404  {object}  swagger.ErrorResponse  "Field not found"
+// @Router       /api/fields/{id} [get]
 func GetField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
@@ -105,17 +127,26 @@ func GetField(c *gin.Context) {
 // UpdateField
 //
 // @Summary      Update a field
-// @Description  Update field properties. Valid types: string, text, number, boolean, date, datetime, attachment, select, list, multiselect, single_select, multi_select
+// @Description  Update field properties including name, type, description, required flag, and config.
+//
+//	Valid field types: string, text, number, boolean, date, datetime, attachment,
+//	select, list, multiselect, single_select, multi_select.
+//
+//	Changing a field type may affect existing record data. Use with caution.
+//	The authenticated token must own the parent database or be a Master token.
+//
 // @Tags         fields
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        id    path  string  true  "Field ID"
-// @Param        body  body  object  true  "Field update fields"  example({"name":"New Name","type":"text","description":"Updated","required":false})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","name":"...","type":"...","description":"...","required":false,"updated_at":"..."}}"
-// @Failure      400  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /fields/{id} [put]
+// @Param        id    path  string                true  "Field ID"
+// @Param        body  body  swagger.FieldUpdateRequest  true  "Field update fields"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.FieldObject}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body or field type"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this field"
+// @Failure      404  {object}  swagger.ErrorResponse  "Field not found"
+// @Router       /api/fields/{id} [put]
 func UpdateField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
@@ -147,14 +178,19 @@ func UpdateField(c *gin.Context) {
 //
 // @Summary      Delete a field
 // @Description  Delete a field by ID.
+//
+//	This action is irreversible and will remove the field from all records.
+//	The authenticated token must own the parent database or be a Master token.
+//
 // @Tags         fields
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Field ID"
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"message":"字段已删除"}}"
-// @Failure      403  {object}  map[string]any
-// @Router       /fields/{id} [delete]
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this field"
+// @Failure      404  {object}  swagger.ErrorResponse  "Field not found"
+// @Router       /api/fields/{id} [delete]
 func DeleteField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
@@ -174,14 +210,18 @@ func DeleteField(c *gin.Context) {
 //
 // @Summary      Get field permissions
 // @Description  Get field-level permission settings for a table.
+//
+//	Returns the read/write/delete permissions for each field in the table,
+//	grouped by role. The authenticated token must own the parent database.
+//
 // @Tags         fields
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Table ID"
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"permissions":[...],"total":0}}"
-// @Failure      403  {object}  map[string]any
-// @Router       /tables/{id}/fields/permissions [get]
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Router       /api/tables/{id}/fields/permissions [get]
 func GetFieldPermissions(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -203,16 +243,21 @@ func GetFieldPermissions(c *gin.Context) {
 //
 // @Summary      Set field permission
 // @Description  Set permission for a specific field in a table.
+//
+//	Allows fine-grained control over which roles can read, write, or delete
+//	data in a specific field. The authenticated token must own the parent database.
+//
 // @Tags         fields
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id    path  string  true  "Table ID"
-// @Param        body  body  object  true  "Permission to set"  example({"field_id":"fld-1","role":"editor","can_read":true,"can_write":true,"can_delete":false})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"message":"权限设置成功"}}"
-// @Failure      400  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /tables/{id}/fields/permissions [post]
+// @Param        body  body  object  true  "Permission to set"
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Router       /api/tables/{id}/fields/permissions [post]
 func SetFieldPermission(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -238,16 +283,22 @@ func SetFieldPermission(c *gin.Context) {
 //
 // @Summary      Batch set field permissions
 // @Description  Set permissions for multiple fields in a table at once.
+//
+//	Accepts an array of permission objects, each specifying a field_id, role,
+//	and the can_read, can_write, can_delete flags. The authenticated token
+//	must own the parent database.
+//
 // @Tags         fields
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id    path  string  true  "Table ID"
-// @Param        body  body  object  true  "Permissions to set"  example({"permissions":[{"field_id":"fld-1","role":"editor","can_read":true,"can_write":true}]})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"message":"批量权限设置成功","count":1}}"
-// @Failure      400  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /tables/{id}/fields/permissions/batch [put]
+// @Param        body  body  object  true  "Permissions to set"
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Router       /api/tables/{id}/fields/permissions/batch [put]
 func BatchSetFieldPermissions(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")

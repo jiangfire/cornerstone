@@ -12,14 +12,19 @@ import (
 //
 // @Summary      Create a database
 // @Description  Create a new database owned by the authenticated token.
+//
+//	The database name must be non-empty. The description field is optional.
+//	The returned object contains the generated database ID and creation timestamp.
+//
 // @Tags         databases
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  object  true  "Database to create"  example({"name":"My DB","description":"A database"})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","name":"...","description":"...","created_at":"..."}}"
-// @Failure      400  {object}  map[string]any
-// @Router       /databases [post]
+// @Param        body  body  swagger.DatabaseCreateRequest  true  "Database to create"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseObject}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Router       /api/databases [post]
 func CreateDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 
@@ -46,15 +51,19 @@ func CreateDatabase(c *gin.Context) {
 
 // ListDatabases
 //
-// @Summary      List databases
+// @Summary      List all databases
 // @Description  Returns all databases accessible to the authenticated token.
+//
+//	Master tokens see all databases. Client tokens see only databases they own.
+//	Results are sorted by creation time (newest first).
+//
 // @Tags         databases
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"databases":[...],"total":0}}"
-// @Failure      500  {object}  map[string]any
-// @Router       /databases [get]
+// @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseListResponse}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      500  {object}  swagger.ErrorResponse
+// @Router       /api/databases [get]
 func ListDatabases(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 
@@ -73,16 +82,21 @@ func ListDatabases(c *gin.Context) {
 
 // GetDatabase
 //
-// @Summary      Get a database
-// @Description  Get database details by ID.
+// @Summary      Get a database by ID
+// @Description  Retrieve full details of a single database by its ID.
+//
+//	The authenticated token must own the database or be a Master token.
+//	Returns 403 if the token does not have access.
+//
 // @Tags         databases
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Database ID"
-// @Success      200  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /databases/{id} [get]
+// @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseObject}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this database"
+// @Failure      404  {object}  swagger.ErrorResponse  "Database not found"
+// @Router       /api/databases/{id} [get]
 func GetDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
@@ -101,16 +115,22 @@ func GetDatabase(c *gin.Context) {
 //
 // @Summary      Update a database
 // @Description  Update database name and/or description.
+//
+//	The authenticated token must own the database or be a Master token.
+//	The name field is required in the request body.
+//
 // @Tags         databases
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        id    path  string  true  "Database ID"
-// @Param        body  body  object  true  "Database update fields"  example({"name":"New Name","description":"Updated"})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","name":"...","description":"...","updated_at":"..."}}"
-// @Failure      400  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /databases/{id} [put]
+// @Param        id    path  string                true  "Database ID"
+// @Param        body  body  swagger.DatabaseUpdateRequest  true  "Database update fields"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseObject}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this database"
+// @Failure      404  {object}  swagger.ErrorResponse  "Database not found"
+// @Router       /api/databases/{id} [put]
 func UpdateDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
@@ -139,15 +159,20 @@ func UpdateDatabase(c *gin.Context) {
 // DeleteDatabase
 //
 // @Summary      Delete a database
-// @Description  Delete a database by ID.
+// @Description  Delete a database and all of its associated tables, fields, and records.
+//
+//	This action is irreversible. The authenticated token must own the database
+//	or be a Master token.
+//
 // @Tags         databases
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Database ID"
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"message":"数据库已删除"}}"
-// @Failure      403  {object}  map[string]any
-// @Router       /databases/{id} [delete]
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this database"
+// @Failure      404  {object}  swagger.ErrorResponse  "Database not found"
+// @Router       /api/databases/{id} [delete]
 func DeleteDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
@@ -165,16 +190,24 @@ func DeleteDatabase(c *gin.Context) {
 
 // CreateDatabaseWithTables
 //
-// @Summary      Create database with tables and fields
+// @Summary      Create a database with tables and fields
 // @Description  Atomically create a database together with nested tables and fields in a single request.
+//
+//	This is a convenience endpoint that combines database, table, and field creation
+//	into one transactional operation. If any part fails, the entire operation is rolled back.
+//
+//	Each table must have a name and may contain an array of field definitions.
+//	Each field definition requires name and type; description and required are optional.
+//
 // @Tags         databases
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  object  true  "Database with nested tables/fields"  example({"name":"DB","description":"","tables":[{"name":"T1","fields":[{"name":"title","type":"string"}]}]})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"database":{...},"tables":[...],"fields":[...],"summary":{"table_count":1,"field_count":1}}}"
-// @Failure      400  {object}  map[string]any
-// @Router       /databases/with-tables [post]
+// @Param        body  body  swagger.DatabaseBulkCreateRequest  true  "Database with nested tables and fields"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseBulkCreateResponse}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Router       /api/databases/with-tables [post]
 func CreateDatabaseWithTables(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 

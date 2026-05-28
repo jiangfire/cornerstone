@@ -48,14 +48,21 @@ func recordResponseWithData(record *models.Record, extra gin.H) gin.H {
 //
 // @Summary      Create a record
 // @Description  Create a new record in a table.
+//
+//	The data field is a key-value map where keys correspond to field names
+//	in the target table. Values must match the field types defined in the schema.
+//	The table_id field is required.
+//
 // @Tags         records
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  object  true  "Record to create"  example({"table_id":"tbl-1","data":{"title":"Hello","count":42}})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","table_id":"...","version":1,"created_at":"...","data":{...}}}"
-// @Failure      400  {object}  map[string]any
-// @Router       /records [post]
+// @Param        body  body  swagger.RecordCreateRequest  true  "Record to create"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.RecordObject}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body or field values"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to target table"
+// @Router       /api/records [post]
 func CreateRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -82,18 +89,24 @@ func CreateRecord(c *gin.Context) {
 
 // ExportRecords 导出记录
 //
-// @Summary      Export records
-// @Description  Export records from a table as CSV or JSON file.
+// @Summary      Export records as CSV or JSON
+// @Description  Export records from a table as a downloadable file.
+//
+//	Supported formats: csv (default) and json. An optional JSON filter expression
+//	can be provided to export only matching records. The response includes
+//	Content-Disposition header for browser downloads.
+//
 // @Tags         records
-// @Accept       json
-// @Produce      octet-stream
+// @Produce      application/octet-stream
 // @Security     ApiKeyAuth
 // @Param        table_id  query  string  true   "Table ID"
-// @Param        format    query  string  false  "Export format (csv or json)"  default(csv)
+// @Param        format    query  string  false  "Export format: csv or json"  default(csv)
 // @Param        filter    query  string  false  "JSON filter expression"
 // @Success      200  {file}  binary
-// @Failure      400  {object}  map[string]any
-// @Router       /records/export [get]
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - missing table_id or invalid format"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to target table"
+// @Router       /api/records/export [get]
 func ExportRecords(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Query("table_id")
@@ -119,20 +132,24 @@ func ExportRecords(c *gin.Context) {
 
 // ListRecords 获取记录列表
 //
-// @Summary      List records
-// @Description  Query records from a table with pagination and filtering.
+// @Summary      List records in a table
+// @Description  Query records from a table with pagination and optional filtering.
+//
+//	The table_id query parameter is required. Use limit and offset for pagination.
+//	An optional JSON filter expression can be provided to narrow results.
+//
 // @Tags         records
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        table_id  query  string  true   "Table ID"
-// @Param        limit     query  int     false  "Page size (1-100)"     default(20)
+// @Param        limit     query  int     false  "Page size (1-100)"  default(20)
 // @Param        offset    query  int     false  "Offset for pagination"  default(0)
 // @Param        filter    query  string  false  "JSON filter expression"
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"items":[...],"total":0,"has_more":false}}"
-// @Failure      400  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /records [get]
+// @Success      200  {object}  swagger.APIResponse{data=swagger.RecordListResponse}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - missing table_id"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to target table"
+// @Router       /api/records [get]
 func ListRecords(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -158,16 +175,21 @@ func ListRecords(c *gin.Context) {
 
 // GetRecord 获取单个记录
 //
-// @Summary      Get a record
-// @Description  Get a single record by ID.
+// @Summary      Get a record by ID
+// @Description  Retrieve a single record by its ID.
+//
+//	Returns the full record data including all field values.
+//	The authenticated token must have access to the parent table.
+//
 // @Tags         records
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Record ID"
-// @Success      200  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /records/{id} [get]
+// @Success      200  {object}  swagger.APIResponse{data=swagger.RecordObject}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this record"
+// @Failure      404  {object}  swagger.ErrorResponse  "Record not found"
+// @Router       /api/records/{id} [get]
 func GetRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	recordID := c.Param("id")
@@ -185,16 +207,24 @@ func GetRecord(c *gin.Context) {
 // UpdateRecord 更新记录
 //
 // @Summary      Update a record
-// @Description  Update record data. Supports optimistic locking via version field.
+// @Description  Update record data. Supports optimistic locking via the version field.
+//
+//	If a version is provided, the server will check that it matches the current
+//	record version. If it does not match, a conflict error is returned.
+//	Omit the version field to skip optimistic locking.
+//
 // @Tags         records
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        id    path  string  true  "Record ID"
-// @Param        body  body  object  true  "Record update"  example({"data":{"title":"Updated"},"version":1})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","version":2,"updated_at":"...","data":{...}}}"
-// @Failure      400  {object}  map[string]any
-// @Router       /records/{id} [put]
+// @Param        id    path  string                 true  "Record ID"
+// @Param        body  body  swagger.RecordUpdateRequest  true  "Record update with optional version"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.RecordObject}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error or version conflict"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this record"
+// @Failure      404  {object}  swagger.ErrorResponse  "Record not found"
+// @Router       /api/records/{id} [put]
 func UpdateRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	recordID := c.Param("id")
@@ -223,14 +253,19 @@ func UpdateRecord(c *gin.Context) {
 //
 // @Summary      Delete a record
 // @Description  Delete a record by ID.
+//
+//	This action is irreversible. The authenticated token must have access
+//	to the parent table.
+//
 // @Tags         records
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Record ID"
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"message":"记录已删除"}}"
-// @Failure      403  {object}  map[string]any
-// @Router       /records/{id} [delete]
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this record"
+// @Failure      404  {object}  swagger.ErrorResponse  "Record not found"
+// @Router       /api/records/{id} [delete]
 func DeleteRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	recordID := c.Param("id")
@@ -250,15 +285,22 @@ func DeleteRecord(c *gin.Context) {
 //
 // @Summary      Batch create records
 // @Description  Create multiple identical records in one request (1-100 records).
+//
+//	The count query parameter specifies how many copies to create (default 1, max 100).
+//	All records will have the same data values from the request body.
+//	The table_id field is required in the request body.
+//
 // @Tags         records
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        count  query  int     true   "Number of records to create (1-100)"  default(1)
-// @Param        body   body  object  true  "Record template"  example({"table_id":"tbl-1","data":{"title":"Hello"}})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"records":[...],"count":1}}"
-// @Failure      400  {object}  map[string]any
-// @Router       /records/batch [post]
+// @Param        count  query  int                        true   "Number of records to create (1-100)"  default(1)
+// @Param        body   body   swagger.RecordBatchCreateRequest  true  "Record template"
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body or count out of range"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to target table"
+// @Router       /api/records/batch [post]
 func BatchCreateRecords(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 

@@ -12,14 +12,20 @@ import (
 //
 // @Summary      Create a table
 // @Description  Create a new table inside a database.
+//
+//	The database_id field is required and must reference an existing database
+//	owned by the authenticated token. The table name must be non-empty.
+//
 // @Tags         tables
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  object  true  "Table to create"  example({"database_id":"db-1","name":"Users","description":"User table"})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","database_id":"...","name":"...","description":"...","created_at":"..."}}"
-// @Failure      400  {object}  map[string]any
-// @Router       /tables [post]
+// @Param        body  body  swagger.TableCreateRequest  true  "Table to create"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.TableObject}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to parent database"
+// @Router       /api/tables [post]
 func CreateTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -49,14 +55,18 @@ func CreateTable(c *gin.Context) {
 //
 // @Summary      List tables in a database
 // @Description  Returns all tables in the specified database.
+//
+//	The authenticated token must have access to the parent database.
+//	Results include table ID, name, description, and timestamps.
+//
 // @Tags         tables
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Database ID"
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"tables":[...],"total":0}}"
-// @Failure      403  {object}  map[string]any
-// @Router       /databases/{id}/tables [get]
+// @Success      200  {object}  swagger.APIResponse{data=swagger.TableListResponse}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this database"
+// @Router       /api/databases/{id}/tables [get]
 func ListTables(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
@@ -76,16 +86,20 @@ func ListTables(c *gin.Context) {
 
 // GetTable 获取表详情
 //
-// @Summary      Get a table
-// @Description  Get table details by ID.
+// @Summary      Get a table by ID
+// @Description  Retrieve full details of a single table by its ID.
+//
+//	The authenticated token must own the parent database or be a Master token.
+//
 // @Tags         tables
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Table ID"
-// @Success      200  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /tables/{id} [get]
+// @Success      200  {object}  swagger.APIResponse{data=swagger.TableObject}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
+// @Router       /api/tables/{id} [get]
 func GetTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -104,16 +118,22 @@ func GetTable(c *gin.Context) {
 //
 // @Summary      Update a table
 // @Description  Update table name and/or description.
+//
+//	The authenticated token must own the parent database or be a Master token.
+//	The name field is required in the request body.
+//
 // @Tags         tables
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        id    path  string  true  "Table ID"
-// @Param        body  body  object  true  "Table update fields"  example({"name":"New Name","description":"Updated"})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","name":"...","description":"...","updated_at":"..."}}"
-// @Failure      400  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /tables/{id} [put]
+// @Param        id    path  string                true  "Table ID"
+// @Param        body  body  swagger.TableUpdateRequest  true  "Table update fields"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.TableObject}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
+// @Router       /api/tables/{id} [put]
 func UpdateTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -142,15 +162,20 @@ func UpdateTable(c *gin.Context) {
 // DeleteTable 删除表
 //
 // @Summary      Delete a table
-// @Description  Delete a table by ID.
+// @Description  Delete a table and all of its associated fields and records.
+//
+//	This action is irreversible. The authenticated token must own the parent
+//	database or be a Master token.
+//
 // @Tags         tables
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Table ID"
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"message":"表已删除"}}"
-// @Failure      403  {object}  map[string]any
-// @Router       /tables/{id} [delete]
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
+// @Router       /api/tables/{id} [delete]
 func DeleteTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")

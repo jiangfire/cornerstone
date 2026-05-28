@@ -56,14 +56,23 @@ func ConfigureMCP(options MCPOptions) {
 // HandleMCP 处理 HTTP 版 MCP 请求
 //
 // @Summary      Handle MCP request (SSE)
-// @Description  Streamable HTTP MCP protocol endpoint. Accepts JSON-RPC requests and can respond with JSON or SSE stream. Requires authentication.
+// @Description  Streamable HTTP MCP protocol endpoint.
+//
+//	Accepts JSON-RPC requests and can respond with JSON or SSE stream
+//	depending on the Accept header. When Accept: text/event-stream is sent
+//	with requests that have IDs, the response is streamed as SSE events.
+//	Otherwise, JSON responses are returned directly.
+//
+//	Requires authentication via API key.
+//
 // @Tags         mcp
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  object  true  "JSON-RPC request"  example({"jsonrpc":"2.0","method":"tools/list","id":1})
-// @Success      200  {object}  map[string]any
-// @Failure      400  {object}  map[string]any
+// @Param        body  body  object  true  "JSON-RPC request"
+// @Success      200  {object}  object
+// @Failure      400  {object}  swagger.ErrorResponse  "Parse error - invalid JSON-RPC"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Router       /mcp [post]
 func HandleMCP(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
@@ -110,11 +119,18 @@ func HandleMCP(c *gin.Context) {
 // HandleMCPGet 返回 GET 形式的 SSE 通道
 //
 // @Summary      Open MCP SSE stream
-// @Description  Opens a Server-Sent Events stream for receiving MCP notifications. Requires Accept: text/event-stream header and authentication.
+// @Description  Opens a Server-Sent Events stream for receiving MCP notifications.
+//
+//	Requires Accept: text/event-stream header and authentication.
+//	Supports replay via Last-Event-ID header for reconnection scenarios.
+//	The stream sends periodic keepalive comments to maintain the connection.
+//
 // @Tags         mcp
 // @Produce      text/event-stream
 // @Security     ApiKeyAuth
 // @Success      200  {string}  string  "SSE stream"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      406  {object}  object  "Not Acceptable - requires Accept: text/event-stream"
 // @Router       /mcp [get]
 func HandleMCPGet(c *gin.Context) {
 	c.Header("Allow", "POST, GET, OPTIONS")

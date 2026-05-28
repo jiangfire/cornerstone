@@ -30,16 +30,25 @@ func NewQueryHandler() *QueryHandler {
 // GET /api/query?q={json_string}
 //
 // @Summary      Execute a query
-// @Description  Execute a full Query DSL request. Supports from, select, where, order_by, limit, offset, group_by, having, aggregates, join, and union.
+// @Description  Execute a full Query DSL request using POST body or GET query parameter.
+//
+//	For POST, send the Query DSL as JSON body.
+//	For GET, pass the Query DSL as a URL-encoded JSON string in the "q" query parameter.
+//
+//	Supports: from, select, where, order_by, limit, offset, group_by, having,
+//	aggregates, join, and union clauses.
+//
 // @Tags         query
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  object  true  "Query DSL body"  example({"from":"records","select":["id","data"],"where":{"and":[{"field":"table_id","op":"eq","value":"tbl-1"}]},"orderBy":[{"field":"created_at","dir":"desc"}],"page":1,"size":20})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"data":[...],"total":0,"page":1,"size":20,"has_more":false}}"
-// @Failure      400  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /query [post]
+// @Param        body  body  swagger.QueryDSLRequest  true  "Query DSL body"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.QueryResult}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid query DSL"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to queried resource"
+// @Router       /api/query [post]
+// @Router       /api/query [get]
 func (h *QueryHandler) Query(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -89,16 +98,22 @@ func (h *QueryHandler) Query(c *gin.Context) {
 // POST /api/query/explain
 //
 // @Summary      Explain a query
-// @Description  Returns the generated SQL and parameters for a query without executing it. Useful for debugging.
+// @Description  Returns the generated SQL and parameters for a query without executing it.
+//
+//	Useful for debugging query construction and verifying correctness.
+//	The query is validated against the authenticated token's permissions
+//	before generating the SQL.
+//
 // @Tags         query
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  object  true  "Query DSL body"  example({"from":"records","select":["id"],"where":{"and":[{"field":"table_id","op":"eq","value":"tbl-1"}]}})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"sql":"SELECT ...","params":[...]}}"
-// @Failure      400  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /query/explain [post]
+// @Param        body  body  swagger.QueryDSLRequest  true  "Query DSL body"
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid query DSL"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to queried resource"
+// @Router       /api/query/explain [post]
 func (h *QueryHandler) QueryExplain(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -142,15 +157,20 @@ func (h *QueryHandler) QueryExplain(c *gin.Context) {
 //
 // @Summary      Validate a query
 // @Description  Validate a query DSL and check access permissions without executing it.
+//
+//	Returns a success message if the query is valid and the token has
+//	the required permissions. Returns a forbidden error if access is denied.
+//
 // @Tags         query
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  object  true  "Query DSL body"  example({"from":"records","select":["id"]})
-// @Success      200  {object}  map[string]any  "{"code":0,"message":"查询验证通过"}"
-// @Failure      400  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /query/validate [post]
+// @Param        body  body  swagger.QueryDSLRequest  true  "Query DSL body"
+// @Success      200  {object}  swagger.APIResponse
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid query DSL"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to queried resource"
+// @Router       /api/query/validate [post]
 func (h *QueryHandler) QueryValidate(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -184,17 +204,23 @@ func (h *QueryHandler) QueryValidate(c *gin.Context) {
 // BatchQuery 批量查询接口
 // POST /api/query/batch
 //
-// @Summary      Batch query
-// @Description  Execute multiple named queries in a single request.
+// @Summary      Execute a batch query
+// @Description  Execute multiple queries in a single request.
+//
+//	Each query in the array is executed independently. Results are returned
+//	as a map keyed by query index. All queries are subject to the
+//	authenticated token's permissions.
+//
 // @Tags         query
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  object  true  "Batch query request"  example({"queries":{"q1":{"from":"records","select":["id"]},"q2":{"from":"tables","select":["id","name"]}}})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"results":{"q1":{...},"q2":{...}}}}"
-// @Failure      400  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /query/batch [post]
+// @Param        body  body  swagger.BatchQueryRequest  true  "Batch query request"
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid query DSL"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to queried resource"
+// @Router       /api/query/batch [post]
 func (h *QueryHandler) BatchQuery(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -223,13 +249,18 @@ func (h *QueryHandler) BatchQuery(c *gin.Context) {
 //
 // @Summary      List queryable tables
 // @Description  Returns all tables the authenticated token can query.
+//
+//	This includes system tables (records, tables, databases, fields, files, tokens)
+//	that the token has been granted access to. Use this to discover available
+//	tables before constructing queries.
+//
 // @Tags         query
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"tables":[...]}}"
-// @Failure      500  {object}  map[string]any
-// @Router       /query/tables [get]
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      500  {object}  swagger.ErrorResponse
+// @Router       /api/query/tables [get]
 func (h *QueryHandler) ListTables(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -249,14 +280,20 @@ func (h *QueryHandler) ListTables(c *gin.Context) {
 //
 // @Summary      Get table schema for query
 // @Description  Returns the allowed fields for a queryable table.
+//
+//	Use this to discover which fields can be used in select, where, and
+//	order_by clauses. The table name must be one of the allowed query targets
+//	for the authenticated token.
+//
 // @Tags         query
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        table  path  string  true  "Table name (records, tables, databases, fields, files, tokens)"
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"table":"records","fields":["id","table_id",...]}}"
-// @Failure      403  {object}  map[string]any
-// @Router       /query/schema/{table} [get]
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
+// @Router       /api/query/schema/{table} [get]
 func (h *QueryHandler) GetTableSchema(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	table := c.Param("table")
@@ -280,10 +317,14 @@ func (h *QueryHandler) GetTableSchema(c *gin.Context) {
 // SimplifiedQuery 简化查询接口（URL 参数形式）
 // GET /api/query/simple?table=records&filter={}&sort=-created_at&page=1&size=20
 //
-// @Summary      Simplified query
-// @Description  Query records using simple URL parameters instead of full DSL.
+// @Summary      Execute a simplified query
+// @Description  Query records using simple URL parameters instead of the full Query DSL.
+//
+//	A lighter alternative to the full DSL. Supports basic filtering via JSON object,
+//	sorting (prefix with "-" for descending), and pagination.
+//	Maximum page size is 1000.
+//
 // @Tags         query
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        table   query  string  true   "Table name"
@@ -291,10 +332,11 @@ func (h *QueryHandler) GetTableSchema(c *gin.Context) {
 // @Param        sort    query  string  false  "Sort expression (prefix with - for desc)"  default(-created_at)
 // @Param        page    query  int     false  "Page number"  default(1)
 // @Param        size    query  int     false  "Page size (max 1000)"  default(20)
-// @Success      200  {object}  map[string]any
-// @Failure      400  {object}  map[string]any
-// @Failure      403  {object}  map[string]any
-// @Router       /query/simple [get]
+// @Success      200  {object}  swagger.APIResponse{data=swagger.QueryResult}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - missing table or invalid parameters"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to queried table"
+// @Router       /api/query/simple [get]
 func (h *QueryHandler) SimplifiedQuery(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 

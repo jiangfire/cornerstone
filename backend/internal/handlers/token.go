@@ -13,14 +13,19 @@ import (
 // ListTokens 列出 Token
 //
 // @Summary      List all tokens
-// @Description  Returns all tokens visible to the current token. Master tokens see everything; client tokens see only themselves.
+// @Description  Returns all tokens visible to the current token.
+//
+//	Master tokens see every token in the system.
+//	Client tokens can only see their own token entry.
+//	Results are sorted by creation time (newest first).
+//
 // @Tags         tokens
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"tokens":[...],"total":0}}"
-// @Failure      500  {object}  map[string]any
-// @Router       /tokens [get]
+// @Success      200  {object}  swagger.APIResponse{data=swagger.TokenListResponse}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      500  {object}  swagger.ErrorResponse
+// @Router       /api/tokens [get]
 func ListTokens(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	isMaster := middleware.IsMasterToken(c)
@@ -38,16 +43,27 @@ func ListTokens(c *gin.Context) {
 // CreateToken 创建 Token（需 Master Token）
 //
 // @Summary      Create a new token
-// @Description  Create a new API token. Requires Master Token. The token value is returned only once and cannot be retrieved again.
+// @Description  Create a new API token. Requires Master Token.
+//
+//	The token value (starting with "cs_") is returned only once in the response
+//	and cannot be retrieved again. Store it securely.
+//
+//	Validation rules:
+//	  - name is required and must be unique
+//	  - scopes is a comma-separated string (e.g. "read,write")
+//	  - expires_at is optional; if set, must be a valid ISO 8601 timestamp
+//
 // @Tags         tokens
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  object  true  "Token to create"  example({"name":"my-token","scopes":"read,write","expires_at":"2026-12-31T00:00:00Z"})
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"...","name":"...","is_master":false,"scopes":"...","token":"cs_..."}}"
-// @Failure      400  {object}  map[string]any
-// @Failure      500  {object}  map[string]any
-// @Router       /tokens [post]
+// @Param        body  body  swagger.TokenCreateRequest  true  "Token to create"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.TokenCreateResponse}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - requires Master Token"
+// @Failure      500  {object}  swagger.ErrorResponse
+// @Router       /api/tokens [post]
 func CreateToken(c *gin.Context) {
 	var req services.CreateTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -76,15 +92,20 @@ func CreateToken(c *gin.Context) {
 // DeleteToken 删除 Token
 //
 // @Summary      Delete a token
-// @Description  Delete a token by ID. Requires Master Token to delete tokens other than your own.
+// @Description  Delete a token by ID.
+//
+//	Requires Master Token to delete tokens other than your own.
+//	Client tokens can only delete themselves.
+//
 // @Tags         tokens
-// @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Token ID"
-// @Success      200  {object}  map[string]any  "{"code":0,"data":{"id":"..."}}"
-// @Failure      400  {object}  map[string]any
-// @Router       /tokens/{id} [delete]
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - insufficient permissions"
+// @Failure      404  {object}  swagger.ErrorResponse  "Token not found"
+// @Router       /api/tokens/{id} [delete]
 func DeleteToken(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	isMaster := middleware.IsMasterToken(c)
@@ -102,16 +123,24 @@ func DeleteToken(c *gin.Context) {
 // UpdateToken 更新 Token 权限（需 Master Token）
 //
 // @Summary      Update a token
-// @Description  Update token scopes and/or expiration. Requires Master Token.
+// @Description  Update token scopes and/or expiration date. Requires Master Token.
+//
+//	Validation rules:
+//	  - scopes is a comma-separated string (e.g. "read,write")
+//	  - expires_at is optional; if set, must be a valid ISO 8601 timestamp
+//
 // @Tags         tokens
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        id    path  string  true  "Token ID"
-// @Param        body  body  object  true  "Token update fields"  example({"scopes":"read","expires_at":"2026-12-31T00:00:00Z"})
-// @Success      200  {object}  map[string]any
-// @Failure      400  {object}  map[string]any
-// @Router       /tokens/{id} [put]
+// @Param        id    path  string              true  "Token ID"
+// @Param        body  body  swagger.TokenUpdateRequest  true  "Token update fields"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.TokenObject}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - requires Master Token"
+// @Failure      404  {object}  swagger.ErrorResponse  "Token not found"
+// @Router       /api/tokens/{id} [put]
 func UpdateToken(c *gin.Context) {
 	targetID := c.Param("id")
 

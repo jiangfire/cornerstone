@@ -26,10 +26,14 @@ const readinessProbeTimeout = 2 * time.Second
 // 用途:k8s livenessProbe / docker HEALTHCHECK 中的最低门槛。
 //
 // @Summary      Health check
-// @Description  Liveness probe. Returns 200 if the process is running. Does not check external dependencies.
+// @Description  Liveness probe. Returns 200 if the process is running.
+//
+//	Does not check external dependencies. Use /ready for a full readiness check.
+//	No authentication required.
+//
 // @Tags         health
 // @Produce      json
-// @Success      200  {object}  map[string]any  "{"status":"healthy","service":"cornerstone-backend","version":"...","time":"..."}"
+// @Success      200  {object}  object  "{"status":"healthy","service":"cornerstone-backend","version":"...","time":"..."}"
 // @Router       /health [get]
 func Health(c *gin.Context) {
 	c.JSON(200, gin.H{
@@ -45,11 +49,15 @@ func Health(c *gin.Context) {
 // 用途:k8s readinessProbe / docker compose healthcheck。
 //
 // @Summary      Readiness check
-// @Description  Readiness probe. Returns 200 if the process is running and the database is reachable. Returns 503 otherwise.
+// @Description  Readiness probe. Returns 200 if the process is running and the database is reachable.
+//
+//	Returns 503 if the database is unreachable. No authentication required.
+//	Use this endpoint for load balancer health checks and orchestration readiness probes.
+//
 // @Tags         health
 // @Produce      json
-// @Success      200  {object}  map[string]any  "{"status":"ready","service":"cornerstone-backend","version":"...","time":"..."}"
-// @Failure      503  {object}  map[string]any  "{"status":"unready","reason":"..."}"
+// @Success      200  {object}  object  "{"status":"ready","service":"cornerstone-backend","version":"...","time":"..."}"
+// @Failure      503  {object}  object  "{"status":"unready","reason":"..."}"
 // @Router       /ready [get]
 func Ready(c *gin.Context) {
 	gormDB := db.DB()

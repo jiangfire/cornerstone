@@ -1,4 +1,606 @@
 basePath: /api
+definitions:
+  swagger.AIChatRequest:
+    properties:
+      context:
+        additionalProperties: {}
+        type: object
+      message:
+        example: 创建一个用户表，包含姓名和邮箱
+        type: string
+    required:
+    - message
+    type: object
+  swagger.AIChatResponse:
+    properties:
+      context:
+        additionalProperties: {}
+        type: object
+      reply:
+        example: 已创建表 users，包含 2 个字段
+        type: string
+      type:
+        example: result
+        type: string
+    type: object
+  swagger.APIResponse:
+    properties:
+      code:
+        example: 0
+        type: integer
+      data: {}
+      message:
+        example: ""
+        type: string
+    type: object
+  swagger.BatchQueryRequest:
+    properties:
+      queries:
+        items:
+          $ref: '#/definitions/swagger.QueryDSLRequest'
+        type: array
+    type: object
+  swagger.BulkCreateFieldDef:
+    properties:
+      description:
+        example: Order number
+        type: string
+      name:
+        example: order_no
+        type: string
+      required:
+        example: true
+        type: boolean
+      type:
+        example: string
+        type: string
+    required:
+    - name
+    - type
+    type: object
+  swagger.BulkCreateTableDef:
+    properties:
+      description:
+        example: Order table
+        type: string
+      fields:
+        items:
+          $ref: '#/definitions/swagger.BulkCreateFieldDef'
+        type: array
+      name:
+        example: orders
+        type: string
+    required:
+    - name
+    type: object
+  swagger.DatabaseBulkCreateRequest:
+    properties:
+      description:
+        example: E-commerce database
+        type: string
+      name:
+        example: ecommerce
+        type: string
+      tables:
+        items:
+          $ref: '#/definitions/swagger.BulkCreateTableDef'
+        type: array
+    required:
+    - name
+    type: object
+  swagger.DatabaseBulkCreateResponse:
+    properties:
+      database:
+        $ref: '#/definitions/swagger.DatabaseObject'
+      fields:
+        items:
+          $ref: '#/definitions/swagger.FieldObject'
+        type: array
+      summary:
+        properties:
+          field_count:
+            example: 5
+            type: integer
+          table_count:
+            example: 2
+            type: integer
+        type: object
+      tables:
+        items:
+          $ref: '#/definitions/swagger.TableObject'
+        type: array
+    type: object
+  swagger.DatabaseCreateRequest:
+    properties:
+      description:
+        example: E-commerce database
+        type: string
+      name:
+        example: ecommerce
+        type: string
+    required:
+    - name
+    type: object
+  swagger.DatabaseListResponse:
+    properties:
+      databases:
+        items:
+          $ref: '#/definitions/swagger.DatabaseObject'
+        type: array
+      total:
+        example: 1
+        type: integer
+    type: object
+  swagger.DatabaseObject:
+    properties:
+      created_at:
+        example: "2026-05-26 14:00:00"
+        type: string
+      description:
+        example: E-commerce database
+        type: string
+      id:
+        example: db_abc123
+        type: string
+      name:
+        example: ecommerce
+        type: string
+      updated_at:
+        example: "2026-05-26 14:00:00"
+        type: string
+    type: object
+  swagger.DatabaseUpdateRequest:
+    properties:
+      description:
+        example: Updated description
+        type: string
+      name:
+        example: ecommerce-v2
+        type: string
+    required:
+    - name
+    type: object
+  swagger.ErrorResponse:
+    properties:
+      code:
+        example: 400
+        type: integer
+      message:
+        example: 参数错误
+        type: string
+    type: object
+  swagger.FieldConfigSwagger:
+    properties:
+      allowed_types:
+        example:
+        - image/*
+        - .pdf
+        items:
+          type: string
+        type: array
+      format:
+        example: YYYY-MM-DD
+        type: string
+      max:
+        example: 100
+        type: number
+      max_file_size_mb:
+        example: 10
+        type: integer
+      max_length:
+        example: 255
+        type: integer
+      min:
+        example: 0
+        type: number
+      multiple:
+        example: false
+        type: boolean
+      options:
+        example:
+        - red
+        - green
+        - blue
+        items:
+          type: string
+        type: array
+      validation:
+        example: ^[a-z]+$
+        type: string
+    type: object
+  swagger.FieldCreateRequest:
+    properties:
+      config:
+        $ref: '#/definitions/swagger.FieldConfigSwagger'
+      description:
+        example: User email address
+        type: string
+      name:
+        example: email
+        type: string
+      options:
+        example: red,green,blue
+        type: string
+      required:
+        example: true
+        type: boolean
+      table_id:
+        example: tbl_abc123
+        type: string
+      type:
+        example: string
+        type: string
+    required:
+    - name
+    - table_id
+    - type
+    type: object
+  swagger.FieldListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/swagger.FieldObject'
+        type: array
+      total:
+        example: 5
+        type: integer
+    type: object
+  swagger.FieldObject:
+    properties:
+      config: {}
+      created_at:
+        example: "2026-05-26 14:00:00"
+        type: string
+      description:
+        example: User email
+        type: string
+      id:
+        example: fld_abc123
+        type: string
+      name:
+        example: email
+        type: string
+      options:
+        example: ""
+        type: string
+      required:
+        example: true
+        type: boolean
+      table_id:
+        example: tbl_abc123
+        type: string
+      type:
+        example: string
+        type: string
+      updated_at:
+        example: "2026-05-26 14:00:00"
+        type: string
+    type: object
+  swagger.FieldUpdateRequest:
+    properties:
+      config:
+        $ref: '#/definitions/swagger.FieldConfigSwagger'
+      description:
+        example: Updated description
+        type: string
+      name:
+        example: email
+        type: string
+      options:
+        example: red,green,blue
+        type: string
+      required:
+        example: true
+        type: boolean
+      type:
+        example: string
+        type: string
+    required:
+    - name
+    - type
+    type: object
+  swagger.FileListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/swagger.FileObject'
+        type: array
+    type: object
+  swagger.FileObject:
+    properties:
+      created_at:
+        example: "2026-05-26 14:00:00"
+        type: string
+      field_id:
+        example: fld_abc123
+        type: string
+      file_name:
+        example: report.pdf
+        type: string
+      file_size:
+        example: 102400
+        type: integer
+      file_type:
+        example: application/pdf
+        type: string
+      id:
+        example: file_abc123
+        type: string
+      record_id:
+        example: rec_abc123
+        type: string
+      storage_url:
+        example: /uploads/2026/05/report.pdf
+        type: string
+    type: object
+  swagger.QueryDSLRequest:
+    properties:
+      aggregates:
+        example:
+        - count:*
+        - avg:age
+        items:
+          type: string
+        type: array
+      from:
+        example: users
+        type: string
+      group_by:
+        example:
+        - status
+        items:
+          type: string
+        type: array
+      having:
+        additionalProperties: {}
+        type: object
+      join:
+        additionalProperties: {}
+        type: object
+      limit:
+        example: 20
+        type: integer
+      offset:
+        example: 0
+        type: integer
+      order_by:
+        example: name ASC
+        type: string
+      select:
+        example:
+        - name
+        - email
+        items:
+          type: string
+        type: array
+      union:
+        additionalProperties: {}
+        type: object
+      where:
+        additionalProperties: {}
+        type: object
+    type: object
+  swagger.QueryResult:
+    properties:
+      data:
+        items:
+          additionalProperties: {}
+          type: object
+        type: array
+      has_more:
+        example: false
+        type: boolean
+      page:
+        example: 1
+        type: integer
+      size:
+        example: 20
+        type: integer
+      total:
+        example: 42
+        type: integer
+    type: object
+  swagger.RecordBatchCreateRequest:
+    properties:
+      count:
+        example: 10
+        type: integer
+      data:
+        additionalProperties: {}
+        type: object
+      table_id:
+        example: tbl_abc123
+        type: string
+    required:
+    - table_id
+    type: object
+  swagger.RecordCreateRequest:
+    properties:
+      data:
+        additionalProperties: {}
+        type: object
+      table_id:
+        example: tbl_abc123
+        type: string
+    required:
+    - table_id
+    type: object
+  swagger.RecordListResponse:
+    properties:
+      has_more:
+        example: true
+        type: boolean
+      records:
+        items:
+          $ref: '#/definitions/swagger.RecordObject'
+        type: array
+      total:
+        example: 100
+        type: integer
+    type: object
+  swagger.RecordObject:
+    properties:
+      created_at:
+        example: "2026-05-26 14:00:00"
+        type: string
+      data:
+        additionalProperties: {}
+        type: object
+      id:
+        example: rec_abc123
+        type: string
+      table_id:
+        example: tbl_abc123
+        type: string
+      updated_at:
+        example: "2026-05-26 14:00:00"
+        type: string
+      version:
+        example: 1
+        type: integer
+    type: object
+  swagger.RecordUpdateRequest:
+    properties:
+      data:
+        additionalProperties: {}
+        type: object
+      version:
+        example: 1
+        type: integer
+    type: object
+  swagger.TableCreateRequest:
+    properties:
+      database_id:
+        example: db_abc123
+        type: string
+      description:
+        example: User table
+        type: string
+      name:
+        example: users
+        type: string
+    required:
+    - database_id
+    - name
+    type: object
+  swagger.TableListResponse:
+    properties:
+      tables:
+        items:
+          $ref: '#/definitions/swagger.TableObject'
+        type: array
+      total:
+        example: 3
+        type: integer
+    type: object
+  swagger.TableObject:
+    properties:
+      created_at:
+        example: "2026-05-26 14:00:00"
+        type: string
+      database_id:
+        example: db_abc123
+        type: string
+      description:
+        example: User table
+        type: string
+      id:
+        example: tbl_abc123
+        type: string
+      name:
+        example: users
+        type: string
+      updated_at:
+        example: "2026-05-26 14:00:00"
+        type: string
+    type: object
+  swagger.TableUpdateRequest:
+    properties:
+      description:
+        example: Updated description
+        type: string
+      name:
+        example: users
+        type: string
+    required:
+    - name
+    type: object
+  swagger.TokenCreateRequest:
+    properties:
+      expires_at:
+        example: "2027-01-01T00:00:00Z"
+        type: string
+      name:
+        example: my-client
+        type: string
+      scopes:
+        example: ""
+        type: string
+    required:
+    - name
+    type: object
+  swagger.TokenCreateResponse:
+    properties:
+      created_at:
+        example: "2026-05-26T14:00:00Z"
+        type: string
+      expires_at:
+        type: string
+      id:
+        example: tok_abc123
+        type: string
+      is_master:
+        example: false
+        type: boolean
+      name:
+        example: my-client
+        type: string
+      scopes:
+        example: ""
+        type: string
+      token:
+        example: cs_xxxxxxxxxxxx
+        type: string
+    type: object
+  swagger.TokenListResponse:
+    properties:
+      tokens:
+        items:
+          $ref: '#/definitions/swagger.TokenObject'
+        type: array
+      total:
+        example: 3
+        type: integer
+    type: object
+  swagger.TokenObject:
+    properties:
+      created_at:
+        example: "2026-05-26T14:00:00Z"
+        type: string
+      expires_at:
+        type: string
+      id:
+        example: tok_abc123
+        type: string
+      is_master:
+        example: false
+        type: boolean
+      name:
+        example: my-client
+        type: string
+      scopes:
+        example: ""
+        type: string
+    type: object
+  swagger.TokenUpdateRequest:
+    properties:
+      expires_at:
+        example: "2027-01-01T00:00:00Z"
+        type: string
+      scopes:
+        example: ""
+        type: string
+    type: object
 host: localhost:8080
 info:
   contact:
@@ -14,63 +616,73 @@ info:
   title: Cornerstone API
   version: "1.0"
 paths:
-  /ai/chat:
+  /api/ai/chat:
     post:
       consumes:
       - application/json
-      description: Send a message to the AI assistant and get a reply. The assistant
-        can query and manage data using available tools.
+      description: Send a message to the AI assistant and get a reply.
       parameters:
       - description: Chat request
         in: body
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.AIChatRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"type":"result","reply":"...","context":{}}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.AIChatResponse'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - message is required
           schema:
-            additionalProperties: true
-            type: object
-        "500":
-          description: Internal Server Error
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "503":
+          description: AI service unavailable - LLM_API_KEY not configured
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Chat with AI assistant
       tags:
       - ai
-  /databases:
+  /api/databases:
     get:
-      consumes:
-      - application/json
       description: Returns all databases accessible to the authenticated token.
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"databases":[...],"total":0}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.DatabaseListResponse'
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: List databases
+      summary: List all databases
       tags:
       - databases
     post:
@@ -83,58 +695,36 @@ paths:
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.DatabaseCreateRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"id":"...","name":"...","description":"...","created_at":"..."}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.DatabaseObject'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid request body
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Create a database
       tags:
       - databases
-  /databases/{id}:
+  /api/databases/{id}:
     delete:
-      consumes:
-      - application/json
-      description: Delete a database by ID.
-      parameters:
-      - description: Database ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: '{"code":0,"data":{"message":"数据库已删除"}}'
-          schema:
-            additionalProperties: true
-            type: object
-        "403":
-          description: Forbidden
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - ApiKeyAuth: []
-      summary: Delete a database
-      tags:
-      - databases
-    get:
-      consumes:
-      - application/json
-      description: Get database details by ID.
+      description: Delete a database and all of its associated tables, fields, and
+        records.
       parameters:
       - description: Database ID
         in: path
@@ -147,16 +737,64 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
-        "403":
-          description: Forbidden
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to this database
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Database not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: Get a database
+      summary: Delete a database
+      tags:
+      - databases
+    get:
+      description: Retrieve full details of a single database by its ID.
+      parameters:
+      - description: Database ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.DatabaseObject'
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to this database
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Database not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a database by ID
       tags:
       - databases
     put:
@@ -174,34 +812,42 @@ paths:
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.DatabaseUpdateRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"id":"...","name":"...","description":"...","updated_at":"..."}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.DatabaseObject'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid request body
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to this database
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Database not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Update a database
       tags:
       - databases
-  /databases/{id}/tables:
+  /api/databases/{id}/tables:
     get:
-      consumes:
-      - application/json
       description: Returns all tables in the specified database.
       parameters:
       - description: Database ID
@@ -213,87 +859,108 @@ paths:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"tables":[...],"total":0}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.TableListResponse'
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to this database
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: List tables in a database
       tags:
       - tables
-  /databases/with-tables:
+  /api/databases/with-tables:
     post:
       consumes:
       - application/json
       description: Atomically create a database together with nested tables and fields
         in a single request.
       parameters:
-      - description: Database with nested tables/fields
+      - description: Database with nested tables and fields
         in: body
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.DatabaseBulkCreateRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"database":{...},"tables":[...],"fields":[...],"summary":{"table_count":1,"field_count":1}}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.DatabaseBulkCreateResponse'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid request body
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: Create database with tables and fields
+      summary: Create a database with tables and fields
       tags:
       - databases
-  /fields:
+  /api/fields:
     post:
       consumes:
       - application/json
-      description: 'Create a new field in a table. Valid types: string, text, number,
-        boolean, date, datetime, attachment, select, list, multiselect, single_select,
-        multi_select'
+      description: Create a new field in a table.
       parameters:
       - description: Field to create
         in: body
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.FieldCreateRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"id":"...","table_id":"...","name":"...","type":"...","description":"...","required":false,"created_at":"..."}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.FieldObject'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid request body or field type
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to parent table
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Create a field
       tags:
       - fields
-  /fields/{id}:
+  /api/fields/{id}:
     delete:
-      consumes:
-      - application/json
       description: Delete a field by ID.
       parameters:
       - description: Field ID
@@ -305,24 +972,33 @@ paths:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"message":"字段已删除"}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to this field
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Field not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Delete a field
       tags:
       - fields
     get:
-      consumes:
-      - application/json
-      description: Get field details by ID.
+      description: Retrieve full details of a single field by its ID.
       parameters:
       - description: Field ID
         in: path
@@ -335,23 +1011,34 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
-        "403":
-          description: Forbidden
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.FieldObject'
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to this field
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Field not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: Get a field
+      summary: Get a field by ID
       tags:
       - fields
     put:
       consumes:
       - application/json
-      description: 'Update field properties. Valid types: string, text, number, boolean,
-        date, datetime, attachment, select, list, multiselect, single_select, multi_select'
+      description: Update field properties including name, type, description, required
+        flag, and config.
       parameters:
       - description: Field ID
         in: path
@@ -363,35 +1050,43 @@ paths:
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.FieldUpdateRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"id":"...","name":"...","type":"...","description":"...","required":false,"updated_at":"..."}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.FieldObject'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid request body or field type
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to this field
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Field not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Update a field
       tags:
       - fields
-  /files/{id}:
+  /api/files/{id}:
     delete:
-      consumes:
-      - application/json
-      description: Delete a file by ID.
+      description: Delete a file and its metadata by ID.
       parameters:
       - description: File ID
         in: path
@@ -404,22 +1099,32 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
-        "403":
-          description: Forbidden
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to this file
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: File not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Delete a file
       tags:
       - files
     get:
-      consumes:
-      - application/json
-      description: Get file metadata by ID.
+      description: Retrieve file metadata by ID, including file name, size, type,
+        and storage path.
       parameters:
       - description: File ID
         in: path
@@ -432,22 +1137,31 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
-        "403":
-          description: Forbidden
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.FileObject'
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to this file
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: File not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Get file metadata
       tags:
       - files
-  /files/{id}/download:
+  /api/files/{id}/download:
     get:
-      consumes:
-      - application/json
       description: Download the actual file content by ID.
       parameters:
       - description: File ID
@@ -462,33 +1176,39 @@ paths:
           description: OK
           schema:
             type: file
-        "403":
-          description: Forbidden
+        "401":
+          description: Unauthorized - invalid or missing API key
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to this file
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: File not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Download a file
       tags:
       - files
-  /files/upload:
+  /api/files/upload:
     post:
       consumes:
       - multipart/form-data
-      description: Upload a file attachment. At least one of record_id or field_id
-        is required.
+      description: Upload a file attachment associated with a record and/or field.
       parameters:
       - description: File to upload
         in: formData
         name: file
         required: true
         type: file
-      - description: Record ID
+      - description: Record ID to attach to
         in: formData
         name: record_id
         type: string
-      - description: Field ID
+      - description: Field ID to attach to
         in: formData
         name: field_id
         type: string
@@ -498,190 +1218,195 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.FileObject'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - missing file or record_id/field_id
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to target record/field
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Upload a file
       tags:
       - files
-  /health:
+  /api/query:
     get:
-      description: Liveness probe. Returns 200 if the process is running. Does not
-        check external dependencies.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: '{"status":"healthy","service":"cornerstone-backend","version":"...","time":"..."}'
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Health check
-      tags:
-      - health
-  /mcp:
-    get:
-      description: 'Opens a Server-Sent Events stream for receiving MCP notifications.
-        Requires Accept: text/event-stream header and authentication.'
-      produces:
-      - text/event-stream
-      responses:
-        "200":
-          description: SSE stream
-          schema:
-            type: string
-      security:
-      - ApiKeyAuth: []
-      summary: Open MCP SSE stream
-      tags:
-      - mcp
-    post:
       consumes:
       - application/json
-      description: Streamable HTTP MCP protocol endpoint. Accepts JSON-RPC requests
-        and can respond with JSON or SSE stream. Requires authentication.
+      description: Execute a full Query DSL request using POST body or GET query parameter.
       parameters:
-      - description: JSON-RPC request
+      - description: Query DSL body
         in: body
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.QueryDSLRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.QueryResult'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid query DSL
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to queried resource
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: Handle MCP request (SSE)
+      summary: Execute a query
       tags:
-      - mcp
-  /query:
+      - query
     post:
       consumes:
       - application/json
-      description: Execute a full Query DSL request. Supports from, select, where,
-        order_by, limit, offset, group_by, having, aggregates, join, and union.
+      description: Execute a full Query DSL request using POST body or GET query parameter.
       parameters:
       - description: Query DSL body
         in: body
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.QueryDSLRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"data":[...],"total":0,"page":1,"size":20,"has_more":false}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.QueryResult'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid query DSL
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to queried resource
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Execute a query
       tags:
       - query
-  /query/batch:
+  /api/query/batch:
     post:
       consumes:
       - application/json
-      description: Execute multiple named queries in a single request.
+      description: Execute multiple queries in a single request.
       parameters:
       - description: Batch query request
         in: body
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.BatchQueryRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"results":{"q1":{...},"q2":{...}}}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid query DSL
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to queried resource
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: Batch query
+      summary: Execute a batch query
       tags:
       - query
-  /query/explain:
+  /api/query/explain:
     post:
       consumes:
       - application/json
       description: Returns the generated SQL and parameters for a query without executing
-        it. Useful for debugging.
+        it.
       parameters:
       - description: Query DSL body
         in: body
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.QueryDSLRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"sql":"SELECT ...","params":[...]}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid query DSL
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to queried resource
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Explain a query
       tags:
       - query
-  /query/schema/{table}:
+  /api/query/schema/{table}:
     get:
-      consumes:
-      - application/json
       description: Returns the allowed fields for a queryable table.
       parameters:
       - description: Table name (records, tables, databases, fields, files, tokens)
@@ -693,25 +1418,35 @@ paths:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"table":"records","fields":["id","table_id",...]}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to this table
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Table not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Get table schema for query
       tags:
       - query
-  /query/simple:
+  /api/query/simple:
     get:
-      consumes:
-      - application/json
-      description: Query records using simple URL parameters instead of full DSL.
+      description: Query records using simple URL parameters instead of the full Query
+        DSL.
       parameters:
       - description: Table name
         in: query
@@ -743,47 +1478,58 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.QueryResult'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - missing table or invalid parameters
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to queried table
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: Simplified query
+      summary: Execute a simplified query
       tags:
       - query
-  /query/tables:
+  /api/query/tables:
     get:
-      consumes:
-      - application/json
       description: Returns all tables the authenticated token can query.
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"tables":[...]}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: List queryable tables
       tags:
       - query
-  /query/validate:
+  /api/query/validate:
     post:
       consumes:
       - application/json
@@ -795,55 +1541,34 @@ paths:
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.QueryDSLRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"message":"查询验证通过"}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.APIResponse'
         "400":
-          description: Bad Request
+          description: Validation error - invalid query DSL
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to queried resource
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Validate a query
       tags:
       - query
-  /ready:
+  /api/records:
     get:
-      description: Readiness probe. Returns 200 if the process is running and the
-        database is reachable. Returns 503 otherwise.
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: '{"status":"ready","service":"cornerstone-backend","version":"...","time":"..."}'
-          schema:
-            additionalProperties: true
-            type: object
-        "503":
-          description: '{"status":"unready","reason":"..."}'
-          schema:
-            additionalProperties: true
-            type: object
-      summary: Readiness check
-      tags:
-      - health
-  /records:
-    get:
-      consumes:
-      - application/json
-      description: Query records from a table with pagination and filtering.
+      description: Query records from a table with pagination and optional filtering.
       parameters:
       - description: Table ID
         in: query
@@ -868,23 +1593,29 @@ paths:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"items":[...],"total":0,"has_more":false}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.RecordListResponse'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - missing table_id
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to target table
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: List records
+      summary: List records in a table
       tags:
       - records
     post:
@@ -897,58 +1628,39 @@ paths:
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.RecordCreateRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"id":"...","table_id":"...","version":1,"created_at":"...","data":{...}}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.RecordObject'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid request body or field values
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to target table
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Create a record
       tags:
       - records
-  /records/{id}:
+  /api/records/{id}:
     delete:
-      consumes:
-      - application/json
       description: Delete a record by ID.
-      parameters:
-      - description: Record ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: '{"code":0,"data":{"message":"记录已删除"}}'
-          schema:
-            additionalProperties: true
-            type: object
-        "403":
-          description: Forbidden
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - ApiKeyAuth: []
-      summary: Delete a record
-      tags:
-      - records
-    get:
-      consumes:
-      - application/json
-      description: Get a single record by ID.
       parameters:
       - description: Record ID
         in: path
@@ -961,56 +1673,118 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
-        "403":
-          description: Forbidden
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to this record
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Record not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: Get a record
+      summary: Delete a record
       tags:
       - records
-    put:
-      consumes:
-      - application/json
-      description: Update record data. Supports optimistic locking via version field.
+    get:
+      description: Retrieve a single record by its ID.
       parameters:
       - description: Record ID
         in: path
         name: id
         required: true
         type: string
-      - description: Record update
-        in: body
-        name: body
-        required: true
-        schema:
-          type: object
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"id":"...","version":2,"updated_at":"...","data":{...}}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.RecordObject'
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to this record
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Record not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a record by ID
+      tags:
+      - records
+    put:
+      consumes:
+      - application/json
+      description: Update record data. Supports optimistic locking via the version
+        field.
+      parameters:
+      - description: Record ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Record update with optional version
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/swagger.RecordUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.RecordObject'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error or version conflict
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to this record
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Record not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Update a record
       tags:
       - records
-  /records/{id}/files:
+  /api/records/{id}/files:
     get:
-      consumes:
-      - application/json
       description: Returns all files attached to a record.
       parameters:
       - description: Record ID
@@ -1022,21 +1796,28 @@ paths:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"items":[...]}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.FileListResponse'
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to this record
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: List files for a record
       tags:
       - files
-  /records/batch:
+  /api/records/batch:
     post:
       consumes:
       - application/json
@@ -1053,30 +1834,39 @@ paths:
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.RecordBatchCreateRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"records":[...],"count":1}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid request body or count out of range
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to target table
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Batch create records
       tags:
       - records
-  /records/export:
+  /api/records/export:
     get:
-      consumes:
-      - application/json
-      description: Export records from a table as CSV or JSON file.
+      description: Export records from a table as a downloadable file.
       parameters:
       - description: Table ID
         in: query
@@ -1084,7 +1874,7 @@ paths:
         required: true
         type: string
       - default: csv
-        description: Export format (csv or json)
+        description: 'Export format: csv or json'
         in: query
         name: format
         type: string
@@ -1100,16 +1890,23 @@ paths:
           schema:
             type: file
         "400":
-          description: Bad Request
+          description: Validation error - missing table_id or invalid format
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to target table
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: Export records
+      summary: Export records as CSV or JSON
       tags:
       - records
-  /tables:
+  /api/tables:
     post:
       consumes:
       - application/json
@@ -1120,58 +1917,39 @@ paths:
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.TableCreateRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"id":"...","database_id":"...","name":"...","description":"...","created_at":"..."}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.TableObject'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid request body
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to parent database
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Create a table
       tags:
       - tables
-  /tables/{id}:
+  /api/tables/{id}:
     delete:
-      consumes:
-      - application/json
-      description: Delete a table by ID.
-      parameters:
-      - description: Table ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: '{"code":0,"data":{"message":"表已删除"}}'
-          schema:
-            additionalProperties: true
-            type: object
-        "403":
-          description: Forbidden
-          schema:
-            additionalProperties: true
-            type: object
-      security:
-      - ApiKeyAuth: []
-      summary: Delete a table
-      tags:
-      - tables
-    get:
-      consumes:
-      - application/json
-      description: Get table details by ID.
+      description: Delete a table and all of its associated fields and records.
       parameters:
       - description: Table ID
         in: path
@@ -1184,16 +1962,64 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
-        "403":
-          description: Forbidden
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to this table
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Table not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: Get a table
+      summary: Delete a table
+      tags:
+      - tables
+    get:
+      description: Retrieve full details of a single table by its ID.
+      parameters:
+      - description: Table ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.TableObject'
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - no access to this table
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Table not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Get a table by ID
       tags:
       - tables
     put:
@@ -1211,34 +2037,42 @@ paths:
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.TableUpdateRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"id":"...","name":"...","description":"...","updated_at":"..."}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.TableObject'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid request body
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to this table
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Table not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Update a table
       tags:
       - tables
-  /tables/{id}/fields:
+  /api/tables/{id}/fields:
     get:
-      consumes:
-      - application/json
       description: Returns all fields in the specified table.
       parameters:
       - description: Table ID
@@ -1250,24 +2084,29 @@ paths:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"items":[...],"total":0}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.FieldListResponse'
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to this table
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: List fields in a table
       tags:
       - fields
-  /tables/{id}/fields/permissions:
+  /api/tables/{id}/fields/permissions:
     get:
-      consumes:
-      - application/json
       description: Get field-level permission settings for a table.
       parameters:
       - description: Table ID
@@ -1279,15 +2118,22 @@ paths:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"permissions":[...],"total":0}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to this table
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Get field permissions
@@ -1313,26 +2159,32 @@ paths:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"message":"权限设置成功"}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid request body
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to this table
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Set field permission
       tags:
       - fields
-  /tables/{id}/fields/permissions/batch:
+  /api/tables/{id}/fields/permissions/batch:
     put:
       consumes:
       - application/json
@@ -1353,44 +2205,54 @@ paths:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"message":"批量权限设置成功","count":1}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid request body
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "403":
-          description: Forbidden
+          description: Forbidden - no access to this table
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Batch set field permissions
       tags:
       - fields
-  /tokens:
+  /api/tokens:
     get:
-      consumes:
-      - application/json
-      description: Returns all tokens visible to the current token. Master tokens
-        see everything; client tokens see only themselves.
+      description: Returns all tokens visible to the current token.
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"tokens":[...],"total":0}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.TokenListResponse'
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: List all tokens
@@ -1399,44 +2261,50 @@ paths:
     post:
       consumes:
       - application/json
-      description: Create a new API token. Requires Master Token. The token value
-        is returned only once and cannot be retrieved again.
+      description: Create a new API token. Requires Master Token.
       parameters:
       - description: Token to create
         in: body
         name: body
         required: true
         schema:
-          type: object
+          $ref: '#/definitions/swagger.TokenCreateRequest'
       produces:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"id":"...","name":"...","is_master":false,"scopes":"...","token":"cs_..."}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.TokenCreateResponse'
+              type: object
         "400":
-          description: Bad Request
+          description: Validation error - invalid request body
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - requires Master Token
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
         "500":
           description: Internal Server Error
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Create a new token
       tags:
       - tokens
-  /tokens/{id}:
+  /api/tokens/{id}:
     delete:
-      consumes:
-      - application/json
-      description: Delete a token by ID. Requires Master Token to delete tokens other
-        than your own.
+      description: Delete a token by ID.
       parameters:
       - description: Token ID
         in: path
@@ -1447,15 +2315,26 @@ paths:
       - application/json
       responses:
         "200":
-          description: '{"code":0,"data":{"id":"..."}}'
+          description: OK
           schema:
-            additionalProperties: true
-            type: object
-        "400":
-          description: Bad Request
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized - invalid or missing API key
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - insufficient permissions
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Token not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
       summary: Delete a token
@@ -1464,7 +2343,7 @@ paths:
     put:
       consumes:
       - application/json
-      description: Update token scopes and/or expiration. Requires Master Token.
+      description: Update token scopes and/or expiration date. Requires Master Token.
       parameters:
       - description: Token ID
         in: path
@@ -1476,6 +2355,86 @@ paths:
         name: body
         required: true
         schema:
+          $ref: '#/definitions/swagger.TokenUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/swagger.APIResponse'
+            - properties:
+                data:
+                  $ref: '#/definitions/swagger.TokenObject'
+              type: object
+        "400":
+          description: Validation error - invalid request body
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "403":
+          description: Forbidden - requires Master Token
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "404":
+          description: Token not found
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+      security:
+      - ApiKeyAuth: []
+      summary: Update a token
+      tags:
+      - tokens
+  /health:
+    get:
+      description: Liveness probe. Returns 200 if the process is running.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"status":"healthy","service":"cornerstone-backend","version":"...","time":"..."}'
+          schema:
+            type: object
+      summary: Health check
+      tags:
+      - health
+  /mcp:
+    get:
+      description: Opens a Server-Sent Events stream for receiving MCP notifications.
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: SSE stream
+          schema:
+            type: string
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "406":
+          description: 'Not Acceptable - requires Accept: text/event-stream'
+          schema:
+            type: object
+      security:
+      - ApiKeyAuth: []
+      summary: Open MCP SSE stream
+      tags:
+      - mcp
+    post:
+      consumes:
+      - application/json
+      description: Streamable HTTP MCP protocol endpoint.
+      parameters:
+      - description: JSON-RPC request
+        in: body
+        name: body
+        required: true
+        schema:
           type: object
       produces:
       - application/json
@@ -1483,18 +2442,38 @@ paths:
         "200":
           description: OK
           schema:
-            additionalProperties: true
             type: object
         "400":
-          description: Bad Request
+          description: Parse error - invalid JSON-RPC
           schema:
-            additionalProperties: true
-            type: object
+            $ref: '#/definitions/swagger.ErrorResponse'
+        "401":
+          description: Unauthorized - invalid or missing API key
+          schema:
+            $ref: '#/definitions/swagger.ErrorResponse'
       security:
       - ApiKeyAuth: []
-      summary: Update a token
+      summary: Handle MCP request (SSE)
       tags:
-      - tokens
+      - mcp
+  /ready:
+    get:
+      description: Readiness probe. Returns 200 if the process is running and the
+        database is reachable.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{"status":"ready","service":"cornerstone-backend","version":"...","time":"..."}'
+          schema:
+            type: object
+        "503":
+          description: '{"status":"unready","reason":"..."}'
+          schema:
+            type: object
+      summary: Readiness check
+      tags:
+      - health
 securityDefinitions:
   ApiKeyAuth:
     description: Enter your API token (Master Token or client token)
