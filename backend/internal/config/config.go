@@ -124,7 +124,7 @@ func (c *Config) Validate() error {
 			}
 		}
 	default:
-		return fmt.Errorf("不支持的数据库类型: %s，支持 postgres 或 sqlite")
+		return fmt.Errorf("不支持的数据库类型: %s，支持 postgres 或 sqlite", c.Database.Type)
 	}
 
 	if strings.TrimSpace(c.Server.Port) == "" {

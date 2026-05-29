@@ -1,8 +1,28 @@
 <template>
   <div class="tokens-view">
+    <div v-if="!hasApiKey" class="api-key-entry">
+      <h3>输入 API Key</h3>
+      <p class="hint">请输入 Master Token 或其他有效的 API Key 以访问系统。Master Token 会在服务启动时输出到日志。</p>
+      <div class="key-input-row">
+        <input
+          v-model="inputKey"
+          type="password"
+          placeholder="cs_..."
+          class="input key-input"
+          @keydown.enter="applyKey"
+        />
+        <button class="btn btn-primary" @click="applyKey">确认</button>
+      </div>
+      <p v-if="keyError" class="error-text">{{ keyError }}</p>
+    </div>
+
+    <template v-else>
     <div class="header">
       <h1>令牌管理</h1>
-      <button class="btn btn-primary" @click="showCreateModal = true">新建令牌</button>
+      <div class="header-actions">
+        <button class="btn btn-secondary" @click="clearKey">退出</button>
+        <button class="btn btn-primary" @click="showCreateModal = true">新建令牌</button>
+      </div>
     </div>
 
     <table class="data-table">
@@ -57,21 +77,48 @@
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { tokenAPI, type Token } from '@/services/api'
+import { tokenAPI, setApiKey, clearApiKey as clearStoredKey, getApiKey, type Token } from '@/services/api'
 
 const tokens = ref<Token[]>([])
 const showCreateModal = ref(false)
 const createdTokenValue = ref('')
 const newToken = ref({ name: '', scopes: '', expires_at: '' })
+const hasApiKey = ref(!!getApiKey())
+const inputKey = ref('')
+const keyError = ref('')
 
 onMounted(async () => {
-  await loadTokens()
+  if (hasApiKey.value) {
+    await loadTokens()
+  }
 })
+
+async function applyKey() {
+  if (!inputKey.value.trim()) return
+  keyError.value = ''
+  setApiKey(inputKey.value.trim())
+  try {
+    await tokenAPI.list()
+    hasApiKey.value = true
+    await loadTokens()
+  } catch {
+    clearStoredKey()
+    keyError.value = 'API Key 无效或已过期，请检查后重试'
+  }
+}
+
+function clearKey() {
+  clearStoredKey()
+  hasApiKey.value = false
+  tokens.value = []
+  inputKey.value = ''
+}
 
 async function loadTokens() {
   try {
@@ -122,11 +169,40 @@ function copyValue(value: string) {
 .tokens-view {
   padding: 20px;
 }
+.api-key-entry {
+  max-width: 480px;
+  margin: 80px auto;
+  text-align: center;
+}
+.api-key-entry h3 {
+  margin-bottom: 8px;
+}
+.hint {
+  color: #888;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+.key-input-row {
+  display: flex;
+  gap: 8px;
+}
+.key-input {
+  flex: 1;
+}
+.error-text {
+  color: #e53e3e;
+  margin-top: 8px;
+  font-size: 14px;
+}
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
+}
+.header-actions {
+  display: flex;
+  gap: 8px;
 }
 .data-table {
   width: 100%;

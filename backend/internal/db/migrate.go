@@ -2,9 +2,7 @@ package db
 
 import (
 	"context"
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"os"
 	"sync"
 	"time"
@@ -131,11 +129,7 @@ func initMasterToken(database *gorm.DB) error {
 
 	masterToken := os.Getenv("MASTER_TOKEN")
 	if masterToken == "" {
-		var err error
-		masterToken, err = generateSecureToken()
-		if err != nil {
-			return fmt.Errorf("生成 Master Token 失败: %w", err)
-		}
+		return fmt.Errorf("MASTER_TOKEN 环境变量未设置，请在 .env 或环境变量中配置 Master Token")
 	}
 
 	token := models.Token{
@@ -148,29 +142,8 @@ func initMasterToken(database *gorm.DB) error {
 		return fmt.Errorf("创建 Master Token 失败: %w", err)
 	}
 
-	fmt.Fprintln(os.Stderr, "============================================")
-	fmt.Fprintln(os.Stderr, "🔑 Master Token 已生成")
-	fmt.Fprintln(os.Stderr, "Token: "+masterToken)
-	fmt.Fprintln(os.Stderr, "⚠️  请妥善保存此 Token，它将用于管理所有其他 Token")
-	fmt.Fprintln(os.Stderr, "============================================")
-
-	zap.L().Info("Master Token 已创建（请查看 stderr 输出）")
+	zap.L().Info("Master Token 已从环境变量初始化")
 	return nil
-}
-
-func generateSecureToken() (string, error) {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-	length := 32
-	maxInt := big.NewInt(int64(len(charset)))
-	b := make([]byte, length)
-	for i := range b {
-		n, err := rand.Int(rand.Reader, maxInt)
-		if err != nil {
-			return "", fmt.Errorf("crypto/rand: %w", err)
-		}
-		b[i] = charset[n.Int64()]
-	}
-	return "cs_" + string(b), nil
 }
 
 // IsSQLite 检查当前数据库是否为 SQLite

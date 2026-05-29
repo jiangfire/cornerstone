@@ -53,8 +53,8 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-}
       DEBUG: "false"
 
-      # 可选：Master Token（留空则启动时自动生成）
-      MASTER_TOKEN: ${MASTER_TOKEN:-}
+      # Master Token（必填，请在 .env 中设置）
+      MASTER_TOKEN: ${MASTER_TOKEN:?MASTER_TOKEN is required (set a secure value in .env)}
 
       # 可选：LLM / AI 助手
       LLM_API_KEY: ${LLM_API_KEY:-}

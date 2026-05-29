@@ -31,7 +31,9 @@ api.interceptors.response.use(
   (error: AxiosError) => {
     if (error.response?.status === 401) {
       localStorage.removeItem('api_key')
-      window.location.href = '/tokens'
+      if (!window.location.pathname.startsWith('/tokens')) {
+        window.location.href = '/tokens'
+      }
     }
     return Promise.reject(error)
   },
