@@ -1,5 +1,5 @@
 // safeUrl.ts
-// 后端字段(governance.external_links 等)可能由跨系统注入,前端在 `:href` /
+// 外部注入的 URL 字段可能包含恶意协议,前端在 `:href` /
 // `window.open` 前必须过 isSafeHttpUrl 检查,阻断 `javascript:` / `data:` /
 // `vbscript:` 等 XSS 注入向量。
 

@@ -6,10 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/rand"
 	"regexp"
 	"strings"
 	"time"
 
+	"github.com/jiangfire/cornerstone/backend/internal/authz"
 	"github.com/jiangfire/cornerstone/backend/internal/models"
 	"gorm.io/gorm"
 )
@@ -94,8 +96,6 @@ type RecordResponse struct {
 	ID        string      `json:"id"`
 	TableID   string      `json:"table_id"`
 	Data      interface{} `json:"data"`
-	CreatedBy string      `json:"created_by"`
-	UpdatedBy string      `json:"updated_by"`
 	Version   int         `json:"version"`
 	CreatedAt string      `json:"created_at"`
 	UpdatedAt string      `json:"updated_at"`
@@ -116,7 +116,7 @@ type QueryResponse struct {
 	HasMore bool             `json:"has_more"`
 }
 
-// checkTableAccess 检查表访问权限
+// checkTableAccess 检查表是否存在
 func (s *RecordService) checkTableAccess(tableID, userID string, requiredRoles []string) error {
 	var table models.Table
 	err := s.db.Where("id = ? AND deleted_at IS NULL", tableID).First(&table).Error
@@ -124,26 +124,25 @@ func (s *RecordService) checkTableAccess(tableID, userID string, requiredRoles [
 		return errors.New("表不存在")
 	}
 
-	var access models.DatabaseAccess
-	err = s.db.Table("database_access AS da").
-		Select("da.*").
-		Joins("INNER JOIN databases d ON d.id = da.database_id").
-		Where("da.database_id = ? AND da.user_id = ? AND d.deleted_at IS NULL", table.DatabaseID, userID).
-		First(&access).Error
+	var db models.Database
+	err = s.db.Where("id = ? AND deleted_at IS NULL", table.DatabaseID).First(&db).Error
 	if err != nil {
-		return errors.New("无权访问该数据库")
+		return errors.New("数据库不存在")
 	}
 
-	roleAllowed := false
-	for _, role := range requiredRoles {
-		if access.Role == role {
-			roleAllowed = true
-			break
-		}
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return err
 	}
-
-	if !roleAllowed {
-		return fmt.Errorf("需要权限：%v，当前角色：%s", requiredRoles, access.Role)
+	action := authz.ActionRead
+	switch {
+	case containsRole(requiredRoles, "owner") || containsRole(requiredRoles, "admin"):
+		action = authz.ActionManage
+	case containsRole(requiredRoles, "editor"):
+		action = authz.ActionWrite
+	}
+	if !authorizer.CanAccessTable(tableID, action) {
+		return errors.New("无权访问该表")
 	}
 
 	return nil
@@ -361,7 +360,7 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 			return errors.New("期望字符串类型（日期格式）")
 		}
 
-	case "select", "single_select":
+	case "select", "single_select", "email", "url", "color", "link":
 		if _, ok := value.(string); !ok {
 			return errors.New("期望字符串类型")
 		}
@@ -384,7 +383,7 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 			}
 		}
 
-	case "list":
+	case "multiselect", "list":
 		items, err := parseStringListValue(value)
 		if err != nil {
 			return err
@@ -410,6 +409,21 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 					}
 				}
 			}
+		}
+	case "json":
+		return nil
+	case "rating":
+		switch rating := value.(type) {
+		case float64:
+			if rating < 1 || rating > 5 {
+				return errors.New("评分必须在 1-5 之间")
+			}
+		case int:
+			if rating < 1 || rating > 5 {
+				return errors.New("评分必须在 1-5 之间")
+			}
+		default:
+			return errors.New("期望数字类型")
 		}
 	}
 
@@ -710,11 +724,9 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 
 	// 4. 创建记录并绑定附件
 	record := models.Record{
-		TableID:   req.TableID,
-		Data:      string(dataJSON),
-		CreatedBy: userID,
-		UpdatedBy: userID,
-		Version:   1,
+		TableID: req.TableID,
+		Data:    string(dataJSON),
+		Version: 1,
 	}
 
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
@@ -728,12 +740,6 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 	}); err != nil {
 		return nil, err
 	}
-
-	NewPluginService(s.db).TriggerByTable(req.TableID, "create", record.ID, userID, map[string]interface{}{
-		"record_id": record.ID,
-		"data":      normalizedData,
-		"user_id":   userID,
-	})
 
 	filteredData := s.filterReadableData(fields, readableFields, normalizedData)
 	record.Data, err = marshalRecordPayload(filteredData)
@@ -852,8 +858,6 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 			ID:        r.ID,
 			TableID:   r.TableID,
 			Data:      data,
-			CreatedBy: r.CreatedBy,
-			UpdatedBy: r.UpdatedBy,
 			Version:   r.Version,
 			CreatedAt: r.CreatedAt.Format("2006-01-02 15:04:05"),
 			UpdatedAt: r.UpdatedAt.Format("2006-01-02 15:04:05"),
@@ -1019,8 +1023,6 @@ func (s *RecordService) GetRecord(recordID, userID string) (*RecordResponse, err
 		ID:        record.ID,
 		TableID:   record.TableID,
 		Data:      data,
-		CreatedBy: record.CreatedBy,
-		UpdatedBy: record.UpdatedBy,
 		Version:   record.Version,
 		CreatedAt: record.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt: record.UpdatedAt.Format("2006-01-02 15:04:05"),
@@ -1088,9 +1090,8 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 		}
 
 		updateResult := updateQuery.Updates(map[string]interface{}{
-			"data":       string(dataJSON),
-			"updated_by": userID,
-			"version":    gorm.Expr("version + 1"),
+			"data":    string(dataJSON),
+			"version": gorm.Expr("version + 1"),
 		})
 		if updateResult.Error != nil {
 			return fmt.Errorf("更新记录失败: %w", updateResult.Error)
@@ -1111,12 +1112,6 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 	}); err != nil {
 		return nil, err
 	}
-
-	NewPluginService(s.db).TriggerByTable(record.TableID, "update", record.ID, userID, map[string]interface{}{
-		"record_id": record.ID,
-		"data":      currentData,
-		"user_id":   userID,
-	})
 
 	filteredData := s.filterReadableData(fields, readableFields, currentData)
 	record.Data, err = marshalRecordPayload(filteredData)
@@ -1148,7 +1143,6 @@ func (s *RecordService) DeleteRecord(recordID, userID string) error {
 		Updates(map[string]interface{}{
 			"deleted_at": now,
 			"updated_at": now,
-			"updated_by": userID,
 			"version":    gorm.Expr("version + 1"),
 		})
 	if result.Error != nil {
@@ -1168,8 +1162,6 @@ func (s *RecordService) DeleteRecord(recordID, userID string) error {
 			payload["data"] = deletedData
 		}
 	}
-
-	NewPluginService(s.db).TriggerByTable(record.TableID, "delete", record.ID, userID, payload)
 
 	return nil
 }
@@ -1226,11 +1218,9 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 	records := make([]*models.Record, count)
 	for i := 0; i < count; i++ {
 		records[i] = &models.Record{
-			TableID:   req.TableID,
-			Data:      string(dataJSON),
-			CreatedBy: userID,
-			UpdatedBy: userID,
-			Version:   1,
+			TableID: req.TableID,
+			Data:    string(dataJSON),
+			Version: 1,
 		}
 	}
 
@@ -1254,6 +1244,39 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 	}
 	for _, record := range records {
 		record.Data = filteredJSON
+	}
+
+	return records, nil
+}
+
+func (s *RecordService) GenerateTestData(tableID, userID string, count int) ([]*models.Record, error) {
+	if count <= 0 {
+		return []*models.Record{}, nil
+	}
+	if err := s.checkTableAccess(tableID, userID, []string{"owner", "admin", "editor"}); err != nil {
+		return nil, err
+	}
+
+	fields, err := s.getTableFields(tableID)
+	if err != nil {
+		return nil, err
+	}
+
+	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	records := make([]*models.Record, 0, count)
+	for i := 0; i < count; i++ {
+		data := make(map[string]interface{}, len(fields))
+		for _, field := range fields {
+			data[field.Name] = generateFieldValue(rng, field.Type)
+		}
+		record, err := s.CreateRecord(CreateRecordRequest{
+			TableID: tableID,
+			Data:    data,
+		}, userID)
+		if err != nil {
+			return nil, err
+		}
+		records = append(records, record)
 	}
 
 	return records, nil

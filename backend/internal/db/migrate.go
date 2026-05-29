@@ -6,17 +6,13 @@ import (
 	"fmt"
 	"math/big"
 	"os"
-	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/jiangfire/cornerstone/backend/internal/config"
 	"github.com/jiangfire/cornerstone/backend/internal/models"
-	"github.com/jiangfire/cornerstone/backend/internal/services"
 	pkgdb "github.com/jiangfire/cornerstone/backend/pkg/db"
 	"go.uber.org/zap"
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -38,14 +34,12 @@ func newCircuitBreaker(threshold int, cooldown time.Duration) *circuitBreaker {
 func (cb *circuitBreaker) allow() bool {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-
 	return time.Now().After(cb.openUntil)
 }
 
 func (cb *circuitBreaker) markSuccess() {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-
 	cb.failures = 0
 	cb.openUntil = time.Time{}
 }
@@ -53,7 +47,6 @@ func (cb *circuitBreaker) markSuccess() {
 func (cb *circuitBreaker) markFailure() {
 	cb.mu.Lock()
 	defer cb.mu.Unlock()
-
 	cb.failures++
 	if cb.failures >= cb.threshold {
 		cb.openUntil = time.Now().Add(cb.cooldown)
@@ -61,12 +54,10 @@ func (cb *circuitBreaker) markFailure() {
 }
 
 var (
-	viewRefreshBreaker    = newCircuitBreaker(3, 2*time.Minute)
-	tokenCleanupBreaker   = newCircuitBreaker(3, 2*time.Minute)
-	outboxDispatchBreaker = newCircuitBreaker(3, 2*time.Minute)
+	tokenCleanupBreaker = newCircuitBreaker(3, 2*time.Minute)
 )
 
-// InitDB 初始化数据库连接（包装pkg/db中的函数）
+// InitDB 初始化数据库连接
 func InitDB(cfg config.DatabaseConfig) error {
 	return pkgdb.InitDB(cfg)
 }
@@ -83,263 +74,93 @@ func Migrate() error {
 
 	logger.Info("开始数据库迁移...")
 
-	// 注册插件（如果需要）
 	if err := database.AutoMigrate(
-		// 核心用户和组织模型
-		&models.User{},
-		&models.Organization{},
-		&models.OrganizationMember{},
-
-		// 数据库和权限模型
+		&models.Token{},
 		&models.Database{},
-		&models.DatabaseAccess{},
-
-		// 数据结构模型
 		&models.Table{},
 		&models.Field{},
 		&models.Record{},
-
-		// 字段级权限模型
-		&models.FieldPermission{},
-
-		// 文件和插件模型
 		&models.File{},
-		&models.Plugin{},
-		&models.PluginBinding{},
-		&models.PluginExecution{},
-
-		// 活动日志
-		&models.ActivityLog{},
-		&models.AppSettings{},
-
-		// 治理域模型
-		&models.GovernanceTask{},
-		&models.GovernanceReview{},
-		&models.GovernanceEvidence{},
-		&models.GovernanceExternalLink{},
-		&models.GovernanceComment{},
-		&models.IntegrationInboundEvent{},
-		&models.GovernanceOutboxEvent{},
-
-		// 安全相关
-		&models.TokenBlacklist{},
 	); err != nil {
 		return fmt.Errorf("自动迁移失败: %w", err)
 	}
 
-	logger.Info("基础表结构迁移完成")
+	logger.Info("表结构迁移完成")
 
-	if !database.Migrator().HasColumn(&models.Field{}, "description") {
-		if err := database.Migrator().AddColumn(&models.Field{}, "description"); err != nil {
-			return fmt.Errorf("添加字段备注列失败: %w", err)
-		}
-	}
-
-	if !database.Migrator().HasColumn(&models.File{}, "field_id") {
-		if err := database.Migrator().AddColumn(&models.File{}, "field_id"); err != nil {
-			return fmt.Errorf("添加文件字段关联列失败: %w", err)
-		}
-	}
-
-	// 创建复合索引
 	if err := createIndexes(database); err != nil {
 		return fmt.Errorf("创建索引失败: %w", err)
 	}
 
-	logger.Info("复合索引创建完成")
+	logger.Info("索引创建完成")
 
-	// 创建物化视图（权限缓存）- 仅 PostgreSQL 支持
-	if !isSQLite(database) {
-		if err := createMaterializedViews(database); err != nil {
-			return fmt.Errorf("创建物化视图失败: %w", err)
-		}
-		logger.Info("物化视图创建完成")
-	} else {
-		logger.Info("SQLite 不支持物化视图，跳过")
-	}
-
-	// 创建token_blacklist表的特殊索引
-	if err := createTokenBlacklistIndexes(database); err != nil {
-		return fmt.Errorf("创建token blacklist索引失败: %w", err)
-	}
-
-	logger.Info("Token blacklist索引创建完成")
-
-	// 初始化默认系统设置（单例）
-	dbType := "postgresql"
-	if isSQLite(database) {
-		dbType = "sqlite"
-	}
-	if err := database.FirstOrCreate(&models.AppSettings{ID: 1}, &models.AppSettings{
-		ID:                1,
-		SystemName:        "Cornerstone",
-		SystemDescription: "数据管理平台",
-		AllowRegistration: true,
-		MaxFileSize:       50,
-		DBType:            dbType,
-		DBPoolSize:        10,
-		DBTimeout:         30,
-		PluginTimeout:     300,
-		PluginWorkDir:     "./plugins",
-		PluginAutoUpdate:  false,
-	}).Error; err != nil {
-		return fmt.Errorf("初始化系统设置失败: %w", err)
-	}
-
-	// 确保至少存在一个系统管理员，避免系统设置无法维护
-	var adminCount int64
-	if err := database.Model(&models.User{}).
-		Where("is_system_admin = ? AND deleted_at IS NULL", true).
-		Count(&adminCount).Error; err != nil {
-		return fmt.Errorf("检查系统管理员失败: %w", err)
-	}
-	if adminCount == 0 {
-		var firstUser models.User
-		err := database.Where("deleted_at IS NULL").
-			Order("created_at ASC").
-			First(&firstUser).Error
-		if err != nil && err != gorm.ErrRecordNotFound {
-			return fmt.Errorf("查询首个用户失败: %w", err)
-		}
-		if err == nil {
-			if err := database.Model(&models.User{}).
-				Where("id = ?", firstUser.ID).
-				Update("is_system_admin", true).Error; err != nil {
-				return fmt.Errorf("初始化系统管理员失败: %w", err)
-			}
-		}
-	}
-
-	// 创建默认管理员用户
-	if err := createDefaultAdminUser(database); err != nil {
-		return fmt.Errorf("创建默认管理员失败: %w", err)
+	if err := initMasterToken(database); err != nil {
+		return fmt.Errorf("初始化 Master Token 失败: %w", err)
 	}
 
 	logger.Info("数据库迁移完成 ✅")
 	return nil
 }
 
-// createDefaultAdminUser 创建默认管理员用户。
-//
-// 凭据来源优先级：
-//  1. 环境变量 BOOTSTRAP_ADMIN_PASSWORD（推荐用于容器化部署）
-//  2. crypto/rand 生成 16 位随机密码
-//
-// 凭据**仅**通过以下方式输出，绝不写入 zap 日志（防止随采集端归档泄漏）：
-//   - 写入 data/initial-admin.txt（权限 0600，已存在则跳过覆盖）
-//   - 同步打印一次到 stderr 供 TTY 启动场景查看
-func createDefaultAdminUser(database *gorm.DB) error {
-	var count int64
-	if err := database.Model(&models.User{}).Where("deleted_at IS NULL").Count(&count).Error; err != nil {
-		return fmt.Errorf("检查用户数量失败: %w", err)
+func createIndexes(db *gorm.DB) error {
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_records_table_id ON records(table_id)").Error; err != nil {
+		return err
 	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_tables_database_id ON tables(database_id)").Error; err != nil {
+		return err
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_fields_table_id ON fields(table_id)").Error; err != nil {
+		return err
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_files_record_id ON files(record_id)").Error; err != nil {
+		return err
+	}
+	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_files_field_id ON files(field_id)").Error; err != nil {
+		return err
+	}
+	return nil
+}
 
+func initMasterToken(database *gorm.DB) error {
+	var count int64
+	if err := database.Model(&models.Token{}).Where("is_master = ?", true).Count(&count).Error; err != nil {
+		return fmt.Errorf("检查 Master Token 失败: %w", err)
+	}
 	if count > 0 {
 		return nil
 	}
 
-	password, source, err := resolveBootstrapPassword()
-	if err != nil {
-		return fmt.Errorf("获取管理员初始密码失败: %w", err)
+	masterToken := os.Getenv("MASTER_TOKEN")
+	if masterToken == "" {
+		var err error
+		masterToken, err = generateSecureToken()
+		if err != nil {
+			return fmt.Errorf("生成 Master Token 失败: %w", err)
+		}
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
-	if err != nil {
-		return fmt.Errorf("密码哈希失败: %w", err)
+	token := models.Token{
+		Token:    masterToken,
+		Name:     "Master Token",
+		IsMaster: true,
+		Scopes:   "{}",
+	}
+	if err := database.Create(&token).Error; err != nil {
+		return fmt.Errorf("创建 Master Token 失败: %w", err)
 	}
 
-	admin := models.User{
-		ID:            "usr_admin",
-		Username:      "admin",
-		Email:         "admin@cornerstone.local",
-		Password:      string(hashedPassword),
-		IsSystemAdmin: true,
-	}
-
-	if err := database.Create(&admin).Error; err != nil {
-		return fmt.Errorf("创建管理员用户失败: %w", err)
-	}
-
-	credentialFile, writeErr := writeBootstrapCredentialsFile(admin.Username, password)
-
-	// 同步打印到 stderr 一次（TTY 启动可见，容器日志收集器一般也会捕获 stderr 但仅此一行）。
 	fmt.Fprintln(os.Stderr, "============================================")
-	fmt.Fprintln(os.Stderr, "🔐 默认管理员账户已创建")
-	fmt.Fprintln(os.Stderr, "用户名: admin")
-	fmt.Fprintln(os.Stderr, "密码:   "+password)
-	if writeErr == nil {
-		fmt.Fprintln(os.Stderr, "凭据已同步写入: "+credentialFile)
-	} else {
-		fmt.Fprintln(os.Stderr, "⚠️  写入凭据文件失败: "+writeErr.Error())
-	}
-	fmt.Fprintln(os.Stderr, "⚠️  请在首次登录后立即修改密码")
+	fmt.Fprintln(os.Stderr, "🔑 Master Token 已生成")
+	fmt.Fprintln(os.Stderr, "Token: "+masterToken)
+	fmt.Fprintln(os.Stderr, "⚠️  请妥善保存此 Token，它将用于管理所有其他 Token")
 	fmt.Fprintln(os.Stderr, "============================================")
 
-	// 结构化日志仅记录元信息，绝不包含密码本身。
-	fields := []zap.Field{
-		zap.String("username", admin.Username),
-		zap.String("source", source),
-	}
-	if writeErr == nil {
-		fields = append(fields, zap.String("credential_file", credentialFile))
-	} else {
-		fields = append(fields, zap.NamedError("credential_file_error", writeErr))
-	}
-	zap.L().Info("默认管理员账户已创建，凭据已写入 data/initial-admin.txt（密码不会出现在日志中）", fields...)
-
+	zap.L().Info("Master Token 已创建（请查看 stderr 输出）")
 	return nil
 }
 
-// resolveBootstrapPassword 解析初始密码：优先环境变量，否则 crypto/rand 随机。
-// 返回 (password, sourceLabel, error)。
-func resolveBootstrapPassword() (string, string, error) {
-	if env := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_PASSWORD")); env != "" {
-		if len(env) < 8 {
-			return "", "", fmt.Errorf("BOOTSTRAP_ADMIN_PASSWORD 长度需 ≥ 8")
-		}
-		return env, "env:BOOTSTRAP_ADMIN_PASSWORD", nil
-	}
-	password, err := generateRandomPassword(16)
-	if err != nil {
-		return "", "", err
-	}
-	return password, "crypto/rand", nil
-}
-
-// writeBootstrapCredentialsFile 把初始凭据写入 data/initial-admin.txt（0600）。
-// 若文件已存在，不覆盖，返回现有路径（caller 视为成功，避免重复创建管理员场景下被误读）。
-func writeBootstrapCredentialsFile(username, password string) (string, error) {
-	dir := "data"
-	if v := strings.TrimSpace(os.Getenv("BOOTSTRAP_ADMIN_FILE_DIR")); v != "" {
-		dir = filepath.Clean(v)
-		if strings.Contains(dir, "..") {
-			return "", fmt.Errorf("BOOTSTRAP_ADMIN_FILE_DIR 包含非法路径遍历")
-		}
-	}
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return "", fmt.Errorf("创建凭据目录 %s 失败: %w", dir, err)
-	}
-
-	path := filepath.Join(dir, "initial-admin.txt")
-	if _, err := os.Stat(path); err == nil {
-		return path, nil
-	}
-
-	content := fmt.Sprintf("username: %s\npassword: %s\ncreated_at: %s\nnote: 首次登录后请立即修改密码并删除本文件\n",
-		username, password, time.Now().Format(time.RFC3339))
-	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
-		return path, fmt.Errorf("写入凭据文件失败: %w", err)
-	}
-	return path, nil
-}
-
-// generateRandomPassword 使用 crypto/rand 生成密码，长度至少为 12。
-// 不再使用基于 time.Now() 的伪随机方案，确保密码不可预测。
-func generateRandomPassword(length int) (string, error) {
-	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
-	if length < 12 {
-		length = 12
-	}
+func generateSecureToken() (string, error) {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	length := 32
 	maxInt := big.NewInt(int64(len(charset)))
 	b := make([]byte, length)
 	for i := range b {
@@ -349,7 +170,7 @@ func generateRandomPassword(length int) (string, error) {
 		}
 		b[i] = charset[n.Int64()]
 	}
-	return string(b), nil
+	return "cs_" + string(b), nil
 }
 
 // IsSQLite 检查当前数据库是否为 SQLite
@@ -357,250 +178,33 @@ func IsSQLite() bool {
 	return isSQLite(pkgdb.DB())
 }
 
-// isSQLite 检查是否为 SQLite 数据库
 func isSQLite(db *gorm.DB) bool {
 	return db.Name() == "sqlite"
 }
 
-// createIndexes 创建复合索引以提升查询性能
-func createIndexes(db *gorm.DB) error {
-	// records表的JSON索引（PostgreSQL使用GIN，SQLite不支持GIN）
-	if !isSQLite(db) {
-		// PostgreSQL: 使用 GIN 索引
-		if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_records_data ON records USING GIN(data)").Error; err != nil {
-			return err
-		}
-	}
-
-	// records表的外键索引（数据查询优化）
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_records_table_id ON records(table_id)").Error; err != nil {
-		return err
-	}
-
-	// tables表的外键索引
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_tables_database_id ON tables(database_id)").Error; err != nil {
-		return err
-	}
-
-	// fields表的外键索引
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_fields_table_id ON fields(table_id)").Error; err != nil {
-		return err
-	}
-
-	// files表的外键索引
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_files_record_id ON files(record_id)").Error; err != nil {
-		return err
-	}
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_files_field_id ON files(field_id)").Error; err != nil {
-		return err
-	}
-
-	// plugin_bindings复合索引
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_plugin_bindings_plugin_table ON plugin_bindings(plugin_id, table_id)").Error; err != nil {
-		return err
-	}
-
-	// field_permissions按角色索引（权限查询优化）
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_field_permissions_role ON field_permissions(role)").Error; err != nil {
-		return err
-	}
-
-	// plugin_executions 索引（执行记录查询优化）
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_plugin_executions_plugin_created ON plugin_executions(plugin_id, created_at DESC)").Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_plugin_executions_table_trigger ON plugin_executions(table_id, trigger)").Error; err != nil {
-		return err
-	}
-
-	// governance_tasks 查询索引
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_tasks_creator_assignee ON governance_tasks(created_by, assignee_id)").Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_tasks_status_priority ON governance_tasks(status, priority)").Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_tasks_resource ON governance_tasks(source_system, resource_type, resource_id)").Error; err != nil {
-		return err
-	}
-
-	// governance_reviews 查询索引
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_reviews_task_status ON governance_reviews(task_id, status)").Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_reviews_reviewer ON governance_reviews(reviewer_id, status)").Error; err != nil {
-		return err
-	}
-
-	// governance_evidences / comments / links 索引
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_evidences_task_created ON governance_evidences(task_id, created_at DESC)").Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_comments_task_created ON governance_comments(task_id, created_at DESC)").Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_external_links_task ON governance_external_links(task_id)").Error; err != nil {
-		return err
-	}
-
-	// integration_inbound_events 索引
-	if err := db.Exec("DROP INDEX IF EXISTS idx_integration_inbound_events_event_id").Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS uk_integration_event_source ON integration_inbound_events(source_system, event_id)").Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_integration_events_source_status ON integration_inbound_events(source_system, status)").Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_integration_events_type_resource ON integration_inbound_events(event_type, resource_type, resource_id)").Error; err != nil {
-		return err
-	}
-
-	// governance_outbox_events 索引
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_outbox_status_next_attempt ON governance_outbox_events(status, next_attempt_at)").Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_governance_outbox_review_status ON governance_outbox_events(review_id, status)").Error; err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// createMaterializedViews 创建权限缓存物化视图
-func createMaterializedViews(db *gorm.DB) error {
-	// 删除旧视图（如果存在）
-	db.Exec("DROP MATERIALIZED VIEW IF EXISTS user_database_permissions")
-
-	// 创建物化视图
-	viewSQL := `
-CREATE MATERIALIZED VIEW user_database_permissions AS
-SELECT
-    da.id as access_id,
-    da.user_id,
-    da.database_id,
-    da.role,
-    d.name as db_name,
-    d.owner_id,
-    d.created_at,
-    d.updated_at
-FROM database_access da
-JOIN databases d ON da.database_id = d.id
-WHERE d.deleted_at IS NULL
-`
-
-	if err := db.Exec(viewSQL).Error; err != nil {
-		return err
-	}
-
-	// 在物化视图上创建索引
-	if err := db.Exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_user_db_permissions_unique ON user_database_permissions(user_id, database_id)").Error; err != nil {
-		return err
-	}
-
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_user_db_permissions_user ON user_database_permissions(user_id)").Error; err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// createTokenBlacklistIndexes 创建token黑名单的特殊索引
-func createTokenBlacklistIndexes(db *gorm.DB) error {
-	// 创建普通索引用于查询性能
-	// 条件索引在PostgreSQL中需要IMMUTABLE函数，这里我们使用应用层过滤
-	indexSQL := `
-CREATE INDEX IF NOT EXISTS idx_blacklist_expired
-ON token_blacklist(expired_at)
-`
-
-	if err := db.Exec(indexSQL).Error; err != nil {
-		return err
-	}
-
-	return nil
-}
-
-// RefreshMaterializedViews 刷新物化视图（用于定时任务）
-func RefreshMaterializedViews() error {
-	database := pkgdb.DB()
-	logger := zap.L()
-
-	// SQLite 不支持物化视图
-	if isSQLite(database) {
-		return nil
-	}
-
-	logger.Info("开始刷新物化视图...")
-
-	if err := database.Exec("REFRESH MATERIALIZED VIEW CONCURRENTLY user_database_permissions").Error; err != nil {
-		return fmt.Errorf("刷新物化视图失败: %w", err)
-	}
-
-	logger.Info("物化视图刷新完成")
-	return nil
-}
-
-// CleanupExpiredTokens 清理过期的token黑名单记录
+// CleanupExpiredTokens 清理过期的 Token
 func CleanupExpiredTokens() error {
 	database := pkgdb.DB()
 	logger := zap.L()
 
-	result := database.Where("expired_at <= ?", time.Now()).Delete(&models.TokenBlacklist{})
+	result := database.Where("expires_at IS NOT NULL AND expires_at <= ?", time.Now()).Delete(&models.Token{})
 	if result.Error != nil {
-		return fmt.Errorf("清理过期token失败: %w", result.Error)
+		return fmt.Errorf("清理过期 Token 失败: %w", result.Error)
 	}
 
 	if result.RowsAffected > 0 {
-		logger.Info("清理过期token记录", zap.Int64("count", result.RowsAffected))
+		logger.Info("清理过期 Token", zap.Int64("count", result.RowsAffected))
 	}
-
 	return nil
 }
 
-// SetupPeriodicTasks 设置定时任务并返回用于等待退出的 WaitGroup
-func SetupPeriodicTasks(ctx context.Context, cfg config.IntegrationsConfig) *sync.WaitGroup {
+// SetupPeriodicTasks 设置定时任务
+func SetupPeriodicTasks(ctx context.Context) *sync.WaitGroup {
 	wg := &sync.WaitGroup{}
 
-	// SQLite 不支持物化视图，跳过刷新任务
-	if !isSQLite(pkgdb.DB()) {
-		// 每5分钟刷新一次物化视图
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			ticker := time.NewTicker(5 * time.Minute)
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					if err := runProtectedTask("刷新物化视图", viewRefreshBreaker, RefreshMaterializedViews); err != nil {
-						zap.L().Error("定时刷新物化视图失败", zap.Error(err))
-					}
-				}
-			}
-		}()
-	}
-
-	// 每小时清理一次过期token（所有数据库类型都支持）
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-
 		ticker := time.NewTicker(1 * time.Hour)
 		defer ticker.Stop()
 
@@ -609,48 +213,19 @@ func SetupPeriodicTasks(ctx context.Context, cfg config.IntegrationsConfig) *syn
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if err := runProtectedTask("清理过期token", tokenCleanupBreaker, CleanupExpiredTokens); err != nil {
-					zap.L().Error("定时清理过期token失败", zap.Error(err))
+				if err := runProtectedTask("清理过期 Token", tokenCleanupBreaker, CleanupExpiredTokens); err != nil {
+					zap.L().Error("定时清理过期 Token 失败", zap.Error(err))
 				}
 			}
 		}
 	}()
-
-	if cfg.OutboxWorkerEnabled {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			interval := time.Duration(cfg.OutboxRetryInterval) * time.Second
-			if interval <= 0 {
-				interval = 1 * time.Minute
-			}
-
-			ticker := time.NewTicker(interval)
-			defer ticker.Stop()
-
-			for {
-				select {
-				case <-ctx.Done():
-					return
-				case <-ticker.C:
-					if err := runProtectedTask("处理治理回写任务", outboxDispatchBreaker, func() error {
-						service := services.NewGovernanceService(pkgdb.DB())
-						return service.ProcessPendingOutbox(20)
-					}); err != nil {
-						zap.L().Error("定时处理治理回写任务失败", zap.Error(err))
-					}
-				}
-			}
-		}()
-	}
 
 	return wg
 }
 
 func runProtectedTask(name string, breaker *circuitBreaker, task func() error) error {
 	if !breaker.allow() {
-		zap.L().Warn("任务熔断中，进入降级模式并跳过执行", zap.String("task", name))
+		zap.L().Warn("任务熔断中，跳过执行", zap.String("task", name))
 		return nil
 	}
 

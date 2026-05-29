@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -15,8 +14,6 @@ import (
 
 func setupHealthHandlerTestDB(t *testing.T) {
 	t.Helper()
-
-	_ = os.Setenv("JWT_SECRET", "health-handler-test-secret")
 
 	dbFile := t.TempDir() + "/health-handler.db"
 	require.NoError(t, pkgdb.InitDB(config.DatabaseConfig{

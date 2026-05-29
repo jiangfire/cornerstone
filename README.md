@@ -1,208 +1,156 @@
 # Cornerstone
 
-> 把零散表格，升级成可交付、可协作、可扩展的数据产品。
+> 轻量数据资产平台：集中存储、Token 接入、AI 助手、MCP 协议。
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![Vue Version](https://img.shields.io/badge/Vue-3.5+-4FC08D?style=flat&logo=vue.js&logoColor=white)](https://vuejs.org/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1?style=flat&logo=postgresql)](https://www.postgresql.org/)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 
-Cornerstone 是一个面向团队的数据管理平台。  
-你可以把它理解为：**“数据库 + 权限系统 + 业务工作台 + 插件扩展”** 的一体化底座。
-
----
-
-## 一句话价值
-
-用更少人力，在更短时间内，把内部数据流程做成可持续迭代的业务系统。
+Cornerstone 是一个轻量数据资产平台，面向**测试、开发和内部数据管理**场景。  
+核心定位：**"数据库 + Token 接口 + Query DSL + AI 助手 + MCP 协议"**。
 
 ---
 
 ## 适合谁用
 
-- 创业团队：希望快速上线内部系统，不想重复造后台
-- 中小企业业务团队：表格过多、权限混乱、难协作
-- 技术团队：需要一个可扩展、可管控的低代码数据底座
-- 交付团队/外包团队：想标准化交付数据管理类项目
+- 需要集中管理散落数据（API 推送、CSV/JSON 导入、AI 生成）的团队
+- 希望用 Token（API Key）直接对接，不想走传统登录流程的场景
+- 需要 AI 辅助建库、建表、生成测试数据的开发者
+- 通过 MCP 协议让 AI Agent 操作结构化数据的场景
 
 ---
 
-## 典型场景
+## 核心能力
 
-### 1) 销售与客户管理
-
-- 统一管理线索、客户、跟进记录、合同附件
-- 按角色控制字段可见范围（例如金额、毛利）
-
-### 2) 运营与项目协作
-
-- 用表/字段快速建模任务、排期、里程碑
-- 通过活动日志追踪“谁在什么时候改了什么”
-
-### 3) 财务与行政流程
-
-- 费用、采购、审批记录结构化管理
-- 文件上传下载与记录绑定，归档更清晰
-
-### 4) 内部工具产品化
-
-- 从 Excel 原型直接过渡到可持续使用的系统
-- 用插件机制接入自动化规则和外部能力
+- **Token 认证**：Master Token 管理一切，普通 Token 可配置权限范围（数据库/表级读写）
+- **数据管理**：Database → Table → Field → Record 完整 CRUD
+- **文件管理**：上传、下载、关联记录
+- **Query DSL**：JSON 描述查询，支持过滤、排序、聚合、JOIN
+- **AI 助手**：自然语言建库、建表、查询数据、生成测试数据
+- **MCP 协议**：通过 `/mcp` 暴露数据库管理与查询工具，SSE 接收变更通知
+- **批量操作**：批量创建记录、导出数据
+- **JSON 建表**：一个请求创建数据库 + 表 + 字段
 
 ---
 
-## 为什么是 Cornerstone
+## 快速开始（Docker）
 
-- 权限够细：数据库级、表级、字段级三级权限
-- 结构够灵活：动态字段，不需要频繁改表结构
-- 扩展够强：支持 Go/Python/Bash 插件
-- 协作够稳：活动日志、权限边界、角色分工清晰
-
----
-
-## 10 分钟体验（推荐 Docker）
-
-### 1) 准备环境
-
-- Docker Desktop（或 Docker Engine + Compose）
-
-### 2) 配置凭据
-
-`docker-compose.yml` 强制要求 `POSTGRES_PASSWORD` 和 `JWT_SECRET` 来自 `.env`，
-不再使用任何弱口令默认值；缺失会让 `docker compose up` 直接报错。
+### 1) 配置
 
 ```bash
 git clone https://github.com/jiangfire/cornerstone.git
 cd cornerstone
 cp .env.example .env
-# 编辑 .env，至少填好 POSTGRES_PASSWORD 与 JWT_SECRET
-# 推荐：openssl rand -base64 48
+# 编辑 .env，按需配置（可选：LLM_API_KEY、MASTER_TOKEN 等）
 ```
 
-### 3) 一键启动
+### 2) 启动
 
 ```bash
-# 生产模式（默认）：仅暴露 8080，不对外开放数据库端口
+# 生产模式
 docker compose up -d --build
 
-# 本地开发模式：额外暴露 5432，启用 debug + CORS=*
+# 开发模式（额外暴露 5432，CORS 全放开）
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
 
-### 4) 访问服务
+### 3) 访问
 
 - 应用首页：`http://localhost:8080`
-- 后端 API：`http://localhost:8080/api`
+- API：`http://localhost:8080/api`
 - 健康检查：`http://localhost:8080/health`
-
-### 5) 停止服务
-
-```bash
-docker compose down
-```
+- Swagger：`http://localhost:8080/swagger/index.html`
+- MCP：`http://localhost:8080/mcp`
 
 ---
 
-## 本地开发启动（前后端分离）
+## 本地开发
 
 ### 环境要求
 
-- Go `1.25+`
-- PostgreSQL `15+`
-- Node.js `20+`
-- pnpm
+- Go 1.25+
+- Node.js 20+ / pnpm
+- SQLite（默认）或 PostgreSQL 15+
 
 ### 后端
 
 ```bash
 cd backend
-cp .env.example .env
 go mod download
 go run ./cmd/server/main.go
 ```
-
-后端默认地址：`http://localhost:8080`
 
 ### 前端
 
 ```bash
 cd frontend
-cp .env.example .env
 pnpm install
 pnpm dev
 ```
 
-前端默认地址：`http://localhost:5173`
-
-### 嵌入式前端资源
-
-如果要把前端产物嵌入到 Go 服务中，使用：
+### 嵌入前端到 Go 二进制
 
 ```bash
 cd frontend
 pnpm run build:embed
 ```
 
-这会先构建 `frontend/dist`，再同步到 `backend/internal/frontend/dist`。
+### 测试与质量
 
-### 单 Docker 镜像说明
+```bash
+# 后端
+cd backend && go test ./...
 
-发布产物默认只提供一个 Docker 镜像：
-
-- `ghcr.io/jiangfire/cornerstone:<tag>`
-
-该镜像同时包含：
-
-- Go 后端 API
-- 已嵌入的前端静态资源
-- 单容器对外提供 `http://localhost:8080`
-
-### Windows 双击启动
-
-如果你是在 Windows 下交付本地可执行包：
-
-- `start.bat`：前台启动 `cornerstone.exe`，打开浏览器，按键退出时会结束进程
-- `Cornerstone.vbs`：无窗口后台启动，自动打开浏览器，关闭弹窗不会结束服务
-
-详细说明见：`README-DOUBLE-CLICK.md`
+# 前端
+cd frontend && pnpm type-check && pnpm lint && pnpm test:unit
+```
 
 ---
 
-## 核心能力
+## 数据模型
 
-- 用户认证：注册、登录、JWT、登出黑名单
-- 组织协作：成员管理、角色管理
-- 数据管理：数据库、表、字段、记录完整 CRUD
-- 权限控制：owner/admin/editor/viewer + 字段级权限
-- 批量处理：批量记录创建
-- 文件系统：上传、下载、删除、关联记录
-- 插件系统：创建、绑定、手动执行、执行记录
-- 系统设置：注册开关、附件大小上限、插件运行参数
-- 统计分析：概览统计、近期活动
-- 治理任务中心：任务、审核、证据、评论、外部资源链接与回写触发
-- HTTP MCP：通过 `/mcp` 按当前 JWT 用户上下文查询、创建数据库，并通过 SSE 接收数据库、表、字段、治理任务/审核等变更通知
+```text
+Database ──1:N──> Table ──1:N──> Field
+                  Table ──1:N──> Record ──1:N──> File
+```
 
----
-
-## API 与兼容性
-
-- API 基础路径：`/api`
-- 兼容路径：`/api/v1`
-- API 文档：`docs/API.md`
-- HTTP MCP 文档：`docs/MCP.md`
-- 数据治理路线图：`docs/DATA-GOVERNANCE-ROADMAP.md`
-- 权限系统：`docs/API.md`（权限接口）、`docs/QUERY-DSL-GUIDE.md`（Query DSL）
+| 模型 | ID 前缀 | 说明 |
+|------|---------|------|
+| Token | `tok_` | API 认证令牌，支持 Master Token 和权限范围 |
+| Database | `db_` | 数据库 |
+| Table | `tbl_` | 表 |
+| Field | `fld_` | 字段（支持 string/number/boolean/date/attachment 等类型） |
+| Record | `rec_` | 记录（JSONB 存储，乐观锁） |
+| File | `fil_` | 文件附件 |
 
 ---
 
-## 上线前清单（生产建议）
+## 认证
 
-- 复制 `.env.example` 到 `.env` 并填入强随机 `JWT_SECRET`（≥32 字节）与 `POSTGRES_PASSWORD`
-- 保持 `SERVER_MODE=release`（默认值）；release 模式下空 / 默认 JWT 密钥会拒绝启动
-- 使用 `docker-compose.yml` 单独启动；`docker-compose.dev.yml` 仅本地开发用
-- 为 PostgreSQL 和日志目录启用持久化与备份
-- 通过反向代理统一 HTTPS 与域名
-- 配置基础监控（健康检查、错误日志、容量）
+所有 API 请求（除 `/health`）需要携带 Token：
+
+```http
+Authorization: Bearer <token>
+```
+
+- **Master Token**：系统启动时自动生成（或通过 `MASTER_TOKEN` 环境变量预设），拥有全部权限
+- **普通 Token**：由 Master Token 创建，可配置数据库/表级权限范围
+
+---
+
+## API 概览
+
+| 领域 | 路径 | 说明 |
+|------|------|------|
+| Token | `GET/POST/PUT/DELETE /api/tokens` | Token 管理 |
+| 数据库 | `GET/POST/PUT/DELETE /api/databases` | 数据库 CRUD |
+| 表 | `GET/POST/PUT/DELETE /api/tables` | 表 CRUD |
+| 字段 | `GET/POST/PUT/DELETE /api/fields` | 字段 CRUD |
+| 记录 | `GET/POST/PUT/DELETE /api/records` | 记录 CRUD + 批量 + 导出 |
+| 文件 | `POST/GET/DELETE /api/files` | 文件上传下载 |
+| 查询 | `GET/POST /api/query` | Query DSL |
+| AI | `POST /api/ai/chat` | AI 助手对话 |
+| MCP | `GET/POST /mcp` | MCP 协议端点 |
 
 ---
 
@@ -210,23 +158,25 @@ pnpm run build:embed
 
 ```text
 cornerstone/
-  backend/    # Go + Gin + GORM
-  frontend/   # Vue3 + TypeScript + Element Plus
-  docs/       # API 与补充文档
+  backend/      # Go + Gin + GORM
+  frontend/     # Vue 3 + TypeScript + Element Plus
+  docs/         # 文档
 ```
 
 ---
 
-## 现在就试
+## 环境变量
 
-如果你在评估一套可长期维护的数据管理平台，可以直接跑起来：
-
-```bash
-cp .env.example .env  # 填入 POSTGRES_PASSWORD / JWT_SECRET
-docker compose up -d --build
-```
-
-你可以先从一个真实业务场景开始（例如"客户管理"或"项目协作"），1 天内验证可用性，1 周内完成首版上线。
+| 变量 | 说明 | 默认值 |
+|------|------|--------|
+| `DB_TYPE` | `sqlite` 或 `postgres` | `sqlite` |
+| `DATABASE_URL` | 数据库连接串 | `./cornerstone.db` |
+| `SERVER_MODE` | `release` 或 `debug` | `release` |
+| `PORT` | 服务端口 | `8080` |
+| `MASTER_TOKEN` | 预设 Master Token（留空则自动生成） | - |
+| `LLM_API_KEY` | LLM API Key | - |
+| `LLM_MODEL` | LLM 模型名 | `gpt-4o` |
+| `LLM_BASE_URL` | 自定义 LLM API 地址 | - |
 
 ---
 

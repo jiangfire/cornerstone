@@ -8,9 +8,33 @@ import (
 	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
-// CreateField 创建字段
+// CreateField
+//
+// @Summary      Create a field
+// @Description  Create a new field in a table.
+//
+//	Valid field types: string, text, number, boolean, date, datetime, attachment,
+//	select, list, multiselect, single_select, multi_select.
+//
+//	For select/multi_select types, use the options field (comma-separated values)
+//	or the config.options array. For number fields, config.min and config.max
+//	define the allowed range. For attachment fields, config defines allowed file
+//	types and size limits.
+//
+//	The authenticated token must own the parent database.
+//
+// @Tags         fields
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  swagger.FieldCreateRequest  true  "Field to create"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.FieldObject}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body or field type"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to parent table"
+// @Router       /api/fields [post]
 func CreateField(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 
 	var req services.CreateFieldRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -19,13 +43,11 @@ func CreateField(c *gin.Context) {
 	}
 
 	fieldService := services.NewFieldService(db.DB())
-	field, err := fieldService.CreateField(req, userID)
+	field, err := fieldService.CreateField(req, tokenID)
 	if err != nil {
 		dto.Error(c, 400, err.Error())
 		return
 	}
-
-	publishFieldChanged([]string{userID}, "created", field)
 
 	dto.Success(c, gin.H{
 		"id":          field.ID,
@@ -38,13 +60,28 @@ func CreateField(c *gin.Context) {
 	})
 }
 
-// ListFields 获取字段列表
+// ListFields
+//
+// @Summary      List fields in a table
+// @Description  Returns all fields in the specified table.
+//
+//	The authenticated token must own the parent database or be a Master token.
+//	Each field includes its type, configuration, and whether it is required.
+//
+// @Tags         fields
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Table ID"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.FieldListResponse}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Router       /api/tables/{id}/fields [get]
 func ListFields(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
 
 	fieldService := services.NewFieldService(db.DB())
-	fields, err := fieldService.ListFields(tableID, userID)
+	fields, err := fieldService.ListFields(tableID, tokenID)
 	if err != nil {
 		dto.Error(c, 403, err.Error())
 		return
@@ -56,13 +93,29 @@ func ListFields(c *gin.Context) {
 	})
 }
 
-// GetField 获取字段详情
+// GetField
+//
+// @Summary      Get a field by ID
+// @Description  Retrieve full details of a single field by its ID.
+//
+//	Returns the field type, configuration, required flag, and other metadata.
+//	The authenticated token must own the parent database or be a Master token.
+//
+// @Tags         fields
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Field ID"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.FieldObject}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this field"
+// @Failure      404  {object}  swagger.ErrorResponse  "Field not found"
+// @Router       /api/fields/{id} [get]
 func GetField(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
 
 	fieldService := services.NewFieldService(db.DB())
-	field, err := fieldService.GetField(fieldID, userID)
+	field, err := fieldService.GetField(fieldID, tokenID)
 	if err != nil {
 		dto.Error(c, 403, err.Error())
 		return
@@ -71,9 +124,31 @@ func GetField(c *gin.Context) {
 	dto.Success(c, field)
 }
 
-// UpdateField 更新字段信息
+// UpdateField
+//
+// @Summary      Update a field
+// @Description  Update field properties including name, type, description, required flag, and config.
+//
+//	Valid field types: string, text, number, boolean, date, datetime, attachment,
+//	select, list, multiselect, single_select, multi_select.
+//
+//	Changing a field type may affect existing record data. Use with caution.
+//	The authenticated token must own the parent database or be a Master token.
+//
+// @Tags         fields
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id    path  string                true  "Field ID"
+// @Param        body  body  swagger.FieldUpdateRequest  true  "Field update fields"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.FieldObject}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body or field type"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this field"
+// @Failure      404  {object}  swagger.ErrorResponse  "Field not found"
+// @Router       /api/fields/{id} [put]
 func UpdateField(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
 
 	var req services.UpdateFieldRequest
@@ -83,13 +158,11 @@ func UpdateField(c *gin.Context) {
 	}
 
 	fieldService := services.NewFieldService(db.DB())
-	field, err := fieldService.UpdateField(fieldID, req, userID)
+	field, err := fieldService.UpdateField(fieldID, req, tokenID)
 	if err != nil {
 		dto.Error(c, 403, err.Error())
 		return
 	}
-
-	publishFieldChanged([]string{userID}, "updated", field)
 
 	dto.Success(c, gin.H{
 		"id":          field.ID,
@@ -101,13 +174,29 @@ func UpdateField(c *gin.Context) {
 	})
 }
 
-// DeleteField 删除字段
+// DeleteField
+//
+// @Summary      Delete a field
+// @Description  Delete a field by ID.
+//
+//	This action is irreversible and will remove the field from all records.
+//	The authenticated token must own the parent database or be a Master token.
+//
+// @Tags         fields
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Field ID"
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this field"
+// @Failure      404  {object}  swagger.ErrorResponse  "Field not found"
+// @Router       /api/fields/{id} [delete]
 func DeleteField(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
 
 	fieldService := services.NewFieldService(db.DB())
-	if err := fieldService.DeleteField(fieldID, userID); err != nil {
+	if err := fieldService.DeleteField(fieldID, tokenID); err != nil {
 		dto.Error(c, 403, err.Error())
 		return
 	}
@@ -117,13 +206,28 @@ func DeleteField(c *gin.Context) {
 	})
 }
 
-// GetFieldPermissions 获取表的字段权限配置
+// GetFieldPermissions
+//
+// @Summary      Get field permissions
+// @Description  Get field-level permission settings for a table.
+//
+//	Returns the read/write/delete permissions for each field in the table,
+//	grouped by role. The authenticated token must own the parent database.
+//
+// @Tags         fields
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Table ID"
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Router       /api/tables/{id}/fields/permissions [get]
 func GetFieldPermissions(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
 
 	fieldService := services.NewFieldService(db.DB())
-	permissions, err := fieldService.GetFieldPermissions(tableID, userID)
+	permissions, err := fieldService.GetFieldPermissions(tableID, tokenID)
 	if err != nil {
 		dto.Error(c, 403, err.Error())
 		return
@@ -135,9 +239,27 @@ func GetFieldPermissions(c *gin.Context) {
 	})
 }
 
-// SetFieldPermission 设置单个字段权限
+// SetFieldPermission
+//
+// @Summary      Set field permission
+// @Description  Set permission for a specific field in a table.
+//
+//	Allows fine-grained control over which roles can read, write, or delete
+//	data in a specific field. The authenticated token must own the parent database.
+//
+// @Tags         fields
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id    path  string  true  "Table ID"
+// @Param        body  body  object  true  "Permission to set"
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Router       /api/tables/{id}/fields/permissions [post]
 func SetFieldPermission(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
 
 	var req services.FieldPermissionRequest
@@ -147,7 +269,7 @@ func SetFieldPermission(c *gin.Context) {
 	}
 
 	fieldService := services.NewFieldService(db.DB())
-	if err := fieldService.SetFieldPermission(tableID, req, userID); err != nil {
+	if err := fieldService.SetFieldPermission(tableID, req, tokenID); err != nil {
 		dto.Error(c, 403, err.Error())
 		return
 	}
@@ -157,9 +279,28 @@ func SetFieldPermission(c *gin.Context) {
 	})
 }
 
-// BatchSetFieldPermissions 批量设置字段权限
+// BatchSetFieldPermissions
+//
+// @Summary      Batch set field permissions
+// @Description  Set permissions for multiple fields in a table at once.
+//
+//	Accepts an array of permission objects, each specifying a field_id, role,
+//	and the can_read, can_write, can_delete flags. The authenticated token
+//	must own the parent database.
+//
+// @Tags         fields
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id    path  string  true  "Table ID"
+// @Param        body  body  object  true  "Permissions to set"
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Router       /api/tables/{id}/fields/permissions/batch [put]
 func BatchSetFieldPermissions(c *gin.Context) {
-	userID := middleware.GetUserID(c)
+	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
 
 	var req services.BatchFieldPermissionsRequest
@@ -169,7 +310,7 @@ func BatchSetFieldPermissions(c *gin.Context) {
 	}
 
 	fieldService := services.NewFieldService(db.DB())
-	if err := fieldService.BatchSetFieldPermissions(tableID, req, userID); err != nil {
+	if err := fieldService.BatchSetFieldPermissions(tableID, req, tokenID); err != nil {
 		dto.Error(c, 403, err.Error())
 		return
 	}

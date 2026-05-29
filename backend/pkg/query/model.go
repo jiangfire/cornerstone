@@ -13,12 +13,17 @@ type QueryRequest struct {
 	From      string          `json:"from"`      // 主表
 	Select    []string        `json:"select"`    // 查询字段
 	Where     *WhereClause    `json:"where"`     // 条件
+	Having    *WhereClause    `json:"having"`    // HAVING 条件（聚合后过滤）
 	Join      []JoinClause    `json:"join"`      // JOIN
 	GroupBy   []string        `json:"groupBy"`   // 分组
 	Aggregate []AggregateFunc `json:"aggregate"` // 聚合
 	OrderBy   []OrderByClause `json:"orderBy"`   // 排序
 	Page      int             `json:"page"`      // 页码
 	Size      int             `json:"size"`      // 每页大小
+
+	// 集合操作
+	Union     []QueryRequest `json:"union,omitempty"`     // UNION 查询
+	Intersect []QueryRequest `json:"intersect,omitempty"` // INTERSECT 查询
 
 	// 简化语法
 	Table  string                 `json:"table"`  // 主表（简写）
@@ -142,20 +147,12 @@ type AllowedTables map[string][]string
 
 // DefaultAllowedTables 默认允许的表
 var DefaultAllowedTables = AllowedTables{
-	"records":              {"id", "table_id", "data", "created_by", "updated_by", "version", "created_at", "updated_at"},
-	"users":                {"id", "username", "email", "phone", "bio", "avatar", "created_at", "updated_at"},
-	"tables":               {"id", "database_id", "name", "description", "created_at", "updated_at"},
-	"databases":            {"id", "name", "description", "owner_id", "is_public", "is_personal", "created_at", "updated_at"},
-	"fields":               {"id", "table_id", "name", "type", "required", "options", "created_at", "updated_at"},
-	"database_access":      {"id", "user_id", "database_id", "role", "created_at", "updated_at"},
-	"field_permissions":    {"id", "table_id", "field_id", "role", "can_read", "can_write", "can_delete", "created_at", "updated_at"},
-	"organizations":        {"id", "name", "description", "owner_id", "created_at", "updated_at"},
-	"organization_members": {"id", "organization_id", "user_id", "role", "joined_at"},
-	"activity_logs":        {"id", "user_id", "action", "resource_type", "resource_id", "description", "created_at"},
-	"files":                {"id", "record_id", "file_name", "file_size", "file_type", "uploaded_by", "created_at"},
-	"plugins":              {"id", "name", "description", "language", "entry_file", "config", "created_by", "created_at"},
-	"plugin_bindings":      {"id", "plugin_id", "table_id", "trigger", "created_at"},
-	"plugin_executions":    {"id", "plugin_id", "table_id", "record_id", "trigger", "status", "output", "error", "duration_ms", "started_at"},
+	"records":   {"id", "table_id", "data", "version", "created_at", "updated_at"},
+	"tables":    {"id", "database_id", "name", "description", "created_at", "updated_at"},
+	"databases": {"id", "name", "description", "created_at", "updated_at"},
+	"fields":    {"id", "table_id", "name", "type", "required", "options", "description", "created_at", "updated_at"},
+	"files":     {"id", "record_id", "field_id", "file_name", "file_size", "file_type", "storage_url", "created_at", "updated_at"},
+	"tokens":    {"id", "name", "is_master", "scopes", "expires_at", "created_at"},
 }
 
 // IsTableAllowed 检查表是否允许访问

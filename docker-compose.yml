@@ -49,19 +49,20 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
       # 日志统一输出 JSON 到 stdout, 轮转/采集交给 docker / 编排层 (compose `logging` 块或 k8s sidecar)。
 
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET is required (use 32+ bytes from a CSPRNG; e.g. `openssl rand -base64 48`)}
-      JWT_EXPIRATION: ${JWT_EXPIRATION:-24}
-
       # 留空表示同源；跨域部署请显式列出允许的 origin（逗号分隔）。
       CORS_ORIGIN: ${CORS_ORIGIN:-}
       DEBUG: "false"
 
-      # 可选：MCP / 集成上游
+      # 可选：Master Token（留空则启动时自动生成）
+      MASTER_TOKEN: ${MASTER_TOKEN:-}
+
+      # 可选：LLM / AI 助手
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gpt-4o}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+
+      # 可选：MCP
       MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
-      LLM_GOVERNOR_URL: ${LLM_GOVERNOR_URL:-}
-      LLM_GOVERNOR_TOKEN: ${LLM_GOVERNOR_TOKEN:-}
-      INTEGRATION_BASE_URLS: ${INTEGRATION_BASE_URLS:-}
-      INTEGRATION_SHARED_TOKEN: ${INTEGRATION_SHARED_TOKEN:-}
     depends_on:
       postgres:
         condition: service_healthy
