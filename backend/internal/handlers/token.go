@@ -81,7 +81,6 @@ func CreateToken(c *gin.Context) {
 	dto.Success(c, gin.H{
 		"id":         token.ID,
 		"name":       token.Name,
-		"is_master":  token.IsMaster,
 		"scopes":     token.Scopes,
 		"expires_at": token.ExpiresAt,
 		"created_at": token.CreatedAt,

@@ -45,7 +45,7 @@ func (s *TokenService) CreateToken(req CreateTokenRequest) (*models.Token, error
 // Master Token 看全部，普通 Token 只看自己
 func (s *TokenService) ListTokens(tokenID string, isMaster bool) ([]models.Token, error) {
 	var tokens []models.Token
-	query := s.db.Order("created_at DESC")
+	query := s.db.Where("is_master = ?", false).Order("created_at DESC")
 
 	if !isMaster {
 		query = query.Where("id = ?", tokenID)

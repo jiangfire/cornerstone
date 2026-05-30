@@ -17,7 +17,7 @@ import (
 	"github.com/jiangfire/cornerstone/backend/pkg/db"
 )
 
-const mcpServerVersion = "dev"
+var mcpServerVersion = version
 
 const (
 	defaultMCPKeepaliveInterval = 25 * time.Second

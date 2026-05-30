@@ -91,8 +91,11 @@ func Migrate() error {
 
 	logger.Info("索引创建完成")
 
-	if err := initMasterToken(database); err != nil {
-		return fmt.Errorf("初始化 Master Token 失败: %w", err)
+	masterToken := os.Getenv("MASTER_TOKEN")
+	if masterToken == "" {
+		logger.Warn("MASTER_TOKEN 环境变量未设置，Master Token 认证将不可用")
+	} else {
+		logger.Info("MASTER_TOKEN 已从环境变量加载")
 	}
 
 	logger.Info("数据库迁移完成 ✅")
@@ -115,34 +118,6 @@ func createIndexes(db *gorm.DB) error {
 	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_files_field_id ON files(field_id)").Error; err != nil {
 		return err
 	}
-	return nil
-}
-
-func initMasterToken(database *gorm.DB) error {
-	var count int64
-	if err := database.Model(&models.Token{}).Where("is_master = ?", true).Count(&count).Error; err != nil {
-		return fmt.Errorf("检查 Master Token 失败: %w", err)
-	}
-	if count > 0 {
-		return nil
-	}
-
-	masterToken := os.Getenv("MASTER_TOKEN")
-	if masterToken == "" {
-		return fmt.Errorf("MASTER_TOKEN 环境变量未设置，请在 .env 或环境变量中配置 Master Token")
-	}
-
-	token := models.Token{
-		Token:    masterToken,
-		Name:     "Master Token",
-		IsMaster: true,
-		Scopes:   "{}",
-	}
-	if err := database.Create(&token).Error; err != nil {
-		return fmt.Errorf("创建 Master Token 失败: %w", err)
-	}
-
-	zap.L().Info("Master Token 已从环境变量初始化")
 	return nil
 }
 

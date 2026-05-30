@@ -6,7 +6,6 @@ on:
   pull_request:
     branches: [ main, master ]
 
-# 默认最小权限；需要写权限的 step 在 job 层显式提权。
 permissions:
   contents: read
 
@@ -104,118 +103,15 @@ jobs:
           ignore-unfixed: true
           exit-code: '1'
           format: table
-          # 与 .dockerignore 同步; 这些不参与运行时, 跳过减少噪音
-          skip-dirs: '.git,docs,node_modules,frontend/node_modules,frontend/dist,backend/internal/frontend/dist,backend/bin,backend/logs'
+          skip-dirs: '.git,docs,node_modules,backend/bin,backend/logs'
 
-  frontend-build:
-    name: Frontend Build
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '20'
-          package-manager-cache: false
-
-      - name: Enable pnpm via Corepack
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.28.0 --activate
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run type check
-        run: pnpm run type-check
-
-      - name: Build frontend
-        run: pnpm run build
-
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v6
-        with:
-          name: frontend-dist
-          path: frontend/dist
-
-  frontend-lint:
-    name: Frontend Lint (eslint)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '20'
-          package-manager-cache: false
-
-      - name: Enable pnpm via Corepack
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.28.0 --activate
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run eslint
-        # 直接调 eslint 而不走 package.json 的 lint script,因为后者带 --fix,
-        # CI 不允许修改文件。--max-warnings=0 把 warning 升格为 error。
-        run: pnpm exec eslint . --max-warnings=0
-
-  frontend-test:
-    name: Frontend Tests (vitest)
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./frontend
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v6
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: '20'
-          package-manager-cache: false
-
-      - name: Enable pnpm via Corepack
-        run: |
-          corepack enable
-          corepack prepare pnpm@10.28.0 --activate
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run vitest
-        run: pnpm run test:unit --run --reporter=default
-
-  embedded-build:
-    name: Embedded Build Verification
-    needs: [frontend-build]
+  build-verify:
+    name: Build Verification
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - name: Download frontend dist
-        uses: actions/download-artifact@v5
-        with:
-          name: frontend-dist
-          path: backend/internal/frontend/dist
 
       - name: Set up Go
         uses: actions/setup-go@v6
@@ -223,7 +119,7 @@ jobs:
           go-version: '1.26.3'
           cache-dependency-path: backend/go.sum
 
-      - name: Verify embedded build compiles
+      - name: Verify build compiles
         run: |
           cd backend
-          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X main.Version=ci" -o /dev/null ./cmd/server
+          CGO_ENABLED=0 go build -trimpath -ldflags="-s -w -X github.com/jiangfire/cornerstone/backend/internal/cli.Version=ci" -o /dev/null ./cmd

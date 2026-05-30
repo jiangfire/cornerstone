@@ -1,12 +1,11 @@
 # Cornerstone
 
-> 轻量数据资产平台：集中存储、Token 接入、AI 助手、MCP 协议。
+> 轻量数据资产平台 CLI：集中存储、Token 接入、AI 助手、MCP 协议。
 
 [![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://golang.org/)
-[![Vue Version](https://img.shields.io/badge/Vue-3.5+-4FC08D?style=flat&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 
-Cornerstone 是一个轻量数据资产平台，面向**测试、开发和内部数据管理**场景。  
+Cornerstone 是一个轻量数据资产平台，面向**测试、开发和内部数据管理**场景。
 核心定位：**"数据库 + Token 接口 + Query DSL + AI 助手 + MCP 协议"**。
 
 ---
@@ -22,18 +21,18 @@ Cornerstone 是一个轻量数据资产平台，面向**测试、开发和内部
 
 ## 核心能力
 
+- **CLI 命令行**：Cobra 框架，支持 db/table/field/record/token 全套 CRUD 命令
 - **Token 认证**：Master Token 管理一切，普通 Token 可配置权限范围（数据库/表级读写）
 - **数据管理**：Database → Table → Field → Record 完整 CRUD
 - **文件管理**：上传、下载、关联记录
 - **Query DSL**：JSON 描述查询，支持过滤、排序、聚合、JOIN
 - **AI 助手**：自然语言建库、建表、查询数据、生成测试数据
 - **MCP 协议**：通过 `/mcp` 暴露数据库管理与查询工具，SSE 接收变更通知
-- **批量操作**：批量创建记录、导出数据
-- **JSON 建表**：一个请求创建数据库 + 表 + 字段
+- **HTTP API**：`serve` 子命令启动 REST API + MCP 服务器
 
 ---
 
-## 快速开始（Docker）
+## 快速开始
 
 ### 1) 配置
 
@@ -44,66 +43,97 @@ cp .env.example .env
 # 编辑 .env，按需配置（可选：LLM_API_KEY、MASTER_TOKEN 等）
 ```
 
-### 2) 启动
+### 2) Docker 启动
 
 ```bash
 # 生产模式
 docker compose up -d --build
 
-# 开发模式（额外暴露 5432，CORS 全放开）
+# 开发模式
 docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ```
 
-### 3) 访问
-
-- 应用首页：`http://localhost:8080`
-- API：`http://localhost:8080/api`
-- 健康检查：`http://localhost:8080/health`
-- Swagger：`http://localhost:8080/swagger/index.html`
-- MCP：`http://localhost:8080/mcp`
-
----
-
-## 本地开发
-
-### 环境要求
-
-- Go 1.25+
-- Node.js 20+ / pnpm
-- SQLite（默认）或 PostgreSQL 15+
-
-### 后端
+### 3) 本地开发
 
 ```bash
 cd backend
 go mod download
-go run ./cmd/server/main.go
+
+# 启动 API 服务器
+go run ./cmd/main.go serve
+
+# 或使用 CLI 命令
+go run ./cmd/main.go --help
+go run ./cmd/main.go migrate
+go run ./cmd/main.go db list
 ```
 
-### 前端
+---
+
+## CLI 命令
 
 ```bash
-cd frontend
-pnpm install
-pnpm dev
+cornerstone [command]
+
+# 服务器
+cornerstone serve                    # 启动 HTTP API + MCP 服务器
+
+# 数据库管理
+cornerstone db list                  # 列出所有数据库
+cornerstone db create <name>         # 创建数据库
+cornerstone db get <id>              # 获取数据库详情
+cornerstone db update <id> -n <name> # 更新数据库
+cornerstone db delete <id>           # 删除数据库
+
+# 表管理
+cornerstone table list <database-id>     # 列出表
+cornerstone table create <db-id> <name>  # 创建表
+cornerstone table get <id>               # 获取表详情
+cornerstone table update <id> -n <name>  # 更新表
+cornerstone table delete <id>            # 删除表
+
+# 字段管理
+cornerstone field list <table-id>               # 列出字段
+cornerstone field create <table-id> <name> <type> # 创建字段
+cornerstone field get <id>                      # 获取字段详情
+cornerstone field update <id> -n <name>         # 更新字段
+cornerstone field delete <id>                   # 删除字段
+
+# 记录管理
+cornerstone record list <table-id>              # 列出记录
+cornerstone record create <table-id> '<json>'   # 创建记录
+cornerstone record get <id>                     # 获取记录
+cornerstone record update <id> '<json>'         # 更新记录
+cornerstone record delete <id>                  # 删除记录
+cornerstone record batch <table-id> '<json>' <count> # 批量创建
+
+# Token 管理
+cornerstone token list              # 列出 Token
+cornerstone token create <name>     # 创建 Token
+cornerstone token update <id>       # 更新 Token
+cornerstone token delete <id>       # 删除 Token
+
+# 其他
+cornerstone migrate                 # 执行数据库迁移
+cornerstone version                 # 显示版本
 ```
 
-### 嵌入前端到 Go 二进制
+---
 
-```bash
-cd frontend
-pnpm run build:embed
-```
+## API 概览（serve 模式）
 
-### 测试与质量
-
-```bash
-# 后端
-cd backend && go test ./...
-
-# 前端
-cd frontend && pnpm type-check && pnpm lint && pnpm test:unit
-```
+| 领域 | 路径 | 说明 |
+|------|------|------|
+| Token | `GET/POST/PUT/DELETE /api/tokens` | Token 管理 |
+| 数据库 | `GET/POST/PUT/DELETE /api/databases` | 数据库 CRUD |
+| 表 | `GET/POST/PUT/DELETE /api/tables` | 表 CRUD |
+| 字段 | `GET/POST/PUT/DELETE /api/fields` | 字段 CRUD |
+| 记录 | `GET/POST/PUT/DELETE /api/records` | 记录 CRUD + 批量 + 导出 |
+| 文件 | `POST/GET/DELETE /api/files` | 文件上传下载 |
+| 查询 | `GET/POST /api/query` | Query DSL |
+| AI | `POST /api/ai/chat` | AI 助手对话 |
+| MCP | `GET/POST /mcp` | MCP 协议端点 |
+| 健康检查 | `GET /health` `/ready` | 健康探针 |
 
 ---
 
@@ -138,29 +168,28 @@ Authorization: Bearer <token>
 
 ---
 
-## API 概览
-
-| 领域 | 路径 | 说明 |
-|------|------|------|
-| Token | `GET/POST/PUT/DELETE /api/tokens` | Token 管理 |
-| 数据库 | `GET/POST/PUT/DELETE /api/databases` | 数据库 CRUD |
-| 表 | `GET/POST/PUT/DELETE /api/tables` | 表 CRUD |
-| 字段 | `GET/POST/PUT/DELETE /api/fields` | 字段 CRUD |
-| 记录 | `GET/POST/PUT/DELETE /api/records` | 记录 CRUD + 批量 + 导出 |
-| 文件 | `POST/GET/DELETE /api/files` | 文件上传下载 |
-| 查询 | `GET/POST /api/query` | Query DSL |
-| AI | `POST /api/ai/chat` | AI 助手对话 |
-| MCP | `GET/POST /mcp` | MCP 协议端点 |
-
----
-
 ## 项目结构
 
 ```text
 cornerstone/
-  backend/      # Go + Gin + GORM
-  frontend/     # Vue 3 + TypeScript + Element Plus
-  docs/         # 文档
+  backend/
+    cmd/main.go              # CLI 入口
+    internal/
+      cli/                   # Cobra CLI 命令
+      config/                # 配置管理
+      db/                    # 数据库初始化/迁移
+      handlers/              # HTTP API 处理器
+      mcp/                   # MCP 协议实现
+      middleware/            # HTTP 中间件
+      models/                # 数据模型
+      services/              # 业务逻辑
+      authz/                 # 权限控制
+    pkg/
+      db/                    # GORM 数据库封装
+      dto/                   # 响应格式
+      log/                   # 日志
+      query/                 # Query DSL 引擎
+  docs/                      # 文档
 ```
 
 ---

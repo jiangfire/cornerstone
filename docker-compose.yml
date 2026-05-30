@@ -18,7 +18,6 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required (set a strong random value in .env)}
       POSTGRES_DB: ${POSTGRES_DB:-cornerstone}
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C"
-    # 默认不向宿主暴露 5432；如需本地访问，使用 docker-compose.dev.yml 覆盖。
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -47,21 +46,16 @@ services:
       PORT: 8080
 
       LOG_LEVEL: ${LOG_LEVEL:-info}
-      # 日志统一输出 JSON 到 stdout, 轮转/采集交给 docker / 编排层 (compose `logging` 块或 k8s sidecar)。
 
-      # 留空表示同源；跨域部署请显式列出允许的 origin（逗号分隔）。
       CORS_ORIGIN: ${CORS_ORIGIN:-}
       DEBUG: "false"
 
-      # Master Token（必填，请在 .env 中设置）
       MASTER_TOKEN: ${MASTER_TOKEN:?MASTER_TOKEN is required (set a secure value in .env)}
 
-      # 可选：LLM / AI 助手
       LLM_API_KEY: ${LLM_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-gpt-4o}
       LLM_BASE_URL: ${LLM_BASE_URL:-}
 
-      # 可选：MCP
       MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
     depends_on:
       postgres:

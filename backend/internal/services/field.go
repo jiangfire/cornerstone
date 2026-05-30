@@ -585,32 +585,6 @@ func (s *FieldService) DeleteField(fieldID, userID string) error {
 	return nil
 }
 
-// FieldPermissionRequest 字段权限请求
-type FieldPermissionRequest struct {
-	FieldID   string `json:"field_id" binding:"required"`
-	Role      string `json:"role" binding:"required,oneof=owner admin editor viewer"`
-	CanRead   bool   `json:"can_read"`
-	CanWrite  bool   `json:"can_write"`
-	CanDelete bool   `json:"can_delete"`
-}
-
-// BatchFieldPermissionsRequest 批量字段权限请求
-type BatchFieldPermissionsRequest struct {
-	Permissions []FieldPermissionRequest `json:"permissions" binding:"required"`
-}
-
-func logPermissionActivity(tx *gorm.DB, userID, tableID, fieldID, role string, canRead, canWrite, canDelete bool) error {
-	return nil
-}
-
-func upsertFieldPermission(tx *gorm.DB, tableID string, req FieldPermissionRequest) error {
-	return nil
-}
-
-func (s *FieldService) getUserRole(tableID, userID string) (string, error) {
-	return "owner", nil
-}
-
 func isMissingTableError(err error) bool {
 	if err == nil {
 		return false
@@ -628,17 +602,5 @@ func (s *FieldService) CheckFieldPermission(userID, fieldID, action string) erro
 	if !authorizer.CanAccessField(fieldID, action) {
 		return errors.New("无权访问该字段")
 	}
-	return nil
-}
-
-func (s *FieldService) GetFieldPermissions(tableID, userID string) ([]any, error) {
-	return []any{}, nil
-}
-
-func (s *FieldService) SetFieldPermission(tableID string, req FieldPermissionRequest, userID string) error {
-	return nil
-}
-
-func (s *FieldService) BatchSetFieldPermissions(tableID string, req BatchFieldPermissionsRequest, userID string) error {
 	return nil
 }

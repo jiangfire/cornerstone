@@ -1,33 +1,7 @@
-package main
-
-// @title           Cornerstone API
-// @version         1.0
-// @description     Lightweight data asset platform with Token-based authentication and AI assistant
-// @termsOfService  http://swagger.io/terms/
-
-// @contact.name    API Support
-// @contact.url     http://www.swagger.io/support
-// @contact.email   support@swagger.io
-
-// @license.name    MIT
-// @license.url     https://opensource.org/licenses/MIT
-
-// @host            localhost:8080
-// @BasePath        /api
-
-// @securityDefinitions.apikey  ApiKeyAuth
-// @in                          header
-// @name                        X-API-Key
-// @description                 Enter your API token (Master Token or client token)
-
-// @securityDefinitions.apikey  BearerAuth
-// @in                          header
-// @name                        Authorization
-// @description                 Enter "Bearer <token>" (e.g., "Bearer cs_abc123")
+package cli
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -36,31 +10,37 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/cobra"
 	"github.com/jiangfire/cornerstone/backend/internal/config"
 	"github.com/jiangfire/cornerstone/backend/internal/db"
-	"github.com/jiangfire/cornerstone/backend/internal/frontend"
 	"github.com/jiangfire/cornerstone/backend/internal/handlers"
 	"github.com/jiangfire/cornerstone/backend/internal/middleware"
 	"github.com/jiangfire/cornerstone/backend/internal/services"
 	applog "github.com/jiangfire/cornerstone/backend/pkg/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"go.uber.org/zap"
-
-	_ "github.com/jiangfire/cornerstone/backend/docs/swagger"
-	ginSwagger "github.com/swaggo/gin-swagger"
-	"github.com/swaggo/files"
 )
 
-var Version = "dev"
+var serveCmd = &cobra.Command{
+	Use:   "serve",
+	Short: "启动 HTTP API + MCP 服务器",
+	Long: `启动 Cornerstone HTTP API 和 MCP 协议服务器。
+提供 REST API、Query DSL、AI 助手和 MCP SSE 端点供外部客户端和 AI Agent 调用。`,
+	RunE: runServe,
+}
 
-func main() {
+func init() {
+	rootCmd.AddCommand(serveCmd)
+}
+
+func runServe(cmd *cobra.Command, args []string) error {
 	cfg, err := config.Load()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		return err
 	}
 
 	if err := applog.InitLogger(cfg.Logger); err != nil {
-		log.Fatalf("Failed to init logger: %v", err)
+		return err
 	}
 
 	logger := applog.GetLogger()
@@ -104,7 +84,6 @@ func main() {
 	r.GET("/health", handlers.Health)
 	r.GET("/ready", handlers.Ready)
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	r.OPTIONS("/mcp", handlers.HandleMCPOptions)
 	mcpRoute := r.Group("/mcp")
@@ -176,7 +155,19 @@ func main() {
 		r.HandleContext(c)
 	})
 
-	frontend.RegisterRoutes(r)
+	r.NoRoute(func(c *gin.Context) {
+		if len(c.Request.URL.Path) >= 5 && c.Request.URL.Path[:5] == "/api/" {
+			c.JSON(http.StatusNotFound, gin.H{
+				"error":   "not found",
+				"message": "The requested API endpoint does not exist",
+			})
+			return
+		}
+		c.JSON(http.StatusNotFound, gin.H{
+			"error":   "not found",
+			"message": "Cornerstone API Server. Use /api endpoints or /mcp for MCP protocol.",
+		})
+	})
 
 	srv := &http.Server{
 		Addr:              cfg.GetServerAddr(),
@@ -216,6 +207,7 @@ func main() {
 
 	applog.Sync()
 	applog.Info("Server exited")
+	return nil
 }
 
 func waitPeriodicTasks(wg *sync.WaitGroup, timeout time.Duration) {

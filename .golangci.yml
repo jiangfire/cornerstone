@@ -72,12 +72,8 @@ linters:
           - gocritic
           - gosec
         path: _test\.go
-      - linters:
-          - all
-        path: backend/internal/frontend/dist
     paths:
       - backend/bin
-      - backend/internal/frontend/dist
       - third_party$
       - builtin$
       - examples$
@@ -91,7 +87,6 @@ formatters:
     generated: lax
     paths:
       - backend/bin
-      - backend/internal/frontend/dist
       - third_party$
       - builtin$
       - examples$

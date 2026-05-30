@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"encoding/json"
+	"os"
 	"strings"
 	"time"
 
@@ -11,13 +12,21 @@ import (
 	"github.com/jiangfire/cornerstone/backend/pkg/dto"
 )
 
-// Auth Token 认证中间件
 func Auth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractToken(c)
 		if token == "" {
 			dto.Unauthorized(c, "缺少 API Key")
 			c.Abort()
+			return
+		}
+
+		masterToken := os.Getenv("MASTER_TOKEN")
+		if masterToken != "" && token == masterToken {
+			c.Set("token_id", "")
+			c.Set("token_is_master", true)
+			c.Set("token_scopes", "{}")
+			c.Next()
 			return
 		}
 
@@ -28,7 +37,6 @@ func Auth() gin.HandlerFunc {
 			return
 		}
 
-		// 检查是否过期
 		if tokenRecord.ExpiresAt != nil && tokenRecord.ExpiresAt.Before(time.Now()) {
 			dto.Unauthorized(c, "API Key 已过期")
 			c.Abort()
@@ -36,14 +44,13 @@ func Auth() gin.HandlerFunc {
 		}
 
 		c.Set("token_id", tokenRecord.ID)
-		c.Set("token_is_master", tokenRecord.IsMaster)
+		c.Set("token_is_master", false)
 		c.Set("token_scopes", tokenRecord.Scopes)
 
 		c.Next()
 	}
 }
 
-// GetTokenID 从上下文中获取 Token ID
 func GetTokenID(c *gin.Context) string {
 	if id, exists := c.Get("token_id"); exists {
 		if s, ok := id.(string); ok {
@@ -53,7 +60,6 @@ func GetTokenID(c *gin.Context) string {
 	return ""
 }
 
-// IsMasterToken 检查是否为 Master Token
 func IsMasterToken(c *gin.Context) bool {
 	if v, exists := c.Get("token_is_master"); exists {
 		if b, ok := v.(bool); ok {
@@ -63,7 +69,6 @@ func IsMasterToken(c *gin.Context) bool {
 	return false
 }
 
-// GetTokenScopes 获取 Token 的权限范围
 func GetTokenScopes(c *gin.Context) map[string]bool {
 	if v, exists := c.Get("token_scopes"); exists {
 		if scopes, ok := v.(map[string]bool); ok {
@@ -79,7 +84,6 @@ func GetTokenScopes(c *gin.Context) map[string]bool {
 	return make(map[string]bool)
 }
 
-// RequireMaster 仅允许 Master Token 访问
 func RequireMaster() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !IsMasterToken(c) {
@@ -92,11 +96,9 @@ func RequireMaster() gin.HandlerFunc {
 }
 
 func extractToken(c *gin.Context) string {
-	// 优先从 X-API-Key 头读取
 	if key := c.GetHeader("X-API-Key"); key != "" {
 		return strings.TrimSpace(key)
 	}
-	// 其次从 Authorization: Bearer 读取
 	auth := c.GetHeader("Authorization")
 	parts := strings.SplitN(auth, " ", 2)
 	if len(parts) == 2 && strings.EqualFold(parts[0], "Bearer") {
