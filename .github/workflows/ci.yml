@@ -156,6 +156,7 @@ jobs:
         with:
           scan-type: fs
           scan-ref: .
+          cache: 'false'
           severity: HIGH,CRITICAL
           ignore-unfixed: true
           exit-code: '1'
