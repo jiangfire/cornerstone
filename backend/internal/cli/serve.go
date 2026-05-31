@@ -21,6 +21,12 @@ import (
 	"go.uber.org/zap"
 )
 
+// @title           Cornerstone API
+// @version         1.0
+// @description     Cornerstone is a headless data platform providing REST API, Query DSL, AI assistant and MCP endpoints.
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
 var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "启动 HTTP API + MCP 服务器",
