@@ -172,6 +172,8 @@ Authorization: Bearer <token>
 
 ```text
 cornerstone/
+  docs/
+    swagger/                  # Swagger API 文档 (swag 生成)
   backend/
     cmd/main.go              # CLI 入口
     internal/
