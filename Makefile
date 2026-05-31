@@ -114,8 +114,8 @@ db-reset: ## Reset database (requires CONFIRM=1)
 
 swagger: ## Generate swagger docs
 	@echo Generating swagger docs...
-	@swag init -g internal/cli/serve.go -o docs/swagger -d ./,./internal/handlers/,./docs/swagger --parseDependency --parseInternal
-	@echo Swagger docs generated: docs/swagger/
+	@swag init -g internal/cli/serve.go -o internal/swagger -d ./,./internal/handlers,./internal/swagger --parseDependency --parseInternal --packagePrefix github.com/jiangfire/cornerstone
+	@echo Swagger docs generated: internal/swagger/
 
 ##@ Docker commands
 

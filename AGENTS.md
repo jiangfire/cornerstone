@@ -19,7 +19,7 @@ Tests use Go's testing package plus `testify`; keep files named `*_test.go` near
 Conventional Commits. Keep the type lowercase and add a scope when the change is isolated. PRs should include a short summary, affected areas, linked issue if any, and the exact verification commands you ran.
 
 ## Swagger
-Handler files contain swag annotations. Types live in `docs/swagger/models.go`. After changing annotations or types, regenerate: `make swagger` (runs `swag init`).
+Handler files contain swag annotations. Types live in `internal/swagger/models.go`. After changing annotations or types, regenerate: `make swagger` (runs `swag init`).
 
 ## Security
 Keep secrets in local `.env` files and never commit real credentials. Use `MASTER_TOKEN` to pre-set a master token in production; leave it empty to auto-generate on startup. Prefer `SERVER_MODE=release` outside local development.
