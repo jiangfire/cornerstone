@@ -35,7 +35,7 @@ DATABASE_URL=:memory:
 ## 快速开始
 
 ```go
-import "github.com/jiangfire/cornerstone/backend/pkg/query"
+import "github.com/jiangfire/cornerstone/pkg/query"
 
 // 创建执行器
 executor := query.NewExecutor(db)
