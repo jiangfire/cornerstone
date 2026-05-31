@@ -5,7 +5,6 @@ on:
     tags:
       - 'v*.*.*'
 
-# 默认最小权限；具体 job 显式提权。
 permissions:
   contents: read
 
@@ -40,19 +39,18 @@ jobs:
         uses: actions/setup-go@v6
         with:
           go-version: '1.26.3'
-          cache-dependency-path: backend/go.sum
+          cache-dependency-path: go.sum
 
       - name: Build binary
         run: |
-          cd backend
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} CGO_ENABLED=0 \
-            go build -ldflags="-s -w -X github.com/jiangfire/cornerstone/backend/internal/cli.Version=${{ github.ref_name }}" -trimpath -tags=sqlite_omit_load_extension -o cornerstone-${{ matrix.suffix }} ./cmd
+            go build -ldflags="-s -w -X github.com/jiangfire/cornerstone/internal/cli.Version=${{ github.ref_name }}" -trimpath -tags=sqlite_omit_load_extension -o cornerstone-${{ matrix.suffix }} ./cmd
 
       - name: Upload artifact
         uses: actions/upload-artifact@v6
         with:
           name: cornerstone-${{ matrix.suffix }}
-          path: backend/cornerstone-${{ matrix.suffix }}
+          path: cornerstone-${{ matrix.suffix }}
 
   release:
     name: Create Release
@@ -60,9 +58,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-      # cosign 无密钥模式需要 OIDC 颁发 token
       id-token: write
-      # syft 写 release attestation
       attestations: write
 
     steps:
@@ -154,7 +150,7 @@ jobs:
           ## Usage
 
           1. Extract the archive
-          2. Set up your \`.env\` file (see backend/.env.example)
+          2. Set up your \`.env\` file (see .env.example)
           3. Run the binary: \`./cornerstone-*\`
 
           ## Docker

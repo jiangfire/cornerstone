@@ -56,7 +56,6 @@ docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 ### 3) 本地开发
 
 ```bash
-cd backend
 go mod download
 
 # 启动 API 服务器
@@ -172,25 +171,24 @@ Authorization: Bearer <token>
 
 ```text
 cornerstone/
+  cmd/main.go                  # CLI 入口
+  internal/
+    cli/                       # Cobra CLI 命令
+    config/                    # 配置管理
+    db/                        # 数据库初始化/迁移
+    handlers/                  # HTTP API 处理器
+    mcp/                       # MCP 协议实现
+    middleware/                # HTTP 中间件
+    models/                    # 数据模型
+    services/                  # 业务逻辑
+    authz/                     # 权限控制
+  pkg/
+    db/                        # GORM 数据库封装
+    dto/                       # 响应格式
+    log/                       # 日志
+    query/                     # Query DSL 引擎
   docs/
-    swagger/                  # Swagger API 文档 (swag 生成)
-  backend/
-    cmd/main.go              # CLI 入口
-    internal/
-      cli/                   # Cobra CLI 命令
-      config/                # 配置管理
-      db/                    # 数据库初始化/迁移
-      handlers/              # HTTP API 处理器
-      mcp/                   # MCP 协议实现
-      middleware/            # HTTP 中间件
-      models/                # 数据模型
-      services/              # 业务逻辑
-      authz/                 # 权限控制
-    pkg/
-      db/                    # GORM 数据库封装
-      dto/                   # 响应格式
-      log/                   # 日志
-      query/                 # Query DSL 引擎
+    swagger/                   # Swagger API 文档 (swag 生成)
 ```
 
 ---

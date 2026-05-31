@@ -31,7 +31,7 @@ services:
   app:
     build:
       context: .
-      dockerfile: backend/Dockerfile
+      dockerfile: Dockerfile
     container_name: cornerstone-app
     restart: unless-stopped
     ports:
