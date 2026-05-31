@@ -10,20 +10,20 @@
 
 ```bash
 # POST
-curl -X POST http://localhost:8080/api/query \
+curl -X POST http://localhost:8080/api/v1/query \
   -H "Authorization: Bearer cs_your_token" \
   -H "Content-Type: application/json" \
   -d '{"from": "records", ...}'
 
 # GET（查询参数编码）
-curl "http://localhost:8080/api/query?q=%7B%22from%22%3A%22records%22%7D" \
+curl "http://localhost:8080/api/v1/query?q=%7B%22from%22%3A%22records%22%7D" \
   -H "Authorization: Bearer cs_your_token"
 ```
 
 ### 简化查询
 
 ```bash
-curl "http://localhost:8080/api/query/simple?table=records&filter=%7B%7D&sort=-created_at&page=1&size=20" \
+curl "http://localhost:8080/api/v1/query/simple?table=records&filter=%7B%7D&sort=-created_at&page=1&size=20" \
   -H "Authorization: Bearer cs_your_token"
 ```
 
@@ -101,7 +101,7 @@ curl http://localhost:8080/api/query/tables \
       "type": "left",
       "table": "users",
       "as": "u",
-      "on": "records.created_by = u.id",
+      "on": {"left": "records.created_by", "op": "eq", "right": "u.id"},
       "select": ["u.username", "u.email"]
     }
   ],
@@ -126,7 +126,9 @@ curl http://localhost:8080/api/query/tables \
     {"func": "sum", "field": "data.amount", "as": "total_amount"}
   ],
   "where": {
-    "table_id": {"op": "eq", "value": "tbl_xxx"}
+    "and": [
+      {"field": "table_id", "op": "eq", "value": "tbl_xxx"}
+    ]
   }
 }
 ```
@@ -159,3 +161,115 @@ curl http://localhost:8080/api/query/tables \
 | MaxDepth | 5 | 嵌套查询最大深度 |
 | MaxRows | 10000 | 最大返回行数 |
 | MaxFields | 100 | 最大查询字段数 |
+
+---
+
+## 高级功能
+
+### HAVING 子句
+
+聚合后过滤，语法与 `where` 一致：
+
+```json
+{
+  "from": "records",
+  "select": ["data.status"],
+  "groupBy": ["data.status"],
+  "aggregate": [
+    {"func": "count", "field": "*", "as": "total"}
+  ],
+  "having": {
+    "and": [
+      {"field": "total", "op": "gt", "value": 10}
+    ]
+  }
+}
+```
+
+### 聚合函数
+
+| 函数 | 说明 |
+|------|------|
+| `count` | 计数 |
+| `count_distinct` | 去重计数 |
+| `sum` | 求和 |
+| `avg` | 平均值 |
+| `min` | 最小值 |
+| `max` | 最大值 |
+| `stddev` | 标准差 |
+| `stddev_pop` | 总体标准差 |
+| `stddev_samp` | 样本标准差 |
+| `variance` | 方差 |
+| `var_pop` | 总体方差 |
+| `var_samp` | 样本方差 |
+
+### JOIN 类型
+
+支持四种 JOIN 类型：
+
+| 类型 | 说明 |
+|------|------|
+| `left` | LEFT JOIN |
+| `right` | RIGHT JOIN |
+| `inner` | INNER JOIN |
+| `outer` | FULL OUTER JOIN |
+
+### NOT 条件否定
+
+任意条件可添加 `"not": true` 取反：
+
+```json
+{"field": "status", "op": "eq", "value": "deleted", "not": true}
+```
+
+### 嵌套 AND/OR 条件
+
+条件可任意嵌套分组：
+
+```json
+{
+  "and": [
+    {"field": "table_id", "op": "eq", "value": "tbl_xxx"},
+    {
+      "or": [
+        {"field": "data.status", "op": "eq", "value": "paid"},
+        {"field": "data.status", "op": "eq", "value": "shipped"}
+      ]
+    }
+  ]
+}
+```
+
+### UNION / INTERSECT 集合查询
+
+```json
+{
+  "from": "active_records",
+  "select": ["id", "name"],
+  "union": [
+    {
+      "from": "archived_records",
+      "select": ["id", "name"]
+    }
+  ]
+}
+```
+
+`intersect` 用法相同，替换 `union` 字段即可。
+
+### JSON 路径字段语法
+
+访问 JSONB 字段内部值，PostgreSQL 自动使用 `->>` `/`->` 语法，SQLite 自动转为 `JSON_EXTRACT`：
+
+```json
+{"field": "data->>status", "op": "eq", "value": "paid"}
+```
+
+---
+
+## 新增端点
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/query/validate` | 校验查询 DSL + 权限（不执行） |
+| GET | `/api/query/schema/:table` | 获取可查询表的字段 Schema |

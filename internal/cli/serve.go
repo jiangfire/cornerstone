@@ -97,7 +97,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	mcpRoute.POST("", handlers.HandleMCP)
 	mcpRoute.GET("", handlers.HandleMCPGet)
 
-	api := r.Group("/api")
+	api := r.Group("/api/v1")
 	{
 		tokenRoute := api.Group("/tokens")
 		tokenRoute.Use(middleware.Auth())
@@ -156,8 +156,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	r.Any("/api/v1/*path", func(c *gin.Context) {
-		c.Request.URL.Path = "/api" + c.Param("path")
+	r.Any("/api/*path", func(c *gin.Context) {
+		c.Request.URL.Path = "/api/v1" + c.Param("path")
 		r.HandleContext(c)
 	})
 

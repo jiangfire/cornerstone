@@ -16,7 +16,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/api/ai/chat": {
+        "/api/v1/ai/chat": {
             "post": {
                 "security": [
                     {
@@ -85,7 +85,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/databases": {
+        "/api/v1/databases": {
             "get": {
                 "security": [
                     {
@@ -195,7 +195,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/databases/with-tables": {
+        "/api/v1/databases/with-tables": {
             "post": {
                 "security": [
                     {
@@ -258,7 +258,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/databases/{id}": {
+        "/api/v1/databases/{id}": {
             "get": {
                 "security": [
                     {
@@ -464,7 +464,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/databases/{id}/tables": {
+        "/api/v1/databases/{id}/tables": {
             "get": {
                 "security": [
                     {
@@ -522,7 +522,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/fields": {
+        "/api/v1/fields": {
             "post": {
                 "security": [
                     {
@@ -591,7 +591,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/fields/{id}": {
+        "/api/v1/fields/{id}": {
             "get": {
                 "security": [
                     {
@@ -797,7 +797,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/files/upload": {
+        "/api/v1/files/upload": {
             "post": {
                 "security": [
                     {
@@ -876,7 +876,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/files/{id}": {
+        "/api/v1/files/{id}": {
             "get": {
                 "security": [
                     {
@@ -1002,7 +1002,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/files/{id}/download": {
+        "/api/v1/files/{id}/download": {
             "get": {
                 "security": [
                     {
@@ -1054,7 +1054,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/query": {
+        "/api/v1/query": {
             "get": {
                 "security": [
                     {
@@ -1190,7 +1190,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/query/batch": {
+        "/api/v1/query/batch": {
             "post": {
                 "security": [
                     {
@@ -1259,7 +1259,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/query/explain": {
+        "/api/v1/query/explain": {
             "post": {
                 "security": [
                     {
@@ -1328,7 +1328,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/query/schema/{table}": {
+        "/api/v1/query/schema/{table}": {
             "get": {
                 "security": [
                     {
@@ -1392,7 +1392,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/query/simple": {
+        "/api/v1/query/simple": {
             "get": {
                 "security": [
                     {
@@ -1483,7 +1483,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/query/tables": {
+        "/api/v1/query/tables": {
             "get": {
                 "security": [
                     {
@@ -1532,7 +1532,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/query/validate": {
+        "/api/v1/query/validate": {
             "post": {
                 "security": [
                     {
@@ -1589,7 +1589,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/records": {
+        "/api/v1/records": {
             "get": {
                 "security": [
                     {
@@ -1740,7 +1740,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/records/batch": {
+        "/api/v1/records/batch": {
             "post": {
                 "security": [
                     {
@@ -1817,7 +1817,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/records/export": {
+        "/api/v1/records/export": {
             "get": {
                 "security": [
                     {
@@ -1882,7 +1882,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/records/{id}": {
+        "/api/v1/records/{id}": {
             "get": {
                 "security": [
                     {
@@ -2088,7 +2088,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/records/{id}/files": {
+        "/api/v1/records/{id}/files": {
             "get": {
                 "security": [
                     {
@@ -2146,7 +2146,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/tables": {
+        "/api/v1/tables": {
             "post": {
                 "security": [
                     {
@@ -2215,7 +2215,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/tables/{id}": {
+        "/api/v1/tables/{id}": {
             "get": {
                 "security": [
                     {
@@ -2421,7 +2421,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/tables/{id}/fields": {
+        "/api/v1/tables/{id}/fields": {
             "get": {
                 "security": [
                     {
@@ -2479,7 +2479,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/tokens": {
+        "/api/v1/tokens": {
             "get": {
                 "security": [
                     {
@@ -2601,7 +2601,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/tokens/{id}": {
+        "/api/v1/tokens/{id}": {
             "put": {
                 "security": [
                     {

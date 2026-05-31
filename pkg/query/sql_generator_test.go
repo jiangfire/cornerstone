@@ -211,6 +211,57 @@ func TestParser_UnionValidation(t *testing.T) {
 	})
 }
 
+func TestSQLGenerator_MaxRowsEnforced(t *testing.T) {
+	g := NewSQLGeneratorWithConfig(true, 100)
+
+	tests := []struct {
+		name      string
+		req       *QueryRequest
+		wantLimit int
+	}{
+		{
+			name: "size within max rows",
+			req: &QueryRequest{
+				From:   "records",
+				Select: []string{"id"},
+				Page:   1,
+				Size:   50,
+			},
+			wantLimit: 50,
+		},
+		{
+			name: "size exceeds max rows clamps to max",
+			req: &QueryRequest{
+				From:   "records",
+				Select: []string{"id"},
+				Page:   1,
+				Size:   200,
+			},
+			wantLimit: 100,
+		},
+		{
+			name: "size is 0 clamps to default 20 within max",
+			req: &QueryRequest{
+				From:   "records",
+				Select: []string{"id"},
+				Page:   1,
+				Size:   0,
+			},
+			wantLimit: 20,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			query, err := g.Generate(tt.req)
+			require.NoError(t, err)
+			assert.Contains(t, query.SQL, "LIMIT ? OFFSET ?")
+			require.GreaterOrEqual(t, len(query.Params), 2)
+			assert.Equal(t, tt.wantLimit, query.Params[len(query.Params)-2])
+		})
+	}
+}
+
 func TestParser_IntersectValidation(t *testing.T) {
 	p := NewParser()
 

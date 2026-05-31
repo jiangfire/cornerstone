@@ -62,7 +62,7 @@ func recordResponseWithData(record *models.Record, extra gin.H) gin.H {
 // @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body or field values"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to target table"
-// @Router       /api/records [post]
+// @Router       /api/v1/records [post]
 func CreateRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -106,7 +106,7 @@ func CreateRecord(c *gin.Context) {
 // @Failure      400  {object}  swagger.ErrorResponse  "Validation error - missing table_id or invalid format"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to target table"
-// @Router       /api/records/export [get]
+// @Router       /api/v1/records/export [get]
 func ExportRecords(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Query("table_id")
@@ -149,7 +149,7 @@ func ExportRecords(c *gin.Context) {
 // @Failure      400  {object}  swagger.ErrorResponse  "Validation error - missing table_id"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to target table"
-// @Router       /api/records [get]
+// @Router       /api/v1/records [get]
 func ListRecords(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -189,7 +189,7 @@ func ListRecords(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this record"
 // @Failure      404  {object}  swagger.ErrorResponse  "Record not found"
-// @Router       /api/records/{id} [get]
+// @Router       /api/v1/records/{id} [get]
 func GetRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	recordID := c.Param("id")
@@ -224,7 +224,7 @@ func GetRecord(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this record"
 // @Failure      404  {object}  swagger.ErrorResponse  "Record not found"
-// @Router       /api/records/{id} [put]
+// @Router       /api/v1/records/{id} [put]
 func UpdateRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	recordID := c.Param("id")
@@ -265,7 +265,7 @@ func UpdateRecord(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this record"
 // @Failure      404  {object}  swagger.ErrorResponse  "Record not found"
-// @Router       /api/records/{id} [delete]
+// @Router       /api/v1/records/{id} [delete]
 func DeleteRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	recordID := c.Param("id")
@@ -300,7 +300,7 @@ func DeleteRecord(c *gin.Context) {
 // @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body or count out of range"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to target table"
-// @Router       /api/records/batch [post]
+// @Router       /api/v1/records/batch [post]
 func BatchCreateRecords(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 

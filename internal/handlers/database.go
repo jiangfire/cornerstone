@@ -24,7 +24,7 @@ import (
 // @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseObject}
 // @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Router       /api/databases [post]
+// @Router       /api/v1/databases [post]
 func CreateDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 
@@ -63,7 +63,7 @@ func CreateDatabase(c *gin.Context) {
 // @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseListResponse}
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      500  {object}  swagger.ErrorResponse
-// @Router       /api/databases [get]
+// @Router       /api/v1/databases [get]
 func ListDatabases(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 
@@ -96,7 +96,7 @@ func ListDatabases(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this database"
 // @Failure      404  {object}  swagger.ErrorResponse  "Database not found"
-// @Router       /api/databases/{id} [get]
+// @Router       /api/v1/databases/{id} [get]
 func GetDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
@@ -130,7 +130,7 @@ func GetDatabase(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this database"
 // @Failure      404  {object}  swagger.ErrorResponse  "Database not found"
-// @Router       /api/databases/{id} [put]
+// @Router       /api/v1/databases/{id} [put]
 func UpdateDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
@@ -172,7 +172,7 @@ func UpdateDatabase(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this database"
 // @Failure      404  {object}  swagger.ErrorResponse  "Database not found"
-// @Router       /api/databases/{id} [delete]
+// @Router       /api/v1/databases/{id} [delete]
 func DeleteDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
@@ -207,7 +207,7 @@ func DeleteDatabase(c *gin.Context) {
 // @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseBulkCreateResponse}
 // @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Router       /api/databases/with-tables [post]
+// @Router       /api/v1/databases/with-tables [post]
 func CreateDatabaseWithTables(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 

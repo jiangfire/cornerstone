@@ -25,7 +25,7 @@ import (
 // @Success      200  {object}  swagger.APIResponse{data=swagger.TokenListResponse}
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      500  {object}  swagger.ErrorResponse
-// @Router       /api/tokens [get]
+// @Router       /api/v1/tokens [get]
 func ListTokens(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	isMaster := middleware.IsMasterToken(c)
@@ -63,7 +63,7 @@ func ListTokens(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - requires Master Token"
 // @Failure      500  {object}  swagger.ErrorResponse
-// @Router       /api/tokens [post]
+// @Router       /api/v1/tokens [post]
 func CreateToken(c *gin.Context) {
 	var req services.CreateTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -104,7 +104,7 @@ func CreateToken(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - insufficient permissions"
 // @Failure      404  {object}  swagger.ErrorResponse  "Token not found"
-// @Router       /api/tokens/{id} [delete]
+// @Router       /api/v1/tokens/{id} [delete]
 func DeleteToken(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	isMaster := middleware.IsMasterToken(c)
@@ -139,7 +139,7 @@ func DeleteToken(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - requires Master Token"
 // @Failure      404  {object}  swagger.ErrorResponse  "Token not found"
-// @Router       /api/tokens/{id} [put]
+// @Router       /api/v1/tokens/{id} [put]
 func UpdateToken(c *gin.Context) {
 	targetID := c.Param("id")
 

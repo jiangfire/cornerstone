@@ -8,11 +8,17 @@ import (
 // SQLGenerator SQL 生成器
 type SQLGenerator struct {
 	isSQLite bool
+	maxRows  int64
 }
 
 // NewSQLGenerator 创建 SQL 生成器
 func NewSQLGenerator(isSQLite bool) *SQLGenerator {
-	return &SQLGenerator{isSQLite: isSQLite}
+	return &SQLGenerator{isSQLite: isSQLite, maxRows: DefaultLimits.MaxRows}
+}
+
+// NewSQLGeneratorWithConfig 创建带自定义 maxRows 的 SQL 生成器
+func NewSQLGeneratorWithConfig(isSQLite bool, maxRows int64) *SQLGenerator {
+	return &SQLGenerator{isSQLite: isSQLite, maxRows: maxRows}
 }
 
 // Generate 生成 SQL 查询
@@ -623,6 +629,10 @@ func (g *SQLGenerator) generateLimit(req *QueryRequest) (string, []interface{}) 
 	}
 	if req.Page <= 0 {
 		req.Page = 1
+	}
+
+	if g.maxRows > 0 && req.Size > int(g.maxRows) {
+		req.Size = int(g.maxRows)
 	}
 
 	offset := (req.Page - 1) * req.Size

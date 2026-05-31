@@ -31,7 +31,7 @@ import (
 // @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body or field type"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to parent table"
-// @Router       /api/fields [post]
+// @Router       /api/v1/fields [post]
 func CreateField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 
@@ -74,7 +74,7 @@ func CreateField(c *gin.Context) {
 // @Success      200  {object}  swagger.APIResponse{data=swagger.FieldListResponse}
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
-// @Router       /api/tables/{id}/fields [get]
+// @Router       /api/v1/tables/{id}/fields [get]
 func ListFields(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -108,7 +108,7 @@ func ListFields(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this field"
 // @Failure      404  {object}  swagger.ErrorResponse  "Field not found"
-// @Router       /api/fields/{id} [get]
+// @Router       /api/v1/fields/{id} [get]
 func GetField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
@@ -144,7 +144,7 @@ func GetField(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this field"
 // @Failure      404  {object}  swagger.ErrorResponse  "Field not found"
-// @Router       /api/fields/{id} [put]
+// @Router       /api/v1/fields/{id} [put]
 func UpdateField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
@@ -188,7 +188,7 @@ func UpdateField(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this field"
 // @Failure      404  {object}  swagger.ErrorResponse  "Field not found"
-// @Router       /api/fields/{id} [delete]
+// @Router       /api/v1/fields/{id} [delete]
 func DeleteField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")

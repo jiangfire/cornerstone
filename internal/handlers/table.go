@@ -25,7 +25,7 @@ import (
 // @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to parent database"
-// @Router       /api/tables [post]
+// @Router       /api/v1/tables [post]
 func CreateTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -66,7 +66,7 @@ func CreateTable(c *gin.Context) {
 // @Success      200  {object}  swagger.APIResponse{data=swagger.TableListResponse}
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this database"
-// @Router       /api/databases/{id}/tables [get]
+// @Router       /api/v1/databases/{id}/tables [get]
 func ListTables(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
@@ -99,7 +99,7 @@ func ListTables(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
 // @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
-// @Router       /api/tables/{id} [get]
+// @Router       /api/v1/tables/{id} [get]
 func GetTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -133,7 +133,7 @@ func GetTable(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
 // @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
-// @Router       /api/tables/{id} [put]
+// @Router       /api/v1/tables/{id} [put]
 func UpdateTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -175,7 +175,7 @@ func UpdateTable(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
 // @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
-// @Router       /api/tables/{id} [delete]
+// @Router       /api/v1/tables/{id} [delete]
 func DeleteTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")

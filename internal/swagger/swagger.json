@@ -7,7 +7,7 @@
         "version": "1.0"
     },
     "paths": {
-        "/api/ai/chat": {
+        "/api/v1/ai/chat": {
             "post": {
                 "security": [
                     {
@@ -76,7 +76,7 @@
                 }
             }
         },
-        "/api/databases": {
+        "/api/v1/databases": {
             "get": {
                 "security": [
                     {
@@ -186,7 +186,7 @@
                 }
             }
         },
-        "/api/databases/with-tables": {
+        "/api/v1/databases/with-tables": {
             "post": {
                 "security": [
                     {
@@ -249,7 +249,7 @@
                 }
             }
         },
-        "/api/databases/{id}": {
+        "/api/v1/databases/{id}": {
             "get": {
                 "security": [
                     {
@@ -455,7 +455,7 @@
                 }
             }
         },
-        "/api/databases/{id}/tables": {
+        "/api/v1/databases/{id}/tables": {
             "get": {
                 "security": [
                     {
@@ -513,7 +513,7 @@
                 }
             }
         },
-        "/api/fields": {
+        "/api/v1/fields": {
             "post": {
                 "security": [
                     {
@@ -582,7 +582,7 @@
                 }
             }
         },
-        "/api/fields/{id}": {
+        "/api/v1/fields/{id}": {
             "get": {
                 "security": [
                     {
@@ -788,7 +788,7 @@
                 }
             }
         },
-        "/api/files/upload": {
+        "/api/v1/files/upload": {
             "post": {
                 "security": [
                     {
@@ -867,7 +867,7 @@
                 }
             }
         },
-        "/api/files/{id}": {
+        "/api/v1/files/{id}": {
             "get": {
                 "security": [
                     {
@@ -993,7 +993,7 @@
                 }
             }
         },
-        "/api/files/{id}/download": {
+        "/api/v1/files/{id}/download": {
             "get": {
                 "security": [
                     {
@@ -1045,7 +1045,7 @@
                 }
             }
         },
-        "/api/query": {
+        "/api/v1/query": {
             "get": {
                 "security": [
                     {
@@ -1181,7 +1181,7 @@
                 }
             }
         },
-        "/api/query/batch": {
+        "/api/v1/query/batch": {
             "post": {
                 "security": [
                     {
@@ -1250,7 +1250,7 @@
                 }
             }
         },
-        "/api/query/explain": {
+        "/api/v1/query/explain": {
             "post": {
                 "security": [
                     {
@@ -1319,7 +1319,7 @@
                 }
             }
         },
-        "/api/query/schema/{table}": {
+        "/api/v1/query/schema/{table}": {
             "get": {
                 "security": [
                     {
@@ -1383,7 +1383,7 @@
                 }
             }
         },
-        "/api/query/simple": {
+        "/api/v1/query/simple": {
             "get": {
                 "security": [
                     {
@@ -1474,7 +1474,7 @@
                 }
             }
         },
-        "/api/query/tables": {
+        "/api/v1/query/tables": {
             "get": {
                 "security": [
                     {
@@ -1523,7 +1523,7 @@
                 }
             }
         },
-        "/api/query/validate": {
+        "/api/v1/query/validate": {
             "post": {
                 "security": [
                     {
@@ -1580,7 +1580,7 @@
                 }
             }
         },
-        "/api/records": {
+        "/api/v1/records": {
             "get": {
                 "security": [
                     {
@@ -1731,7 +1731,7 @@
                 }
             }
         },
-        "/api/records/batch": {
+        "/api/v1/records/batch": {
             "post": {
                 "security": [
                     {
@@ -1808,7 +1808,7 @@
                 }
             }
         },
-        "/api/records/export": {
+        "/api/v1/records/export": {
             "get": {
                 "security": [
                     {
@@ -1873,7 +1873,7 @@
                 }
             }
         },
-        "/api/records/{id}": {
+        "/api/v1/records/{id}": {
             "get": {
                 "security": [
                     {
@@ -2079,7 +2079,7 @@
                 }
             }
         },
-        "/api/records/{id}/files": {
+        "/api/v1/records/{id}/files": {
             "get": {
                 "security": [
                     {
@@ -2137,7 +2137,7 @@
                 }
             }
         },
-        "/api/tables": {
+        "/api/v1/tables": {
             "post": {
                 "security": [
                     {
@@ -2206,7 +2206,7 @@
                 }
             }
         },
-        "/api/tables/{id}": {
+        "/api/v1/tables/{id}": {
             "get": {
                 "security": [
                     {
@@ -2412,7 +2412,7 @@
                 }
             }
         },
-        "/api/tables/{id}/fields": {
+        "/api/v1/tables/{id}/fields": {
             "get": {
                 "security": [
                     {
@@ -2470,7 +2470,7 @@
                 }
             }
         },
-        "/api/tokens": {
+        "/api/v1/tokens": {
             "get": {
                 "security": [
                     {
@@ -2592,7 +2592,7 @@
                 }
             }
         },
-        "/api/tokens/{id}": {
+        "/api/v1/tokens/{id}": {
             "put": {
                 "security": [
                     {

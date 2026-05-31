@@ -39,7 +39,7 @@ func InitAIAgent(agent *services.AIAgent) {
 // @Failure      400  {object}  swagger.ErrorResponse  "Validation error - message is required"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      503  {object}  swagger.ErrorResponse  "AI service unavailable - LLM_API_KEY not configured"
-// @Router       /api/ai/chat [post]
+// @Router       /api/v1/ai/chat [post]
 func ChatWithAI(c *gin.Context) {
 	if aiAgent == nil {
 		dto.InternalServerError(c, "AI agent not configured")

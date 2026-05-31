@@ -28,7 +28,7 @@ import (
 // @Failure      400  {object}  swagger.ErrorResponse  "Validation error - missing file or record_id/field_id"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to target record/field"
-// @Router       /api/files/upload [post]
+// @Router       /api/v1/files/upload [post]
 func UploadFile(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	recordID := c.PostForm("record_id")
@@ -77,7 +77,7 @@ func UploadFile(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this file"
 // @Failure      404  {object}  swagger.ErrorResponse  "File not found"
-// @Router       /api/files/{id} [get]
+// @Router       /api/v1/files/{id} [get]
 func GetFile(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fileID := c.Param("id")
@@ -108,7 +108,7 @@ func GetFile(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this file"
 // @Failure      404  {object}  swagger.ErrorResponse  "File not found"
-// @Router       /api/files/{id}/download [get]
+// @Router       /api/v1/files/{id}/download [get]
 func DownloadFile(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fileID := c.Param("id")
@@ -144,7 +144,7 @@ func DownloadFile(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this file"
 // @Failure      404  {object}  swagger.ErrorResponse  "File not found"
-// @Router       /api/files/{id} [delete]
+// @Router       /api/v1/files/{id} [delete]
 func DeleteFile(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fileID := c.Param("id")
@@ -173,7 +173,7 @@ func DeleteFile(c *gin.Context) {
 // @Success      200  {object}  swagger.APIResponse{data=swagger.FileListResponse}
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this record"
-// @Router       /api/records/{id}/files [get]
+// @Router       /api/v1/records/{id}/files [get]
 func ListRecordFiles(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	recordID := c.Param("id")

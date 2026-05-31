@@ -729,7 +729,7 @@ info:
   title: Cornerstone API
   version: "1.0"
 paths:
-  /api/ai/chat:
+  /api/v1/ai/chat:
     post:
       consumes:
       - application/json
@@ -770,7 +770,7 @@ paths:
       summary: Chat with AI assistant
       tags:
       - ai
-  /api/databases:
+  /api/v1/databases:
     get:
       description: Returns all databases accessible to the authenticated token.
       produces:
@@ -834,7 +834,7 @@ paths:
       summary: Create a database
       tags:
       - databases
-  /api/databases/{id}:
+  /api/v1/databases/{id}:
     delete:
       description: Delete a database and all of its associated tables, fields, and
         records.
@@ -959,7 +959,7 @@ paths:
       summary: Update a database
       tags:
       - databases
-  /api/databases/{id}/tables:
+  /api/v1/databases/{id}/tables:
     get:
       description: Returns all tables in the specified database.
       parameters:
@@ -993,7 +993,7 @@ paths:
       summary: List tables in a database
       tags:
       - tables
-  /api/databases/with-tables:
+  /api/v1/databases/with-tables:
     post:
       consumes:
       - application/json
@@ -1031,7 +1031,7 @@ paths:
       summary: Create a database with tables and fields
       tags:
       - databases
-  /api/fields:
+  /api/v1/fields:
     post:
       consumes:
       - application/json
@@ -1072,7 +1072,7 @@ paths:
       summary: Create a field
       tags:
       - fields
-  /api/fields/{id}:
+  /api/v1/fields/{id}:
     delete:
       description: Delete a field by ID.
       parameters:
@@ -1197,7 +1197,7 @@ paths:
       summary: Update a field
       tags:
       - fields
-  /api/files/{id}:
+  /api/v1/files/{id}:
     delete:
       description: Delete a file and its metadata by ID.
       parameters:
@@ -1273,7 +1273,7 @@ paths:
       summary: Get file metadata
       tags:
       - files
-  /api/files/{id}/download:
+  /api/v1/files/{id}/download:
     get:
       description: Download the actual file content by ID.
       parameters:
@@ -1306,7 +1306,7 @@ paths:
       summary: Download a file
       tags:
       - files
-  /api/files/upload:
+  /api/v1/files/upload:
     post:
       consumes:
       - multipart/form-data
@@ -1354,7 +1354,7 @@ paths:
       summary: Upload a file
       tags:
       - files
-  /api/query:
+  /api/v1/query:
     get:
       consumes:
       - application/json
@@ -1435,7 +1435,7 @@ paths:
       summary: Execute a query
       tags:
       - query
-  /api/query/batch:
+  /api/v1/query/batch:
     post:
       consumes:
       - application/json
@@ -1476,7 +1476,7 @@ paths:
       summary: Execute a batch query
       tags:
       - query
-  /api/query/explain:
+  /api/v1/query/explain:
     post:
       consumes:
       - application/json
@@ -1518,7 +1518,7 @@ paths:
       summary: Explain a query
       tags:
       - query
-  /api/query/schema/{table}:
+  /api/v1/query/schema/{table}:
     get:
       description: Returns the allowed fields for a queryable table.
       parameters:
@@ -1556,7 +1556,7 @@ paths:
       summary: Get table schema for query
       tags:
       - query
-  /api/query/simple:
+  /api/v1/query/simple:
     get:
       description: Query records using simple URL parameters instead of the full Query
         DSL.
@@ -1614,7 +1614,7 @@ paths:
       summary: Execute a simplified query
       tags:
       - query
-  /api/query/tables:
+  /api/v1/query/tables:
     get:
       description: Returns all tables the authenticated token can query.
       produces:
@@ -1642,7 +1642,7 @@ paths:
       summary: List queryable tables
       tags:
       - query
-  /api/query/validate:
+  /api/v1/query/validate:
     post:
       consumes:
       - application/json
@@ -1679,7 +1679,7 @@ paths:
       summary: Validate a query
       tags:
       - query
-  /api/records:
+  /api/v1/records:
     get:
       description: Query records from a table with pagination and optional filtering.
       parameters:
@@ -1771,7 +1771,7 @@ paths:
       summary: Create a record
       tags:
       - records
-  /api/records/{id}:
+  /api/v1/records/{id}:
     delete:
       description: Delete a record by ID.
       parameters:
@@ -1896,7 +1896,7 @@ paths:
       summary: Update a record
       tags:
       - records
-  /api/records/{id}/files:
+  /api/v1/records/{id}/files:
     get:
       description: Returns all files attached to a record.
       parameters:
@@ -1930,7 +1930,7 @@ paths:
       summary: List files for a record
       tags:
       - files
-  /api/records/batch:
+  /api/v1/records/batch:
     post:
       consumes:
       - application/json
@@ -1977,7 +1977,7 @@ paths:
       summary: Batch create records
       tags:
       - records
-  /api/records/export:
+  /api/v1/records/export:
     get:
       description: Export records from a table as a downloadable file.
       parameters:
@@ -2019,7 +2019,7 @@ paths:
       summary: Export records as CSV or JSON
       tags:
       - records
-  /api/tables:
+  /api/v1/tables:
     post:
       consumes:
       - application/json
@@ -2060,7 +2060,7 @@ paths:
       summary: Create a table
       tags:
       - tables
-  /api/tables/{id}:
+  /api/v1/tables/{id}:
     delete:
       description: Delete a table and all of its associated fields and records.
       parameters:
@@ -2184,7 +2184,7 @@ paths:
       summary: Update a table
       tags:
       - tables
-  /api/tables/{id}/fields:
+  /api/v1/tables/{id}/fields:
     get:
       description: Returns all fields in the specified table.
       parameters:
@@ -2218,7 +2218,7 @@ paths:
       summary: List fields in a table
       tags:
       - fields
-  /api/tokens:
+  /api/v1/tokens:
     get:
       description: Returns all tokens visible to the current token.
       produces:
@@ -2290,7 +2290,7 @@ paths:
       summary: Create a new token
       tags:
       - tokens
-  /api/tokens/{id}:
+  /api/v1/tokens/{id}:
     delete:
       description: Delete a token by ID.
       parameters:
