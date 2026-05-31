@@ -316,7 +316,7 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 		return nil, err
 	}
 
-	// 2. 如果提供了options字符串，转换为Config
+	// 2. 如果前端提供了options字符串，转换为Config
 	if req.Options != "" && supportsFieldOptions(req.Type) {
 		// 将逗号分隔的字符串转换为字符串数组
 		optionsList := strings.Split(req.Options, ",")

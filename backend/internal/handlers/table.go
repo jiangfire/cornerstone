@@ -9,6 +9,23 @@ import (
 )
 
 // CreateTable 创建表
+//
+// @Summary      Create a table
+// @Description  Create a new table inside a database.
+//
+//	The database_id field is required and must reference an existing database
+//	owned by the authenticated token. The table name must be non-empty.
+//
+// @Tags         tables
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  swagger.TableCreateRequest  true  "Table to create"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.TableObject}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to parent database"
+// @Router       /api/tables [post]
 func CreateTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
@@ -35,6 +52,21 @@ func CreateTable(c *gin.Context) {
 }
 
 // ListTables 获取表列表
+//
+// @Summary      List tables in a database
+// @Description  Returns all tables in the specified database.
+//
+//	The authenticated token must have access to the parent database.
+//	Results include table ID, name, description, and timestamps.
+//
+// @Tags         tables
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Database ID"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.TableListResponse}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this database"
+// @Router       /api/databases/{id}/tables [get]
 func ListTables(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
@@ -53,6 +85,21 @@ func ListTables(c *gin.Context) {
 }
 
 // GetTable 获取表详情
+//
+// @Summary      Get a table by ID
+// @Description  Retrieve full details of a single table by its ID.
+//
+//	The authenticated token must own the parent database or be a Master token.
+//
+// @Tags         tables
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Table ID"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.TableObject}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
+// @Router       /api/tables/{id} [get]
 func GetTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -68,6 +115,25 @@ func GetTable(c *gin.Context) {
 }
 
 // UpdateTable 更新表信息
+//
+// @Summary      Update a table
+// @Description  Update table name and/or description.
+//
+//	The authenticated token must own the parent database or be a Master token.
+//	The name field is required in the request body.
+//
+// @Tags         tables
+// @Accept       json
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id    path  string                true  "Table ID"
+// @Param        body  body  swagger.TableUpdateRequest  true  "Table update fields"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.TableObject}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
+// @Router       /api/tables/{id} [put]
 func UpdateTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
@@ -94,6 +160,22 @@ func UpdateTable(c *gin.Context) {
 }
 
 // DeleteTable 删除表
+//
+// @Summary      Delete a table
+// @Description  Delete a table and all of its associated fields and records.
+//
+//	This action is irreversible. The authenticated token must own the parent
+//	database or be a Master token.
+//
+// @Tags         tables
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        id  path  string  true  "Table ID"
+// @Success      200  {object}  swagger.APIResponse{data=object}
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
+// @Router       /api/tables/{id} [delete]
 func DeleteTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
