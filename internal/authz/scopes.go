@@ -5,10 +5,16 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/cache"
 	"gorm.io/gorm"
 )
+
+// tokenCache 缓存 Token 及其解析后的权限配置，减少每次请求都查 DB 的开销。
+// TTL 5 分钟，在大多数业务场景下 Token 和 Scopes 不会频繁变更。
+var tokenCache = cache.NewCache[string, *Authorizer](5 * time.Minute)
 
 const (
 	ActionRead   = "read"
@@ -38,10 +44,17 @@ func NewAuthorizer(db *gorm.DB, tokenID string) (*Authorizer, error) {
 		return nil, errors.New("数据库未初始化")
 	}
 
+	// 尝试从缓存读取
+	if a, ok := tokenCache.Get(tokenID); ok {
+		// 缓存中的 Authorizer 需要指向当前的 db（连接可能变化，如测试时）
+		// 所以只缓存 token 和 scopes，db 仍然用传入的
+		return &Authorizer{db: db, token: a.token, scopes: a.scopes}, nil
+	}
+
 	var token models.Token
 	if err := db.Where("id = ?", tokenID).First(&token).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("Token 不存在")
+			return nil, errors.New("token 不存在")
 		}
 		return nil, fmt.Errorf("查询 Token 失败: %w", err)
 	}
@@ -51,7 +64,9 @@ func NewAuthorizer(db *gorm.DB, tokenID string) (*Authorizer, error) {
 		return nil, err
 	}
 
-	return &Authorizer{db: db, token: token, scopes: scopes}, nil
+	authorizer := &Authorizer{db: db, token: token, scopes: scopes}
+	tokenCache.Set(tokenID, authorizer)
+	return authorizer, nil
 }
 
 func parseScopes(raw string) (ScopeConfig, error) {
@@ -161,6 +176,63 @@ func (a *Authorizer) CanAccessField(fieldID, action string) bool {
 	}
 
 	return a.CanAccessTable(field.TableID, action)
+}
+
+// CanAccessFields 批量检查字段权限，只查一次数据库获取字段信息。
+func (a *Authorizer) CanAccessFields(fieldIDs []string, action string) map[string]bool {
+	results := make(map[string]bool, len(fieldIDs))
+	if len(fieldIDs) == 0 {
+		return results
+	}
+	if a.IsMaster() {
+		for _, id := range fieldIDs {
+			results[id] = true
+		}
+		return results
+	}
+
+	// 一次性查询所有字段定义
+	var fields []models.Field
+	if err := a.db.Where("id IN ? AND deleted_at IS NULL", fieldIDs).Find(&fields).Error; err != nil {
+		for _, id := range fieldIDs {
+			results[id] = false
+		}
+		return results
+	}
+
+	fieldMap := make(map[string]models.Field, len(fields))
+	tableIDSet := make(map[string]struct{})
+	for _, f := range fields {
+		fieldMap[f.ID] = f
+		tableIDSet[f.TableID] = struct{}{}
+	}
+
+	// 批量缓存表权限，避免对每个字段重复查询
+	tablePerms := make(map[string]bool, len(tableIDSet))
+	for tableID := range tableIDSet {
+		tablePerms[tableID] = a.CanAccessTable(tableID, action)
+	}
+
+	for _, id := range fieldIDs {
+		field, ok := fieldMap[id]
+		if !ok {
+			results[id] = false
+			continue
+		}
+
+		if scope, ok := a.scopes.Tables[field.TableID]; ok && len(scope.Fields) > 0 {
+			if actions, ok := scope.Fields[field.ID]; ok && containsAction(actions, action) {
+				results[id] = true
+				continue
+			}
+			if actions, ok := scope.Fields[field.Name]; ok && containsAction(actions, action) {
+				results[id] = true
+				continue
+			}
+		}
+		results[id] = tablePerms[field.TableID]
+	}
+	return results
 }
 
 func containsAction(actions []string, action string) bool {

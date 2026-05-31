@@ -22,16 +22,15 @@ func TestFieldService_CreateField_AcceptsExtendedTypes(t *testing.T) {
 	require.NoError(t, db.Create(master).Error)
 
 	types := []string{
-		"select",
-		"multiselect",
-		"list",
-		"json",
+		"string",
+		"text",
+		"number",
+		"boolean",
+		"date",
+		"datetime",
 		"file",
-		"link",
-		"email",
-		"url",
-		"color",
-		"rating",
+		"json",
+		"list",
 	}
 
 	for _, fieldType := range types {

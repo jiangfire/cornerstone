@@ -73,4 +73,3 @@ func TestExecutor_ExecuteHonorsTokenDatabaseScopes(t *testing.T) {
 	require.Len(t, result.Data, 1)
 	assert.Equal(t, allowedTable.ID, result.Data[0]["table_id"])
 }
-

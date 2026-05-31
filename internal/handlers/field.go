@@ -13,12 +13,11 @@ import (
 // @Summary      Create a field
 // @Description  Create a new field in a table.
 //
-//	Valid field types: string, text, number, boolean, date, datetime, attachment,
-//	select, list, multiselect, single_select, multi_select.
+//	Valid field types: string, text, number, boolean, date, datetime, file, json, list.
 //
-//	For select/multi_select types, use the options field (comma-separated values)
+//	For list type, use the options field (comma-separated values)
 //	or the config.options array. For number fields, config.min and config.max
-//	define the allowed range. For attachment fields, config defines allowed file
+//	define the allowed range. For file fields, config defines allowed file
 //	types and size limits.
 //
 //	The authenticated token must own the parent database.
@@ -129,8 +128,7 @@ func GetField(c *gin.Context) {
 // @Summary      Update a field
 // @Description  Update field properties including name, type, description, required flag, and config.
 //
-//	Valid field types: string, text, number, boolean, date, datetime, attachment,
-//	select, list, multiselect, single_select, multi_select.
+//	Valid field types: string, text, number, boolean, date, datetime, file, json, list.
 //
 //	Changing a field type may affect existing record data. Use with caution.
 //	The authenticated token must own the parent database or be a Master token.

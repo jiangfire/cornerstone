@@ -118,6 +118,14 @@ func createIndexes(db *gorm.DB) error {
 	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_files_field_id ON files(field_id)").Error; err != nil {
 		return err
 	}
+
+	// PostgreSQL: GIN 索引加速 JSONB 查询（data @>、JSON 路径等）
+	if !isSQLite(db) {
+		if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_records_data_gin ON records USING GIN (data)").Error; err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 

@@ -13,6 +13,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/cache"
 	"gorm.io/gorm"
 )
 
@@ -71,12 +72,16 @@ func parseAttachmentValue(value interface{}) ([]string, error) {
 
 // RecordService 数据记录服务
 type RecordService struct {
-	db *gorm.DB
+	db         *gorm.DB
+	fieldCache *cache.Cache[string, []models.Field]
 }
 
 // NewRecordService 创建记录服务实例
 func NewRecordService(db *gorm.DB) *RecordService {
-	return &RecordService{db: db}
+	return &RecordService{
+		db:         db,
+		fieldCache: cache.NewCache[string, []models.Field](5 * time.Minute),
+	}
 }
 
 // CreateRecordRequest 创建记录请求
@@ -150,9 +155,8 @@ func (s *RecordService) checkTableAccess(tableID, userID string, requiredRoles [
 
 // validateRecordData 验证记录数据
 func (s *RecordService) validateRecordData(tableID string, data map[string]interface{}, currentRecordID, userID string) error {
-	// 获取表的所有字段定义
-	var fields []models.Field
-	err := s.db.Where("table_id = ? AND deleted_at IS NULL", tableID).Find(&fields).Error
+	// 获取表的所有字段定义（走缓存）
+	fields, err := s.getTableFields(tableID)
 	if err != nil {
 		return fmt.Errorf("获取字段定义失败: %w", err)
 	}
@@ -183,15 +187,17 @@ func (s *RecordService) validateRecordData(tableID string, data map[string]inter
 			continue
 		}
 
+		config := parseStoredFieldConfig(field.Options)
+
 		if isAttachmentFieldType(field.Type) {
-			if err := s.validateAttachmentFieldValue(field, value, currentRecordID, userID); err != nil {
+			if err := s.validateAttachmentFieldValue(field, config, value, currentRecordID, userID); err != nil {
 				return fmt.Errorf("字段 '%s' 验证失败: %w", field.Name, err)
 			}
 			continue
 		}
 
 		// 根据字段类型验证数据
-		if err := s.validateFieldValue(field, value); err != nil {
+		if err := s.validateFieldValueWithConfig(field, config, value); err != nil {
 			return fmt.Errorf("字段 '%s' 验证失败: %w", field.Name, err)
 		}
 	}
@@ -199,13 +205,12 @@ func (s *RecordService) validateRecordData(tableID string, data map[string]inter
 	return nil
 }
 
-func (s *RecordService) validateAttachmentFieldValue(field models.Field, value interface{}, currentRecordID, userID string) error {
+func (s *RecordService) validateAttachmentFieldValue(field models.Field, config FieldConfig, value interface{}, currentRecordID, userID string) error {
 	fileIDs, err := parseAttachmentValue(value)
 	if err != nil {
 		return err
 	}
 
-	config := parseStoredFieldConfig(field.Options)
 	if !config.Multiple && len(fileIDs) > 1 {
 		return errors.New("该附件字段只允许上传单个文件")
 	}
@@ -297,8 +302,14 @@ func (s *RecordService) syncAttachmentBindings(tx *gorm.DB, recordID string, fie
 	return nil
 }
 
-// validateFieldValue 验证字段值
+// validateFieldValue 验证字段值（兼容 wrapper，内部会重新解析配置）
 func (s *RecordService) validateFieldValue(field models.Field, value interface{}) error {
+	config := parseStoredFieldConfig(field.Options)
+	return s.validateFieldValueWithConfig(field, config, value)
+}
+
+// validateFieldValueWithConfig 使用预解析配置验证字段值，避免重复 Unmarshal
+func (s *RecordService) validateFieldValueWithConfig(field models.Field, config FieldConfig, value interface{}) error {
 	// Handle nil values - these should be handled by the caller, but we'll be defensive
 	if value == nil {
 		return nil
@@ -317,33 +328,23 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 			return nil
 		}
 
-		// 检查配置
-		if field.Options != "" {
-			var config map[string]interface{}
-			if err := json.Unmarshal([]byte(field.Options), &config); err == nil {
-				// 检查最大长度
-				if maxLen, exists := config["max_length"].(float64); exists {
-					if len(strValue) > int(maxLen) {
-						return fmt.Errorf("长度不能超过 %d 个字符", int(maxLen))
-					}
-				}
-
-				// 检查正则表达式验证
-				if validation, exists := config["validation"].(string); exists && validation != "" {
-					matched, err := regexp.MatchString(validation, strValue)
-					if err != nil {
-						return fmt.Errorf("正则表达式无效: %w", err)
-					}
-					if !matched {
-						return fmt.Errorf("格式不匹配，要求: %s", validation)
-					}
-				}
+		// 使用预解析配置
+		if config.MaxLength != nil && len(strValue) > *config.MaxLength {
+			return fmt.Errorf("长度不能超过 %d 个字符", *config.MaxLength)
+		}
+		if config.Validation != "" {
+			matched, err := regexp.MatchString(config.Validation, strValue)
+			if err != nil {
+				return fmt.Errorf("正则表达式无效: %w", err)
+			}
+			if !matched {
+				return fmt.Errorf("格式不匹配，要求: %s", config.Validation)
 			}
 		}
 
 	case "number":
 		switch value.(type) {
-		case float64, float32, int, int32, int64:
+		case float64, float32, int, int32, int64, json.Number:
 			// OK
 		default:
 			return errors.New("期望数字类型")
@@ -355,88 +356,60 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 		}
 
 	case "date", "datetime":
-		// 简单验证：检查是否为字符串
-		if _, ok := value.(string); !ok {
+		strValue, ok := value.(string)
+		if !ok {
 			return errors.New("期望字符串类型（日期格式）")
 		}
-
-	case "select", "single_select", "email", "url", "color", "link":
-		if _, ok := value.(string); !ok {
-			return errors.New("期望字符串类型")
+		var layouts []string
+		if field.Type == "date" {
+			layouts = []string{"2006-01-02", time.RFC3339}
+		} else {
+			layouts = []string{time.RFC3339, "2006-01-02T15:04:05", "2006-01-02 15:04:05"}
 		}
-		// 检查选项是否有效
-		if field.Options != "" {
-			var config map[string]interface{}
-			if err := json.Unmarshal([]byte(field.Options), &config); err == nil {
-				if options, exists := config["options"].([]interface{}); exists {
-					valid := false
-					for _, opt := range options {
-						if opt.(string) == value.(string) {
-							valid = true
-							break
-						}
-					}
-					if !valid {
-						return fmt.Errorf("无效的选项值: %s", value.(string))
-					}
-				}
+		parsed := false
+		for _, layout := range layouts {
+			if _, err := time.Parse(layout, strValue); err == nil {
+				parsed = true
+				break
 			}
 		}
+		if !parsed {
+			return fmt.Errorf("无效的日期格式: %s", strValue)
+		}
 
-	case "multiselect", "list":
-		items, err := parseStringListValue(value)
+	case "list":
+		_, err := parseStringListValue(value)
 		if err != nil {
 			return err
 		}
-
-		// 历史 multiselect / multi_select 字段继续沿用选项约束；
-		// 新 list 类型只校验“字符串数组”，不强制命中建议项。
-		if (field.Type == "multiselect" || field.Type == "multi_select") && field.Options != "" {
-			var config map[string]interface{}
-			if err := json.Unmarshal([]byte(field.Options), &config); err == nil {
-				if options, exists := config["options"].([]interface{}); exists {
-					for _, val := range items {
-						valid := false
-						for _, opt := range options {
-							if opt.(string) == val {
-								valid = true
-								break
-							}
-						}
-						if !valid {
-							return fmt.Errorf("无效的选项值: %s", val)
-						}
-					}
-				}
-			}
-		}
 	case "json":
-		return nil
-	case "rating":
-		switch rating := value.(type) {
-		case float64:
-			if rating < 1 || rating > 5 {
-				return errors.New("评分必须在 1-5 之间")
+		if strValue, ok := value.(string); ok {
+			var dummy interface{}
+			if err := json.Unmarshal([]byte(strValue), &dummy); err != nil {
+				return fmt.Errorf("无效的 JSON 字符串: %w", err)
 			}
-		case int:
-			if rating < 1 || rating > 5 {
-				return errors.New("评分必须在 1-5 之间")
-			}
-		default:
-			return errors.New("期望数字类型")
+			return nil
 		}
+		if _, err := json.Marshal(value); err != nil {
+			return fmt.Errorf("无效的 JSON 值: %w", err)
+		}
+		return nil
 	}
 
 	return nil
 }
 
 func (s *RecordService) getTableFields(tableID string) ([]models.Field, error) {
+	if fields, ok := s.fieldCache.Get(tableID); ok {
+		return fields, nil
+	}
 	var fields []models.Field
 	if err := s.db.Where("table_id = ? AND deleted_at IS NULL", tableID).
 		Order("created_at ASC").
 		Find(&fields).Error; err != nil {
 		return nil, fmt.Errorf("获取字段定义失败: %w", err)
 	}
+	s.fieldCache.Set(tableID, fields)
 	return fields, nil
 }
 
@@ -474,13 +447,27 @@ func (s *RecordService) normalizeRecordData(fields []models.Field, data map[stri
 func (s *RecordService) getFieldAccessMaps(fields []models.Field, userID string) (map[string]models.Field, map[string]models.Field, error) {
 	readableFields := make(map[string]models.Field, len(fields))
 	writableFields := make(map[string]models.Field, len(fields))
+
+	fieldIDs := make([]string, len(fields))
+	for i, f := range fields {
+		fieldIDs[i] = f.ID
+	}
+
 	fieldService := NewFieldService(s.db)
+	readResults, err := fieldService.CheckFieldPermissions(userID, fieldIDs, "read")
+	if err != nil {
+		return nil, nil, err
+	}
+	writeResults, err := fieldService.CheckFieldPermissions(userID, fieldIDs, "write")
+	if err != nil {
+		return nil, nil, err
+	}
 
 	for _, field := range fields {
-		if err := fieldService.CheckFieldPermission(userID, field.ID, "read"); err == nil {
+		if readResults[field.ID] {
 			readableFields[field.Name] = field
 		}
-		if err := fieldService.CheckFieldPermission(userID, field.ID, "write"); err == nil {
+		if writeResults[field.ID] {
 			writableFields[field.Name] = field
 		}
 	}
@@ -1199,7 +1186,7 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 			return nil, err
 		}
 		if len(fileIDs) > 0 {
-			return nil, errors.New("批量创建暂不支持 attachment 字段")
+			return nil, errors.New("批量创建暂不支持 file 字段")
 		}
 	}
 
@@ -1214,27 +1201,34 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 		return nil, fmt.Errorf("数据序列化失败: %w", err)
 	}
 
-	// 4. 批量创建
-	records := make([]*models.Record, count)
-	for i := 0; i < count; i++ {
-		records[i] = &models.Record{
-			TableID: req.TableID,
-			Data:    string(dataJSON),
-			Version: 1,
-		}
-	}
+	const batchSize = 100
 
-	// 使用事务确保原子性
-	tx := s.db.Begin()
-	for _, record := range records {
-		if err := tx.Create(record).Error; err != nil {
-			tx.Rollback()
-			return nil, fmt.Errorf("批量创建失败: %w", err)
+	// 4. 单事务批量创建，保证原子性；分批仅为了控制单条 INSERT 大小
+	records := make([]*models.Record, 0, count)
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		for i := 0; i < count; i += batchSize {
+			end := i + batchSize
+			if end > count {
+				end = count
+			}
+			batch := make([]models.Record, 0, end-i)
+			for j := i; j < end; j++ {
+				batch = append(batch, models.Record{
+					TableID: req.TableID,
+					Data:    string(dataJSON),
+					Version: 1,
+				})
+			}
+			if err := tx.Create(&batch).Error; err != nil {
+				return fmt.Errorf("批量创建失败: %w", err)
+			}
+			for j := range batch {
+				records = append(records, &batch[j])
+			}
 		}
-	}
-
-	if err := tx.Commit().Error; err != nil {
-		return nil, fmt.Errorf("提交事务失败: %w", err)
+		return nil
+	}); err != nil {
+		return nil, err
 	}
 
 	filteredData := s.filterReadableData(fields, readableFields, normalizedData)
@@ -1262,7 +1256,7 @@ func (s *RecordService) GenerateTestData(tableID, userID string, count int) ([]*
 		return nil, err
 	}
 
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	rng := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec // test data generation, not security-sensitive
 	records := make([]*models.Record, 0, count)
 	for i := 0; i < count; i++ {
 		data := make(map[string]interface{}, len(fields))

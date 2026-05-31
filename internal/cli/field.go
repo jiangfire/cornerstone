@@ -3,10 +3,10 @@ package cli
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	appdb "github.com/jiangfire/cornerstone/internal/db"
 	"github.com/jiangfire/cornerstone/internal/services"
 	"github.com/jiangfire/cornerstone/pkg/db"
+	"github.com/spf13/cobra"
 )
 
 var fieldCmd = &cobra.Command{
@@ -23,7 +23,7 @@ var fieldListCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		token, err := getMasterTokenID()
 		if err != nil {
@@ -42,13 +42,13 @@ var fieldCreateCmd = &cobra.Command{
 	Use:   "create [table-id] [name] [type]",
 	Short: "在表中创建字段",
 	Long: `在表中创建字段。支持的字段类型：
-  string, text, number, boolean, date, datetime, file, select, multiselect, list, json, link, email, url, color, rating`,
+  string, text, number, boolean, date, datetime, file, json, list`,
 	Args: cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		desc, _ := cmd.Flags().GetString("description")
 		required, _ := cmd.Flags().GetBool("required")
@@ -81,7 +81,7 @@ var fieldGetCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		token, err := getMasterTokenID()
 		if err != nil {
@@ -104,7 +104,7 @@ var fieldUpdateCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		name, _ := cmd.Flags().GetString("name")
 		fieldType, _ := cmd.Flags().GetString("type")
@@ -138,7 +138,7 @@ var fieldDeleteCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		token, err := getMasterTokenID()
 		if err != nil {

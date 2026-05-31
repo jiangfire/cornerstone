@@ -3,10 +3,10 @@ package cli
 import (
 	"fmt"
 
-	"github.com/spf13/cobra"
 	appdb "github.com/jiangfire/cornerstone/internal/db"
 	"github.com/jiangfire/cornerstone/internal/services"
 	"github.com/jiangfire/cornerstone/pkg/db"
+	"github.com/spf13/cobra"
 )
 
 var tableCmd = &cobra.Command{
@@ -23,7 +23,7 @@ var tableListCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		token, err := getMasterTokenID()
 		if err != nil {
@@ -46,7 +46,7 @@ var tableCreateCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		desc, _ := cmd.Flags().GetString("description")
 		token, err := getMasterTokenID()
@@ -74,7 +74,7 @@ var tableGetCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		token, err := getMasterTokenID()
 		if err != nil {
@@ -97,7 +97,7 @@ var tableUpdateCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		name, _ := cmd.Flags().GetString("name")
 		desc, _ := cmd.Flags().GetString("description")
@@ -125,7 +125,7 @@ var tableDeleteCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		token, err := getMasterTokenID()
 		if err != nil {

@@ -153,15 +153,15 @@ func GetToolDefinitions() []ToolDef {
 							"description": "Table description",
 						},
 						"fields": map[string]any{
-							"type": "array",
+							"type":        "array",
 							"description": "Field definitions",
 							"items": map[string]any{
 								"type": "object",
 								"properties": map[string]any{
-									"name": map[string]any{"type": "string"},
-									"type": map[string]any{"type": "string", "enum": []string{"string", "text", "number", "boolean", "date", "datetime", "select", "list"}},
+									"name":        map[string]any{"type": "string"},
+									"type":        map[string]any{"type": "string", "enum": []string{"string", "text", "number", "boolean", "date", "datetime", "file", "json", "list"}},
 									"description": map[string]any{"type": "string"},
-									"required": map[string]any{"type": "boolean"},
+									"required":    map[string]any{"type": "boolean"},
 								},
 								"required": []string{"name", "type"},
 							},
@@ -217,9 +217,9 @@ func GetToolDefinitions() []ToolDef {
 							"description": "Table name to query (e.g., records, tables, databases)",
 						},
 						"select": map[string]any{
-							"type": "array",
+							"type":        "array",
 							"description": "Fields to select",
-							"items": map[string]any{"type": "string"},
+							"items":       map[string]any{"type": "string"},
 						},
 						"where": map[string]any{
 							"type":        "object",
@@ -251,10 +251,10 @@ func GetToolDefinitions() []ToolDef {
 							"description": "Table ID",
 						},
 						"records": map[string]any{
-							"type": "array",
+							"type":        "array",
 							"description": "Array of record data objects",
 							"items": map[string]any{
-								"type": "object",
+								"type":        "object",
 								"description": "Record data as key-value pairs",
 							},
 						},
@@ -404,7 +404,9 @@ func (a *AIAgent) Chat(messages []Message, executeTool func(name string, args ma
 	assistantMsg := result.Choices[0].Message
 
 	if len(assistantMsg.ToolCalls) > 0 {
-		toolMessages := append(messages, assistantMsg)
+		toolMessages := make([]Message, 0, len(messages)+1+len(assistantMsg.ToolCalls))
+		toolMessages = append(toolMessages, messages...)
+		toolMessages = append(toolMessages, assistantMsg)
 		for _, tc := range assistantMsg.ToolCalls {
 			var args map[string]any
 			if err := json.Unmarshal([]byte(tc.Function.Arguments), &args); err != nil {

@@ -30,4 +30,3 @@ func TestDatabaseService_ListDatabasesHonorsTokenScopes(t *testing.T) {
 	require.Len(t, databases, 1)
 	assert.Equal(t, allowedDB.ID, databases[0].ID)
 }
-

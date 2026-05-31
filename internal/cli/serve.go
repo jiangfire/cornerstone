@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/spf13/cobra"
 	"github.com/jiangfire/cornerstone/internal/config"
 	"github.com/jiangfire/cornerstone/internal/db"
 	"github.com/jiangfire/cornerstone/internal/handlers"
@@ -18,6 +17,7 @@ import (
 	"github.com/jiangfire/cornerstone/internal/services"
 	applog "github.com/jiangfire/cornerstone/pkg/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/spf13/cobra"
 	"go.uber.org/zap"
 )
 

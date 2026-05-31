@@ -67,7 +67,7 @@ func (s *TokenService) DeleteToken(tokenID string, targetID string, isMaster boo
 	var t models.Token
 	if err := s.db.Where("id = ?", targetID).First(&t).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("Token 不存在")
+			return errors.New("token 不存在")
 		}
 		return fmt.Errorf("查询 Token 失败: %w", err)
 	}
@@ -87,7 +87,7 @@ func (s *TokenService) UpdateToken(targetID string, scopes string, expiresAt *ti
 	var t models.Token
 	if err := s.db.Where("id = ?", targetID).First(&t).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("Token 不存在")
+			return nil, errors.New("token 不存在")
 		}
 		return nil, fmt.Errorf("查询 Token 失败: %w", err)
 	}

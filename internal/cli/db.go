@@ -6,12 +6,12 @@ import (
 	"os"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/jiangfire/cornerstone/internal/config"
 	appdb "github.com/jiangfire/cornerstone/internal/db"
 	"github.com/jiangfire/cornerstone/internal/services"
-	applog "github.com/jiangfire/cornerstone/pkg/log"
 	"github.com/jiangfire/cornerstone/pkg/db"
+	applog "github.com/jiangfire/cornerstone/pkg/log"
+	"github.com/spf13/cobra"
 )
 
 func ensureDB() error {
@@ -63,7 +63,7 @@ var dbListCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		token, err := getMasterTokenID()
 		if err != nil {
@@ -86,7 +86,7 @@ var dbCreateCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		desc, _ := cmd.Flags().GetString("description")
 		token, err := getMasterTokenID()
@@ -113,7 +113,7 @@ var dbGetCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		token, err := getMasterTokenID()
 		if err != nil {
@@ -136,7 +136,7 @@ var dbUpdateCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		name, _ := cmd.Flags().GetString("name")
 		desc, _ := cmd.Flags().GetString("description")
@@ -164,7 +164,7 @@ var dbDeleteCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		token, err := getMasterTokenID()
 		if err != nil {

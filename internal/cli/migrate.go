@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spf13/cobra"
 	"github.com/jiangfire/cornerstone/internal/config"
 	"github.com/jiangfire/cornerstone/internal/db"
 	applog "github.com/jiangfire/cornerstone/pkg/log"
+	"github.com/spf13/cobra"
 )
 
 var migrateCmd = &cobra.Command{
@@ -36,7 +36,7 @@ func runMigrate(cmd *cobra.Command, args []string) error {
 	}, 3, time.Second); err != nil {
 		return fmt.Errorf("初始化数据库失败: %w", err)
 	}
-	defer db.CloseDB()
+	defer func() { _ = db.CloseDB() }()
 
 	if err := db.Migrate(); err != nil {
 		return fmt.Errorf("迁移失败: %w", err)

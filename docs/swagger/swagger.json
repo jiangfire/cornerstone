@@ -3264,7 +3264,7 @@
                 },
                 "type": {
                     "type": "string",
-                    "example": "select"
+                    "example": "string"
                 }
             }
         },
@@ -3319,7 +3319,7 @@
                 },
                 "type": {
                     "type": "string",
-                    "example": "select"
+                    "example": "string"
                 },
                 "updated_at": {
                     "type": "string",
@@ -3358,7 +3358,7 @@
                 },
                 "type": {
                     "type": "string",
-                    "example": "select"
+                    "example": "string"
                 }
             }
         },

@@ -266,9 +266,9 @@ type CreateDBWithTablesRequest struct {
 }
 
 type CreateDBWithTablesResult struct {
-	Database *models.Database   `json:"database"`
-	Tables   []*models.Table    `json:"tables"`
-	Fields   []*models.Field    `json:"fields"`
+	Database *models.Database `json:"database"`
+	Tables   []*models.Table  `json:"tables"`
+	Fields   []*models.Field  `json:"fields"`
 }
 
 func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest, ownerID string) (*CreateDBWithTablesResult, error) {

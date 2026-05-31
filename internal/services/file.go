@@ -204,7 +204,7 @@ func (s *FileService) UploadFile(req UploadFileRequest, userID string) (*models.
 			return nil, err
 		}
 		if !isAttachmentFieldType(field.Type) {
-			return nil, errors.New("仅 attachment 类型字段支持绑定上传文件")
+			return nil, errors.New("仅 file 类型字段支持绑定上传文件")
 		}
 		if record != nil && field.TableID != record.TableID {
 			return nil, errors.New("字段不属于当前记录所在表")

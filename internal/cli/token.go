@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/spf13/cobra"
 	appdb "github.com/jiangfire/cornerstone/internal/db"
 	"github.com/jiangfire/cornerstone/internal/services"
 	"github.com/jiangfire/cornerstone/pkg/db"
+	"github.com/spf13/cobra"
 )
 
 var tokenCmd = &cobra.Command{
@@ -23,7 +23,7 @@ var tokenListCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		masterToken, err := getMasterTokenID()
 		if err != nil {
@@ -46,7 +46,7 @@ var tokenCreateCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		if _, err := getMasterTokenID(); err != nil {
 			return err
@@ -91,7 +91,7 @@ var tokenUpdateCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		if _, err := getMasterTokenID(); err != nil {
 			return err
@@ -126,7 +126,7 @@ var tokenDeleteCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		masterToken, err := getMasterTokenID()
 		if err != nil {

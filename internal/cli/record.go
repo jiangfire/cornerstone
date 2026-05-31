@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/spf13/cobra"
 	appdb "github.com/jiangfire/cornerstone/internal/db"
 	"github.com/jiangfire/cornerstone/internal/services"
 	"github.com/jiangfire/cornerstone/pkg/db"
+	"github.com/spf13/cobra"
 )
 
 var recordCmd = &cobra.Command{
@@ -25,7 +25,7 @@ var recordListCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
@@ -58,7 +58,7 @@ var recordCreateCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(args[1]), &data); err != nil {
@@ -89,7 +89,7 @@ var recordGetCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		token, err := getMasterTokenID()
 		if err != nil {
@@ -112,7 +112,7 @@ var recordUpdateCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(args[1]), &data); err != nil {
@@ -144,7 +144,7 @@ var recordDeleteCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		token, err := getMasterTokenID()
 		if err != nil {
@@ -167,7 +167,7 @@ var recordBatchCmd = &cobra.Command{
 		if err := ensureDB(); err != nil {
 			return err
 		}
-		defer appdb.CloseDB()
+		defer func() { _ = appdb.CloseDB() }()
 
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(args[1]), &data); err != nil {

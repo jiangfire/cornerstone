@@ -3273,7 +3273,7 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string",
-                    "example": "select"
+                    "example": "string"
                 }
             }
         },
@@ -3328,7 +3328,7 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string",
-                    "example": "select"
+                    "example": "string"
                 },
                 "updated_at": {
                     "type": "string",
@@ -3367,7 +3367,7 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string",
-                    "example": "select"
+                    "example": "string"
                 }
             }
         },

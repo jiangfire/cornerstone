@@ -54,8 +54,8 @@ type BulkCreateTableField struct {
 
 // BulkCreateTable is a nested table definition inside DatabaseBulkCreateRequest.
 type BulkCreateTable struct {
-	Name        string               `json:"name" binding:"required" example:"users"`
-	Description string               `json:"description" example:"User accounts"`
+	Name        string                 `json:"name" binding:"required" example:"users"`
+	Description string                 `json:"description" example:"User accounts"`
 	Fields      []BulkCreateTableField `json:"fields"`
 }
 
@@ -110,7 +110,7 @@ type TableListResponse struct {
 
 // --- Field ---
 
-// FieldConfig describes the configuration for select, number, attachment and other typed fields.
+// FieldConfig describes the configuration for list, number, file and other typed fields.
 type FieldConfig struct {
 	Options       []string `json:"options,omitempty" example:"option1,option2"`
 	Required      bool     `json:"required,omitempty" example:"false"`
@@ -128,7 +128,7 @@ type FieldConfig struct {
 type FieldCreateRequest struct {
 	TableID     string      `json:"table_id" binding:"required" example:"tbl_xyz789"`
 	Name        string      `json:"name" binding:"required,min=1,max=255" example:"status"`
-	Type        string      `json:"type" binding:"required" example:"select"`
+	Type        string      `json:"type" binding:"required" example:"string"`
 	Description string      `json:"description" binding:"max=1000" example:"Current status"`
 	Required    bool        `json:"required" example:"true"`
 	Options     string      `json:"options" example:"active,inactive"`
@@ -138,7 +138,7 @@ type FieldCreateRequest struct {
 // FieldUpdateRequest body for PUT /api/fields/{id}
 type FieldUpdateRequest struct {
 	Name        string      `json:"name" binding:"required,min=1,max=255" example:"status"`
-	Type        string      `json:"type" binding:"required" example:"select"`
+	Type        string      `json:"type" binding:"required" example:"string"`
 	Description string      `json:"description" binding:"max=1000" example:"Current status"`
 	Required    bool        `json:"required" example:"true"`
 	Options     string      `json:"options" example:"active,inactive"`
@@ -150,7 +150,7 @@ type FieldObject struct {
 	ID          string      `json:"id" example:"fld_def456"`
 	TableID     string      `json:"table_id" example:"tbl_xyz789"`
 	Name        string      `json:"name" example:"status"`
-	Type        string      `json:"type" example:"select"`
+	Type        string      `json:"type" example:"string"`
 	Description string      `json:"description" example:"Current status"`
 	Required    bool        `json:"required" example:"true"`
 	Options     string      `json:"options,omitempty" example:"active,inactive"`
@@ -267,20 +267,20 @@ type FileListResponse struct {
 
 // QueryDSLRequest body for POST /api/query
 type QueryDSLRequest struct {
-	From      string          `json:"from" example:"records"`
-	Select    []string        `json:"select" example:"id,name,data"`
-	Where     *WhereClause    `json:"where"`
-	Having    *WhereClause    `json:"having"`
-	Join      []JoinClause    `json:"join"`
-	GroupBy   []string        `json:"groupBy" example:"table_id"`
-	Aggregate []AggregateFunc `json:"aggregate"`
-	OrderBy   []OrderByClause `json:"orderBy"`
-	Page      int             `json:"page" example:"1"`
-	Size      int             `json:"size" example:"20"`
+	From      string            `json:"from" example:"records"`
+	Select    []string          `json:"select" example:"id,name,data"`
+	Where     *WhereClause      `json:"where"`
+	Having    *WhereClause      `json:"having"`
+	Join      []JoinClause      `json:"join"`
+	GroupBy   []string          `json:"groupBy" example:"table_id"`
+	Aggregate []AggregateFunc   `json:"aggregate"`
+	OrderBy   []OrderByClause   `json:"orderBy"`
+	Page      int               `json:"page" example:"1"`
+	Size      int               `json:"size" example:"20"`
 	Union     []QueryDSLRequest `json:"union,omitempty"`
-	Table     string          `json:"table" example:"records"`
-	Filter    map[string]any  `json:"filter"`
-	Sort      string          `json:"sort" example:"-created_at"`
+	Table     string            `json:"table" example:"records"`
+	Filter    map[string]any    `json:"filter"`
+	Sort      string            `json:"sort" example:"-created_at"`
 }
 
 // WhereClause represents a WHERE or HAVING condition tree.

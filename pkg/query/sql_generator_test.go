@@ -83,8 +83,8 @@ func TestSQLGenerator_HavingClause(t *testing.T) {
 	g := NewSQLGenerator(true)
 
 	req := &QueryRequest{
-		From:   "records",
-		Select: []string{"table_id"},
+		From:    "records",
+		Select:  []string{"table_id"},
 		GroupBy: []string{"table_id"},
 		Aggregate: []AggregateFunc{
 			{Func: "count", Field: "*", As: "cnt"},
@@ -148,8 +148,8 @@ func TestParser_HavingValidation(t *testing.T) {
 
 	t.Run("valid having clause", func(t *testing.T) {
 		req := &QueryRequest{
-			From:   "records",
-			Select: []string{"table_id"},
+			From:    "records",
+			Select:  []string{"table_id"},
 			GroupBy: []string{"table_id"},
 			Aggregate: []AggregateFunc{
 				{Func: "count", Field: "*", As: "cnt"},

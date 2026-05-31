@@ -366,12 +366,12 @@ func executeGenerateTestData(db *gorm.DB, tokenID string, args map[string]any) (
 
 func generateFieldValue(rng *rand.Rand, fieldType string) any {
 	switch normalizeFieldType(fieldType) {
-	case "string", "link":
+	case "string":
 		names := []string{"Alice", "Bob", "Charlie", "Diana", "Eve", "Frank", "Grace", "Henry"}
 		return names[rng.Intn(len(names))]
 	case "text", "json":
 		sentences := []string{"Lorem ipsum dolor sit amet.", "Quick brown fox jumps over the lazy dog.", "The early bird catches the worm."}
-		if normalizeFieldType(fieldType) == "json" {
+		if fieldType == "json" {
 			return map[string]any{"sample": sentences[rng.Intn(len(sentences))]}
 		}
 		return sentences[rng.Intn(len(sentences))]
@@ -386,20 +386,7 @@ func generateFieldValue(rng *rand.Rand, fieldType string) any {
 			return t.Format(time.RFC3339)
 		}
 		return t.Format("2006-01-02")
-	case "select", "email", "url", "color":
-		switch normalizeFieldType(fieldType) {
-		case "email":
-			return fmt.Sprintf("user%d@example.com", rng.Intn(1000))
-		case "url":
-			return fmt.Sprintf("https://example.com/item/%d", rng.Intn(1000))
-		case "color":
-			colors := []string{"#ff0000", "#00ff00", "#0000ff", "#ff9900"}
-			return colors[rng.Intn(len(colors))]
-		default:
-			options := []string{"active", "pending", "completed", "cancelled"}
-			return options[rng.Intn(len(options))]
-		}
-	case "multiselect", "list", "file":
+	case "list", "file":
 		items := []string{"tag1", "tag2", "tag3", "tag4", "tag5"}
 		count := 1 + rng.Intn(3)
 		result := make([]string, count)
@@ -407,8 +394,6 @@ func generateFieldValue(rng *rand.Rand, fieldType string) any {
 			result[i] = items[rng.Intn(len(items))]
 		}
 		return result
-	case "rating":
-		return 1 + rng.Intn(5)
 	default:
 		return "sample_value"
 	}

@@ -273,7 +273,7 @@ definitions:
         example: tbl_xyz789
         type: string
       type:
-        example: select
+        example: string
         type: string
     required:
     - name
@@ -316,7 +316,7 @@ definitions:
         example: tbl_xyz789
         type: string
       type:
-        example: select
+        example: string
         type: string
       updated_at:
         example: "2026-01-01 00:00:00"
@@ -342,7 +342,7 @@ definitions:
         example: true
         type: boolean
       type:
-        example: select
+        example: string
         type: string
     required:
     - name

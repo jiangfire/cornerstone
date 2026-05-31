@@ -48,16 +48,7 @@ func validateFieldName(name string) error {
 }
 
 func normalizeFieldType(fieldType string) string {
-	switch fieldType {
-	case "single_select":
-		return "select"
-	case "multiselect", "multi_select":
-		return "multiselect"
-	case "attachment":
-		return "file"
-	default:
-		return fieldType
-	}
+	return fieldType
 }
 
 func isDeprecatedFieldType(fieldType string) bool {
@@ -65,17 +56,16 @@ func isDeprecatedFieldType(fieldType string) bool {
 }
 
 func isAttachmentFieldType(fieldType string) bool {
-	return normalizeFieldType(fieldType) == "file"
+	return fieldType == "file"
 }
 
 func supportsFieldOptions(fieldType string) bool {
-	normalizedType := normalizeFieldType(fieldType)
-	return normalizedType == "select" || normalizedType == "multiselect" || normalizedType == "list"
+	return fieldType == "list"
 }
 
 // validateFieldType 验证字段类型
 func validateFieldType(fieldType string) error {
-	validTypes := []string{"string", "text", "number", "boolean", "date", "datetime", "attachment", "file", "select", "list", "multiselect", "single_select", "multi_select", "json", "link", "email", "url", "color", "rating"}
+	validTypes := []string{"string", "text", "number", "boolean", "date", "datetime", "file", "json", "list"}
 	for _, validType := range validTypes {
 		if fieldType == validType {
 			return nil
@@ -191,7 +181,7 @@ func validateFieldDescription(description string) error {
 
 // FieldConfig 字段配置
 type FieldConfig struct {
-	Options       []string `json:"options,omitempty"`          // 单选候选项 / 列表建议项
+	Options       []string `json:"options,omitempty"`          // 列表建议项
 	Required      bool     `json:"required,omitempty"`         // 是否必填
 	Min           *float64 `json:"min,omitempty"`              // 最小值
 	Max           *float64 `json:"max,omitempty"`              // 最大值
@@ -210,7 +200,7 @@ type CreateFieldRequest struct {
 	Type        string      `json:"type" binding:"required"`
 	Description string      `json:"description" binding:"max=1000"`
 	Required    bool        `json:"required"`
-	Options     string      `json:"options"` // 下拉选项，逗号分隔
+	Options     string      `json:"options"` // 列表选项，逗号分隔
 	Config      FieldConfig `json:"config"`
 }
 
@@ -585,14 +575,6 @@ func (s *FieldService) DeleteField(fieldID, userID string) error {
 	return nil
 }
 
-func isMissingTableError(err error) bool {
-	if err == nil {
-		return false
-	}
-	message := strings.ToLower(err.Error())
-	return strings.Contains(message, "no such table") || strings.Contains(message, "does not exist")
-}
-
 // CheckFieldPermission 检查用户对特定字段的权限
 func (s *FieldService) CheckFieldPermission(userID, fieldID, action string) error {
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
@@ -603,4 +585,13 @@ func (s *FieldService) CheckFieldPermission(userID, fieldID, action string) erro
 		return errors.New("无权访问该字段")
 	}
 	return nil
+}
+
+// CheckFieldPermissions 批量检查字段权限，只查一次数据库。
+func (s *FieldService) CheckFieldPermissions(userID string, fieldIDs []string, action string) (map[string]bool, error) {
+	authorizer, err := authz.NewAuthorizer(s.db, userID)
+	if err != nil {
+		return nil, err
+	}
+	return authorizer.CanAccessFields(fieldIDs, action), nil
 }

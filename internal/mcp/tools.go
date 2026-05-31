@@ -111,15 +111,15 @@ func (s *ToolService) ListTools() []ToolDefinition {
 						"description": "Table description.",
 					},
 					"fields": map[string]interface{}{
-						"type": "array",
+						"type":        "array",
 						"description": "Field definitions.",
 						"items": map[string]interface{}{
 							"type": "object",
 							"properties": map[string]interface{}{
-								"name": map[string]interface{}{"type": "string"},
-								"type": map[string]interface{}{"type": "string"},
+								"name":        map[string]interface{}{"type": "string"},
+								"type":        map[string]interface{}{"type": "string"},
 								"description": map[string]interface{}{"type": "string"},
-								"required": map[string]interface{}{"type": "boolean"},
+								"required":    map[string]interface{}{"type": "boolean"},
 							},
 							"required": []string{"name", "type"},
 						},
