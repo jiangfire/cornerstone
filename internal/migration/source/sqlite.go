@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	// Register SQLite driver for database/sql source connections.
 	_ "github.com/glebarez/go-sqlite"
 )
 
@@ -160,6 +161,7 @@ func (s *SQLiteSource) sqliteUniqueKeys(tableName string) ([][]string, map[strin
 }
 
 func (s *SQLiteSource) EstimateRowCount(_ string, tableName string) (int64, error) {
+	// #nosec G201 -- identifiers are quoted via quoteSQLiteIdentifier before interpolation.
 	query := fmt.Sprintf(`SELECT COUNT(*) FROM %s`, quoteSQLiteIdentifier(tableName))
 	var count int64
 	if err := s.db.QueryRow(query).Scan(&count); err != nil {

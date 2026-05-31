@@ -1,6 +1,7 @@
 package migration
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -537,6 +538,11 @@ func normalizeValueForField(fieldType string, value interface{}) interface{} {
 		switch v := value.(type) {
 		case []byte:
 			return string(v)
+		case time.Time:
+			if fieldType == "date" {
+				return v.UTC().Format("2006-01-02")
+			}
+			return v.UTC().Format(time.RFC3339)
 		default:
 			return value
 		}
@@ -952,10 +958,6 @@ func (r *Runner) loadOrInitState(plan *compiledPlan) (MigrationState, error) {
 	return state, nil
 }
 
-func (r *Runner) pickStrategy(tableName string, schema *source.TableSchema) source.PaginationStrategy {
-	return r.pickStrategyWithSource(r.src, tableName, schema)
-}
-
 func (r *Runner) pickStrategyWithSource(src source.Source, tableName string, schema *source.TableSchema) source.PaginationStrategy {
 	if r.cfg.Data.PaginationStrategy == PaginationOffset {
 		return source.StrategyOffset
@@ -1007,25 +1009,6 @@ func (r *Runner) sourceDatabaseName() string {
 		return r.cfg.EffectiveTargetDatabase()
 	}
 	return ""
-}
-
-func toInt64(value interface{}) int64 {
-	switch v := value.(type) {
-	case int64:
-		return v
-	case int:
-		return int64(v)
-	case float64:
-		return int64(v)
-	case json.Number:
-		i, _ := v.Int64()
-		return i
-	case string:
-		i, _ := strconv.ParseInt(v, 10, 64)
-		return i
-	default:
-		return 0
-	}
 }
 
 func normalizeCursorValue(value interface{}) interface{} {
@@ -1210,7 +1193,7 @@ func jsonLikeEqual(left, right interface{}) bool {
 	if err != nil {
 		return false
 	}
-	return string(leftJSON) == string(rightJSON)
+	return bytes.Equal(leftJSON, rightJSON)
 }
 
 func computeSampleSize(total int64) int {

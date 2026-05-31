@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	// Register MySQL driver for database/sql source connections.
 	_ "github.com/go-sql-driver/mysql"
 )
 
@@ -178,6 +179,7 @@ func (s *MySQLSource) EstimateRowCount(dbName, tableName string) (int64, error) 
 	if strings.TrimSpace(dbName) == "" {
 		dbName = s.databaseName
 	}
+	// #nosec G201 -- identifiers are quoted via quoteMySQLIdentifier before interpolation.
 	query := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s", quoteMySQLIdentifier(dbName), quoteMySQLIdentifier(tableName))
 	var count int64
 	if err := s.db.QueryRow(query).Scan(&count); err != nil {

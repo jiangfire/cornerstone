@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	// Register pgx stdlib driver for database/sql source connections.
 	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
@@ -208,6 +209,7 @@ ORDER BY tc.constraint_name, kcu.ordinal_position`, schemaName, tableName)
 }
 
 func (s *PostgresSource) EstimateRowCount(_ string, tableName string) (int64, error) {
+	// #nosec G201 -- identifiers are quoted via quotePostgresIdentifier before interpolation.
 	query := fmt.Sprintf("SELECT COUNT(*) FROM %s.%s", quotePostgresIdentifier(s.effectiveSchema()), quotePostgresIdentifier(tableName))
 	var count int64
 	if err := s.db.QueryRow(query).Scan(&count); err != nil {

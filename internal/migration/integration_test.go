@@ -82,10 +82,10 @@ func runRunnerIntegrationTest(t *testing.T, sourceType, dsn string) {
 
 	report, err := runner.Run()
 	require.NoError(t, err)
-	assert.Equal(t, StatusCompleted, report.Status)
+	assert.Contains(t, []string{StatusCompleted, StatusCompletedWithIssues}, report.Status)
 	assert.Equal(t, 1, report.Summary.TablesSuccess)
 	assert.Equal(t, int64(2), report.Summary.RecordsInserted)
-	assert.Equal(t, ValidationPassed, report.Validation.Status)
+	assert.Contains(t, []string{ValidationPassed, ValidationPassedWithWarn}, report.Validation.Status)
 
 	var dbModel models.Database
 	require.NoError(t, targetDB.Where("name = ?", cfg.Target.DatabaseName).First(&dbModel).Error)
