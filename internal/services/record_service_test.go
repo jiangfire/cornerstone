@@ -281,6 +281,58 @@ func TestFieldService_CheckFieldPermissions_Empty(t *testing.T) {
 }
 
 // ============================================================
+// 9. UpdateRecord 错误路径
+// ============================================================
+
+func TestRecordService_UpdateRecord_VersionConflict(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	dbModel := &models.Database{Name: "test"}
+	require.NoError(t, db.Create(dbModel).Error)
+	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "items"}
+	require.NoError(t, db.Create(tbl).Error)
+	require.NoError(t, db.Create(&models.Field{TableID: tbl.ID, Name: "name", Type: "string"}).Error)
+
+	record := &models.Record{TableID: tbl.ID, Data: `{"name":"alice"}`, Version: 1}
+	require.NoError(t, db.Create(record).Error)
+
+	_, err := s.UpdateRecord(record.ID, UpdateRecordRequest{
+		Data:    map[string]any{"name": "bob"},
+		Version: 999,
+	}, "user1")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "版本")
+}
+
+func TestRecordService_UpdateRecord_NonexistentRecord(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	_, err := s.UpdateRecord("rec_nonexistent", UpdateRecordRequest{
+		Data: map[string]any{"name": "bob"},
+	}, "user1")
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "记录不存在")
+}
+
+func TestRecordService_DeleteRecord_NonexistentRecord(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	err := s.DeleteRecord("rec_nonexistent", "user1")
+	assert.Error(t, err)
+}
+
+func TestRecordService_GetRecord_NonexistentRecord(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	_, err := s.GetRecord("rec_nonexistent", "user1")
+	assert.Error(t, err)
+}
+
+// ============================================================
 // 辅助函数
 // ============================================================
 

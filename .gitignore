@@ -49,7 +49,8 @@ bin/
 
 # 测试覆盖
 coverage/
-*.out
+coverage.html
+coverage.out
 *.test
 
 # Go 依赖

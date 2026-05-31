@@ -375,6 +375,7 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 		return nil, fmt.Errorf("创建字段失败: %w", err)
 	}
 
+	InvalidateFieldCache(field.TableID)
 	return &field, nil
 }
 
@@ -540,6 +541,7 @@ func (s *FieldService) UpdateField(fieldID string, req UpdateFieldRequest, userI
 		return nil, fmt.Errorf("更新字段失败: %w", err)
 	}
 
+	InvalidateFieldCache(field.TableID)
 	return field, nil
 }
 
@@ -572,6 +574,7 @@ func (s *FieldService) DeleteField(fieldID, userID string) error {
 		return fmt.Errorf("字段不存在: %w", gorm.ErrRecordNotFound)
 	}
 
+	InvalidateFieldCache(field.TableID)
 	return nil
 }
 

@@ -9,43 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
-	"github.com/jiangfire/cornerstone/internal/config"
 	"github.com/jiangfire/cornerstone/internal/models"
-	pkgdb "github.com/jiangfire/cornerstone/pkg/db"
+	"github.com/jiangfire/cornerstone/internal/testutil"
 )
 
 func setupMCPTestDB(t *testing.T) *gorm.DB {
-	t.Helper()
-
-	err := pkgdb.InitDB(config.DatabaseConfig{
-		Type: "sqlite",
-		URL:  ":memory:",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = pkgdb.CloseDB()
-	})
-
-	db := pkgdb.DB()
-	err = db.AutoMigrate(
-		&models.Token{},
-		&models.Database{},
-		&models.Table{},
-		&models.Field{},
-		&models.Record{},
-		&models.File{},
-	)
-	require.NoError(t, err)
-
-	require.NoError(t, db.Create(&models.Token{
-		ID:       "test_user",
-		Token:    "cs_test_user_master",
-		Name:     "test_user",
-		IsMaster: true,
-		Scopes:   "{}",
-	}).Error)
-
-	return db
+	return testutil.SetupTestDBWithTokens(t, "test_user")
 }
 
 func TestToolService_ListTools(t *testing.T) {
@@ -253,4 +222,64 @@ func TestToolService_Call_GenerateTestData_InvalidCount(t *testing.T) {
 	result, err := svc.Call(context.Background(), "generate_test_data", args)
 	require.NoError(t, err)
 	assert.True(t, result.IsError)
+}
+
+func TestToolService_Call_CreateDatabase_MissingName(t *testing.T) {
+	db := setupMCPTestDB(t)
+	svc := NewToolService(db, "test_user")
+
+	args, _ := json.Marshal(map[string]any{})
+
+	result, err := svc.Call(context.Background(), "create_database", args)
+	require.NoError(t, err)
+	assert.True(t, result.IsError)
+}
+
+func TestToolService_Call_CreateTable_NonexistentDatabase(t *testing.T) {
+	db := setupMCPTestDB(t)
+	svc := NewToolService(db, "test_user")
+
+	args, _ := json.Marshal(map[string]any{
+		"database_id": "db_nonexistent",
+		"name":        "users",
+	})
+
+	result, err := svc.Call(context.Background(), "create_table", args)
+	require.NoError(t, err)
+	assert.True(t, result.IsError)
+}
+
+func TestToolService_Call_InsertRecord_NonexistentTable(t *testing.T) {
+	db := setupMCPTestDB(t)
+	svc := NewToolService(db, "test_user")
+
+	args, _ := json.Marshal(map[string]any{
+		"table_id": "tbl_nonexistent",
+		"data":     map[string]any{"name": "Alice"},
+	})
+
+	result, err := svc.Call(context.Background(), "insert_record", args)
+	require.NoError(t, err)
+	assert.True(t, result.IsError)
+}
+
+func TestToolService_Call_DeleteRecord_NonexistentRecord(t *testing.T) {
+	db := setupMCPTestDB(t)
+	svc := NewToolService(db, "test_user")
+
+	args, _ := json.Marshal(map[string]any{
+		"record_id": "rec_nonexistent",
+	})
+
+	result, err := svc.Call(context.Background(), "delete_record", args)
+	require.NoError(t, err)
+	assert.True(t, result.IsError)
+}
+
+func TestToolService_Call_NilArgs(t *testing.T) {
+	db := setupMCPTestDB(t)
+	svc := NewToolService(db, "test_user")
+
+	_, err := svc.Call(context.Background(), "create_database", nil)
+	assert.Error(t, err)
 }

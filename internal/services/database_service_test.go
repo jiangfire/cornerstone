@@ -7,50 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
-	"github.com/jiangfire/cornerstone/internal/config"
-	"github.com/jiangfire/cornerstone/internal/models"
-	pkgdb "github.com/jiangfire/cornerstone/pkg/db"
+	"github.com/jiangfire/cornerstone/internal/testutil"
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {
-	t.Helper()
-
-	err := pkgdb.InitDB(config.DatabaseConfig{
-		Type: "sqlite",
-		URL:  ":memory:",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = pkgdb.CloseDB()
-	})
-
-	db := pkgdb.DB()
-	err = db.AutoMigrate(
-		&models.Token{},
-		&models.Database{},
-		&models.Table{},
-		&models.Field{},
-		&models.Record{},
-		&models.File{},
-	)
-	require.NoError(t, err)
-
-	require.NoError(t, db.Create(&models.Token{
-		ID:       "user1",
-		Token:    "cs_user1_master",
-		Name:     "user1",
-		IsMaster: true,
-		Scopes:   "{}",
-	}).Error)
-	require.NoError(t, db.Create(&models.Token{
-		ID:       "test_user",
-		Token:    "cs_test_user_master",
-		Name:     "test_user",
-		IsMaster: true,
-		Scopes:   "{}",
-	}).Error)
-
-	return db
+	return testutil.SetupTestDBWithTokens(t, "user1", "test_user")
 }
 
 func TestDatabaseService_CreateDatabaseWithTables(t *testing.T) {

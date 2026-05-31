@@ -9,35 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
 
-	"github.com/jiangfire/cornerstone/internal/config"
 	"github.com/jiangfire/cornerstone/internal/models"
-	pkgdb "github.com/jiangfire/cornerstone/pkg/db"
+	"github.com/jiangfire/cornerstone/internal/testutil"
 )
 
 func setupAIToolsTestDB(t *testing.T) *gorm.DB {
-	t.Helper()
-
-	err := pkgdb.InitDB(config.DatabaseConfig{
-		Type: "sqlite",
-		URL:  ":memory:",
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = pkgdb.CloseDB()
-	})
-
-	db := pkgdb.DB()
-	err = db.AutoMigrate(
-		&models.Token{},
-		&models.Database{},
-		&models.Table{},
-		&models.Field{},
-		&models.Record{},
-		&models.File{},
-	)
-	require.NoError(t, err)
-
-	return db
+	return testutil.SetupTestDB(t)
 }
 
 func TestExecuteAITool_ListDatabases(t *testing.T) {

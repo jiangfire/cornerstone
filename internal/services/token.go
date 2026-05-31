@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
 	"gorm.io/gorm"
 )
@@ -79,6 +80,7 @@ func (s *TokenService) DeleteToken(tokenID string, targetID string, isMaster boo
 	if err := s.db.Delete(&t).Error; err != nil {
 		return fmt.Errorf("删除 Token 失败: %w", err)
 	}
+	authz.InvalidateTokenCache(targetID)
 	return nil
 }
 
@@ -108,5 +110,6 @@ func (s *TokenService) UpdateToken(targetID string, scopes string, expiresAt *ti
 	if err := s.db.Where("id = ?", targetID).First(&t).Error; err != nil {
 		return nil, fmt.Errorf("查询最新 Token 失败: %w", err)
 	}
+	authz.InvalidateTokenCache(targetID)
 	return &t, nil
 }

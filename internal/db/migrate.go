@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/config"
 	"github.com/jiangfire/cornerstone/internal/models"
 	pkgdb "github.com/jiangfire/cornerstone/pkg/db"
@@ -150,6 +151,7 @@ func CleanupExpiredTokens() error {
 
 	if result.RowsAffected > 0 {
 		logger.Info("清理过期 Token", zap.Int64("count", result.RowsAffected))
+		authz.ClearTokenCache()
 	}
 	return nil
 }

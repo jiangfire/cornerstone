@@ -13,7 +13,6 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
-	"github.com/jiangfire/cornerstone/pkg/cache"
 	"gorm.io/gorm"
 )
 
@@ -72,15 +71,13 @@ func parseAttachmentValue(value interface{}) ([]string, error) {
 
 // RecordService 数据记录服务
 type RecordService struct {
-	db         *gorm.DB
-	fieldCache *cache.Cache[string, []models.Field]
+	db *gorm.DB
 }
 
 // NewRecordService 创建记录服务实例
 func NewRecordService(db *gorm.DB) *RecordService {
 	return &RecordService{
-		db:         db,
-		fieldCache: cache.NewCache[string, []models.Field](5 * time.Minute),
+		db: db,
 	}
 }
 
@@ -400,7 +397,7 @@ func (s *RecordService) validateFieldValueWithConfig(field models.Field, config 
 }
 
 func (s *RecordService) getTableFields(tableID string) ([]models.Field, error) {
-	if fields, ok := s.fieldCache.Get(tableID); ok {
+	if fields, ok := SharedFieldCache.Get(tableID); ok {
 		return fields, nil
 	}
 	var fields []models.Field
@@ -409,7 +406,7 @@ func (s *RecordService) getTableFields(tableID string) ([]models.Field, error) {
 		Find(&fields).Error; err != nil {
 		return nil, fmt.Errorf("获取字段定义失败: %w", err)
 	}
-	s.fieldCache.Set(tableID, fields)
+	SharedFieldCache.Set(tableID, fields)
 	return fields, nil
 }
 

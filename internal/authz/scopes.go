@@ -14,7 +14,7 @@ import (
 
 // tokenCache 缓存 Token 及其解析后的权限配置，减少每次请求都查 DB 的开销。
 // TTL 5 分钟，在大多数业务场景下 Token 和 Scopes 不会频繁变更。
-var tokenCache = cache.NewCache[string, *Authorizer](5 * time.Minute)
+var tokenCache = cache.NewString[*Authorizer]("token", 5*time.Minute)
 
 const (
 	ActionRead   = "read"
@@ -337,4 +337,14 @@ func (a *Authorizer) AccessibleRecordIDs() ([]string, error) {
 		return nil, err
 	}
 	return ids, nil
+}
+
+// InvalidateTokenCache 失效指定 Token 的缓存。
+func InvalidateTokenCache(tokenID string) {
+	tokenCache.Delete(tokenID)
+}
+
+// ClearTokenCache 清空所有 Token 缓存。
+func ClearTokenCache() {
+	tokenCache.Clear()
 }

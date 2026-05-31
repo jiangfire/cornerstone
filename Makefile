@@ -83,6 +83,13 @@ test-cover: ## Run tests (coverage analysis)
 	@$(GO) tool cover -html=coverage.out -o coverage.html
 	@echo Coverage report: coverage.html
 
+test-clean: ## Clean test cache and orphaned test artifacts
+	@echo Cleaning test cache...
+	@$(GO) clean -testcache
+	@echo Cleaning orphaned test databases...
+	@-pwsh -Command "Get-ChildItem -Path . -Filter 'test_*.db' -Recurse | Remove-Item -Force"
+	@echo Done.
+
 ##@ Quality checks
 
 lint: ## Run code checks
