@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-`backend/` contains the Go CLI + API server. Entry point is `backend/cmd/main.go`; CLI commands live in `backend/internal/cli`, business logic in `backend/internal/services`, HTTP handlers in `backend/internal/handlers`, and shared utilities in `backend/pkg`. `docs/` stores reference docs.
+`backend/` contains the Go CLI + API server. Entry point is `backend/cmd/main.go`; CLI commands live in `backend/internal/cli`, business logic in `backend/internal/services`, HTTP handlers in `backend/internal/handlers`, and shared utilities in `backend/pkg`.
 
 ## Build, Test, and Development Commands
 Use Docker for a full stack boot: `docker compose up -d --build`. For backend-only work: `cd backend && go run ./cmd/main.go serve`. Run backend tests with `cd backend && go test ./...`. For CLI usage: `cd backend && go run ./cmd/main.go --help`. Validate code quality with `make fmt`, `make vet`, `make lint`, and `make test`. Build binary: `make build`.

@@ -1,6 +1,6 @@
-# Query DSL - 前端查询 DSL
+# Query DSL - 查询 DSL
 
-前端通过 JSON 字符串描述查询需求，后端安全解析并执行。无需手写 SQL，同时保证安全性。
+通过 JSON 字符串描述查询需求，后端安全解析并执行。无需手写 SQL，同时保证安全性。
 
 支持 **PostgreSQL** 和 **SQLite** 两种数据库。
 

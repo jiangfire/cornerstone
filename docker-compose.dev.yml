@@ -4,7 +4,7 @@
 #
 # 提供的本地便利：
 #   - 把 Postgres 暴露到宿主 5432，便于直接接 psql / DBeaver。
-#   - 后端切到 debug，CORS 全放开，便于 Vue dev server 直连。
+#   - 后端切到 debug，CORS 全放开，便于 CLI / API 客户端调试。
 #
 # 注意：本文件仅供本地开发使用，不要在公开环境启用。
 

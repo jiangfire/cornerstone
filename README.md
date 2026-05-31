@@ -2,7 +2,7 @@
 
 > 轻量数据资产平台 CLI：集中存储、Token 接入、AI 助手、MCP 协议。
 
-[![Go Version](https://img.shields.io/badge/Go-1.25+-00ADD8?style=flat&logo=go)](https://golang.org/)
+[![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 
 Cornerstone 是一个轻量数据资产平台，面向**测试、开发和内部数据管理**场景。
@@ -189,7 +189,6 @@ cornerstone/
       dto/                   # 响应格式
       log/                   # 日志
       query/                 # Query DSL 引擎
-  docs/                      # 文档
 ```
 
 ---
