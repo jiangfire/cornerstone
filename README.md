@@ -20,6 +20,14 @@ docker compose up -d --build
 
 从 [Releases](https://github.com/jiangfire/cornerstone/releases) 下载对应平台的二进制文件。
 
+### 从源码构建
+
+```bash
+make build          # 构建当前平台二进制
+make test           # 运行测试
+make dev            # 启动开发服务器
+```
+
 ---
 
 ## 配置
@@ -320,6 +328,20 @@ curl -X POST http://localhost:8080/api/v1/ai/chat \
 ## Query DSL
 
 通过 JSON 描述查询，支持过滤、排序、聚合、JOIN。详见 [Query DSL 文档](docs/Query.md)。
+
+---
+
+## 开发
+
+```bash
+make build          # 构建二进制（输出到 bin/）
+make test           # 运行全部测试（含 race 检测）
+make test-cover     # 运行测试并生成覆盖率报告
+make lint           # 运行 golangci-lint
+make check          # 完整检查（fmt + vet + test）
+make swagger        # 重新生成 Swagger 文档
+make dev            # 启动本地开发服务器
+```
 
 ---
 
