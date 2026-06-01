@@ -30,7 +30,7 @@ curl "http://localhost:8080/api/v1/query/simple?table=records&filter=%7B%7D&sort
 ### 批量查询
 
 ```bash
-curl -X POST http://localhost:8080/api/query/batch \
+curl -X POST http://localhost:8080/api/v1/query/batch \
   -H "Authorization: Bearer cs_your_token" \
   -H "Content-Type: application/json" \
   -d '{"queries": {"q1": {"from": "records", ...}, "q2": {"from": "tables", ...}}}'
@@ -39,7 +39,7 @@ curl -X POST http://localhost:8080/api/query/batch \
 ### 查询解释
 
 ```bash
-curl -X POST http://localhost:8080/api/query/explain \
+curl -X POST http://localhost:8080/api/v1/query/explain \
   -H "Authorization: Bearer cs_your_token" \
   -H "Content-Type: application/json" \
   -d '{"from": "records", ...}'
@@ -48,7 +48,7 @@ curl -X POST http://localhost:8080/api/query/explain \
 ### 可访问表列表
 
 ```bash
-curl http://localhost:8080/api/query/tables \
+curl http://localhost:8080/api/v1/query/tables \
   -H "Authorization: Bearer cs_your_token"
 ```
 
@@ -267,9 +267,9 @@ curl http://localhost:8080/api/query/tables \
 
 ---
 
-## 新增端点
+## 查询校验与 Schema 端点
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| POST | `/api/query/validate` | 校验查询 DSL + 权限（不执行） |
-| GET | `/api/query/schema/:table` | 获取可查询表的字段 Schema |
+| POST | `/api/v1/query/validate` | 校验查询 DSL + 权限（不执行） |
+| GET | `/api/v1/query/schema/:table` | 获取可查询表的字段 Schema |

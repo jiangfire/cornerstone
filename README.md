@@ -4,6 +4,7 @@
 
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
+[![Tests](https://github.com/jiangfire/cornerstone/actions/workflows/ci.yml/badge.svg)](https://github.com/jiangfire/cornerstone/actions/workflows/ci.yml)
 
 ---
 
@@ -319,6 +320,20 @@ curl -X POST http://localhost:8080/api/v1/ai/chat \
 ## Query DSL
 
 通过 JSON 描述查询，支持过滤、排序、聚合、JOIN。详见 [Query DSL 文档](docs/Query.md)。
+
+---
+
+## 测试
+
+```bash
+go test ./...                           # 运行全部测试
+go test ./... -coverprofile=coverage.out # 生成覆盖率报告
+go tool cover -func=coverage.out        # 查看函数级覆盖率
+```
+
+关键业务链覆盖率：authz 90%+, config 91%+, middleware 93%+, handlers 90%+, services 85%+, query 86%+, migration 85%+。
+
+CI 中还包含 MySQL 8.4 和 PostgreSQL 16 的迁移集成测试，以及 golangci-lint、govulncheck 和 Trivy 安全扫描。
 
 ---
 
