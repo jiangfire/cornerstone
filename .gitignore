@@ -51,6 +51,9 @@ bin/
 coverage/
 coverage.html
 coverage.out
+coverage_*.out
+cov
+cover
 *.test
 
 # Go 依赖

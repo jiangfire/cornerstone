@@ -1,6 +1,6 @@
 # Cornerstone
 
-> 轻量数据资产平台：CLI + REST API + AI 助手 + MCP 协议
+> 轻量数据资产平台：CLI + REST API + 外部迁移 + AI 助手 + MCP 协议
 
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
@@ -29,20 +29,21 @@ docker compose up -d --build
 |------|------|--------|
 | `DB_TYPE` | `sqlite` 或 `postgres` | `sqlite` |
 | `DATABASE_URL` | 数据库连接串 | `./cornerstone.db` |
-| `DB_MAX_OPEN` | 数据库最大打开连接数 | `25` |
+| `DB_MAX_OPEN` | 数据库最大打开连接数 | `10` |
 | `DB_MAX_IDLE` | 数据库最大空闲连接数 | `5` |
-| `DB_MAX_LIFETIME` | 连接最大生命周期 | `5m` |
+| `DB_MAX_LIFETIME` | 连接最大生命周期（秒） | `3600` |
 | `SERVER_MODE` | `release` 或 `debug` | `release` |
 | `PORT` | 服务端口 | `8080` |
 | `LOG_LEVEL` | 日志级别 | `info` |
-| `MASTER_TOKEN` | Master Token（留空则自动生成） | - |
+| `MASTER_TOKEN` | Master Token（留空则 Master Token 认证不可用） | - |
 | `LLM_API_KEY` | LLM API Key（启用 AI 助手） | - |
 | `LLM_MODEL` | LLM 模型名 | `gpt-4o` |
 | `LLM_BASE_URL` | 自定义 LLM API 地址 | - |
-| `MCP_ALLOWED_ORIGINS` | MCP 允许的来源（逗号分隔） | `*` |
-| `MCP_SSE_KEEPALIVE_SEC` | SSE 心跳间隔（秒） | `30` |
-| `MCP_SSE_RETRY_MS` | SSE 重连间隔（毫秒） | `5000` |
-| `MCP_SSE_REPLAY_BUFFER` | SSE 重放缓冲区大小 | `100` |
+| `MCP_ALLOWED_ORIGINS` | MCP 允许的来源（逗号分隔） | (空) |
+| `MCP_SSE_KEEPALIVE_SEC` | SSE 心跳间隔（秒） | `25` |
+| `MCP_SSE_RETRY_MS` | SSE 重连间隔（毫秒） | `3000` |
+| `MCP_SSE_REPLAY_BUFFER` | SSE 重放缓冲区大小 | `128` |
+| `REDIS_URL` | Redis 连接串（留空使用内存缓存） | - |
 
 ---
 
@@ -127,10 +128,46 @@ cornerstone token update <id>       # 更新 Token
 cornerstone token delete <id>       # 删除 Token
 ```
 
+### 外部数据库迁移
+
+将外部关系型数据库（MySQL / PostgreSQL / SQLite）的结构和数据迁移到 Cornerstone：
+
+```bash
+cornerstone migration run                    # 执行迁移
+  -c, --config string                        迁移配置文件路径
+  --source-type string                       源库类型：mysql|postgres|sqlite
+  --source-dsn string                        源库连接 DSN
+  --target-db string                         目标 Cornerstone Database 名称
+  --include-tables string                    要迁移的表（逗号分隔）
+  --exclude-tables string                    排除的表（逗号分隔）
+  --with-data                                迁移数据（默认 true）
+  --skip-data                                仅迁移结构
+  --batch-size int                           批量读取大小（默认 500）
+  --dry-run                                  空跑模式，仅输出计划
+  --resume string                            从指定任务 ID 恢复
+  --continue-on-error                        单表错误后继续其他表
+  --pagination-strategy string               分页策略：cursor|offset
+  --cursor-column string                     游标列
+  --checkpoint-interval int                  位点持久化间隔（默认 100）
+  --rollback-on-failure string               失败回滚策略：table|none
+  --max-concurrent-tables int                并发迁移表数（默认 1）
+cornerstone migration preview                # 预览迁移计划
+cornerstone migration template               # 输出配置模板
+cornerstone migration config create          # 创建配置模板文件
+cornerstone migration config validate        # 校验配置文件
+cornerstone migration config list            # 列出配置
+```
+
+### 缓存管理
+
+```bash
+cornerstone cache clear                 # 清空所有缓存（字段缓存 + Token 缓存）
+```
+
 ### 其他
 
 ```bash
-cornerstone migrate                 # 执行数据库迁移
+cornerstone migrate                 # 执行数据库迁移（表结构）
 cornerstone --version               # 显示版本
 ```
 
@@ -229,7 +266,7 @@ Database ──1:N──> Table ──1:N──> Field
 | Token | `tok_` | API 认证令牌，Master Token 拥有全部权限 |
 | Database | `db_` | 数据库 |
 | Table | `tbl_` | 表 |
-| Field | `fld_` | 字段（string/number/boolean/date/attachment 等） |
+| Field | `fld_` | 字段（string / text / number / boolean / date / datetime / file / json / list） |
 | Record | `rec_` | 记录（JSONB 存储，乐观锁） |
 | File | `fil_` | 文件附件 |
 

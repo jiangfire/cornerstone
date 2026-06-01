@@ -143,6 +143,7 @@ func (r *Runner) Run() (*MigrationReport, error) {
 	)
 
 	report := &MigrationReport{
+		MigrationID: r.migrationID,
 		Status:    StatusCompleted,
 		StartedAt: state.StartedAt,
 		Summary: ReportSummary{
@@ -938,7 +939,7 @@ func (r *Runner) loadOrInitState(plan *compiledPlan) (MigrationState, error) {
 
 	state := MigrationState{
 		MigrationID: r.migrationID,
-		Source:      normalizeLower(r.cfg.Source.Type) + ":" + r.cfg.BuildSourceDSN(),
+		Source:      r.stateSourceDescriptor(),
 		TargetDB:    plan.TargetDatabase,
 		StartedAt:   time.Now().UTC(),
 		Tables:      map[string]TableState{},
@@ -1009,6 +1010,25 @@ func (r *Runner) sourceDatabaseName() string {
 		return r.cfg.EffectiveTargetDatabase()
 	}
 	return ""
+}
+
+func (r *Runner) stateSourceDescriptor() string {
+	sourceType := normalizeLower(r.cfg.Source.Type)
+	databaseName := strings.TrimSpace(r.cfg.Source.Database)
+	if databaseName == "" {
+		switch sourceType {
+		case "sqlite":
+			databaseName = r.sourceDatabaseName()
+		case "mysql":
+			databaseName = mysqlDatabaseNameFromDSN(r.cfg.Source.DSN)
+		case "postgres":
+			databaseName = postgresDatabaseNameFromDSN(r.cfg.Source.DSN)
+		}
+	}
+	if databaseName == "" {
+		return sourceType
+	}
+	return sourceType + ":" + databaseName
 }
 
 func normalizeCursorValue(value interface{}) interface{} {
@@ -1277,4 +1297,26 @@ func toFloat64(value interface{}) (float64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func mysqlDatabaseNameFromDSN(dsn string) string {
+	parts := strings.SplitN(dsn, "/", 2)
+	if len(parts) != 2 {
+		return ""
+	}
+	dbPart := parts[1]
+	if idx := strings.Index(dbPart, "?"); idx >= 0 {
+		dbPart = dbPart[:idx]
+	}
+	return strings.TrimSpace(dbPart)
+}
+
+func postgresDatabaseNameFromDSN(dsn string) string {
+	for _, part := range strings.Fields(dsn) {
+		if !strings.HasPrefix(part, "dbname=") {
+			continue
+		}
+		return strings.TrimSpace(strings.TrimPrefix(part, "dbname="))
+	}
+	return ""
 }

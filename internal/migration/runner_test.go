@@ -65,6 +65,7 @@ func TestRunnerPreviewAndRun(t *testing.T) {
 
 	report, err := runner.Run()
 	require.NoError(t, err)
+	assert.Equal(t, runner.migrationID, report.MigrationID)
 	assert.Equal(t, StatusCompleted, report.Status)
 	assert.Equal(t, 1, report.Summary.TablesSuccess)
 	assert.Equal(t, int64(2), report.Summary.RecordsInserted)
@@ -168,6 +169,44 @@ func TestRunnerResume_FromCheckpoint(t *testing.T) {
 	var records []models.Record
 	require.NoError(t, targetDB.Where("table_id = ?", tbl.ID).Find(&records).Error)
 	assert.Len(t, records, 2)
+}
+
+func TestRunnerLoadOrInitState_SanitizesSourceDescriptor(t *testing.T) {
+	runner, err := NewRunner(nil, "", Config{
+		Source: SourceConfig{
+			Type: "mysql",
+			DSN:  "user:super-secret@tcp(localhost:3306)/shop?parseTime=true",
+		},
+		Target: TargetConfig{
+			DatabaseName: "shop_target",
+		},
+		Data: DataConfig{
+			Enabled:             true,
+			BatchSize:           100,
+			PaginationStrategy:  PaginationCursor,
+			MaxConcurrentTables: 1,
+		},
+		Options: OptionsConfig{
+			CheckpointInterval: 1,
+			RollbackOnFailure:  RollbackTable,
+		},
+	}, RunnerOptions{
+		StateDir: t.TempDir(),
+	})
+	require.NoError(t, err)
+
+	state, err := runner.loadOrInitState(&compiledPlan{
+		PreviewPlan: PreviewPlan{
+			TargetDatabase: "shop_target",
+			Tables: []PreviewTablePlan{
+				{SourceTable: "users", EstimatedRows: 10},
+			},
+		},
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "mysql:shop", state.Source)
+	assert.NotContains(t, state.Source, "super-secret")
+	assert.NotContains(t, state.Source, "localhost")
 }
 
 func buildSQLiteSourceFixture(t *testing.T) string {

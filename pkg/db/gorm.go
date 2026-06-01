@@ -20,6 +20,11 @@ func DB() *gorm.DB {
 	return db
 }
 
+// SetDB 设置数据库连接对象（用于测试）
+func SetDB(d *gorm.DB) {
+	db = d
+}
+
 // IsSQLite 检查当前是否为 SQLite 数据库
 func IsSQLite() bool {
 	if db == nil {

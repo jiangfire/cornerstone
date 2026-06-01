@@ -34,6 +34,7 @@ type PreviewTablePlan struct {
 }
 
 type MigrationReport struct {
+	MigrationID string                 `json:"migration_id"`
 	Status     string                 `json:"status"`
 	StartedAt  time.Time              `json:"started_at"`
 	FinishedAt time.Time              `json:"finished_at"`
