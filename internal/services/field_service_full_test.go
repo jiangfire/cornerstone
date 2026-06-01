@@ -427,12 +427,12 @@ func TestValidateFieldConfig_OptionTooLong(t *testing.T) {
 // ============================================================
 
 func TestValidateFieldConfig_MinGreaterThanMax(t *testing.T) {
-	min := 10.0
-	max := 5.0
+	cfgMin := 10.0
+	cfgMax := 5.0
 
 	err := validateFieldConfig(FieldConfig{
-		Min: &min,
-		Max: &max,
+		Min: &cfgMin,
+		Max: &cfgMax,
 	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "最小值不能大于最大值")
@@ -508,14 +508,14 @@ func TestValidateFieldConfig_NegativeMaxFileSize(t *testing.T) {
 // ============================================================
 
 func TestValidateFieldConfig_Valid(t *testing.T) {
-	min := 1.0
-	max := 100.0
+	cfgMin := 1.0
+	cfgMax := 100.0
 	maxLen := 50
 
 	err := validateFieldConfig(FieldConfig{
 		Options:       []string{"a", "b"},
-		Min:           &min,
-		Max:           &max,
+		Min:           &cfgMin,
+		Max:           &cfgMax,
 		MaxLength:     &maxLen,
 		Validation:    `^[a-z]+$`,
 		AllowedTypes:  []string{".pdf", "image/*"},
@@ -792,15 +792,15 @@ func TestUpdateField_WithConfig(t *testing.T) {
 	}, master.ID)
 	require.NoError(t, err)
 
-	min := 0.0
-	max := 100.0
+	cfgMin := 0.0
+	cfgMax := 100.0
 	updated, err := svc.UpdateField(created.ID, UpdateFieldRequest{
 		Name:     "score",
 		Type:     "number",
 		Required: true,
 		Config: FieldConfig{
-			Min: &min,
-			Max: &max,
+			Min: &cfgMin,
+			Max: &cfgMax,
 		},
 	}, master.ID)
 	require.NoError(t, err)
@@ -969,8 +969,8 @@ func TestValidateFieldConfig_EmptyValidation(t *testing.T) {
 // ============================================================
 
 func TestValidateFieldConfig_MinOnly(t *testing.T) {
-	min := 5.0
-	err := validateFieldConfig(FieldConfig{Min: &min})
+	cfgMin := 5.0
+	err := validateFieldConfig(FieldConfig{Min: &cfgMin})
 	assert.NoError(t, err)
 }
 
@@ -979,8 +979,8 @@ func TestValidateFieldConfig_MinOnly(t *testing.T) {
 // ============================================================
 
 func TestValidateFieldConfig_MaxOnly(t *testing.T) {
-	max := 100.0
-	err := validateFieldConfig(FieldConfig{Max: &max})
+	cfgMax := 100.0
+	err := validateFieldConfig(FieldConfig{Max: &cfgMax})
 	assert.NoError(t, err)
 }
 

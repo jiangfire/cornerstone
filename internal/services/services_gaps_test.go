@@ -466,8 +466,8 @@ func TestExtractKnownRecordData_FiltersUnknownFields(t *testing.T) {
 		{ID: "fld_2", Name: "age"},
 	}
 	data := map[string]interface{}{
-		"name":   "Alice",
-		"fld_2":  30,
+		"name":    "Alice",
+		"fld_2":   30,
 		"unknown": "value",
 	}
 

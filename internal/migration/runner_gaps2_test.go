@@ -419,7 +419,7 @@ func TestCompareColumnStats_NumericMismatch(t *testing.T) {
 func TestCompareColumnStats_DateMismatch(t *testing.T) {
 	db := testutil.SetupTestDBWithTokens(t, "master")
 	runner, err := NewRunner(db, "master", Config{
-		Source: SourceConfig{Type: "sqlite", DSN: ":memory:"},
+		Source:  SourceConfig{Type: "sqlite", DSN: ":memory:"},
 		Mapping: MappingConfig{Overrides: map[string]string{"DATE": "date"}},
 		Data: DataConfig{
 			Enabled: true, BatchSize: 100, PaginationStrategy: PaginationCursor, MaxConcurrentTables: 1,

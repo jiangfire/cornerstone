@@ -9,12 +9,12 @@ import (
 
 func TestNewTypeMapper_Dispatches(t *testing.T) {
 	cases := []struct {
-		name       string
-		dbType     string
-		overrides  map[string]string
-		rawType    string
-		wantType   string
-		wantWarn   bool
+		name      string
+		dbType    string
+		overrides map[string]string
+		rawType   string
+		wantType  string
+		wantWarn  bool
 	}{
 		{"mysql", "mysql", nil, "int(11)", "number", false},
 		{"postgres", "postgres", nil, "boolean", "boolean", false},

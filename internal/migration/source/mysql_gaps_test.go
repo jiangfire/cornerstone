@@ -291,7 +291,7 @@ ORDER BY index_name, seq_in_index`)).
 
 func TestMySQLDatabaseNameFromDSN(t *testing.T) {
 	tests := []struct {
-		dsn   string
+		dsn    string
 		expect string
 	}{
 		{"user:pass@tcp(host:3306)/mydb", "mydb"},

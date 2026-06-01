@@ -144,8 +144,8 @@ func (r *Runner) Run() (*MigrationReport, error) {
 
 	report := &MigrationReport{
 		MigrationID: r.migrationID,
-		Status:    StatusCompleted,
-		StartedAt: state.StartedAt,
+		Status:      StatusCompleted,
+		StartedAt:   state.StartedAt,
 		Summary: ReportSummary{
 			TablesTotal:  len(plan.Tables),
 			RecordsTotal: plan.TotalEstimatedRows,

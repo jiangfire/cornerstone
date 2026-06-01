@@ -26,20 +26,6 @@ func createNonMasterToken(t *testing.T, db *gorm.DB) string {
 	return token.ID
 }
 
-func createDBAndTableForGapTest(t *testing.T, db *gorm.DB, userID string) (string, string) {
-	t.Helper()
-	dbSvc := NewDatabaseService(db)
-	database, err := dbSvc.CreateDatabase(CreateDBRequest{Name: "gapdb"}, userID)
-	require.NoError(t, err)
-	tblSvc := NewTableService(db)
-	table, err := tblSvc.CreateTable(CreateTableRequest{
-		DatabaseID: database.ID,
-		Name:       "items",
-	}, userID)
-	require.NoError(t, err)
-	return database.ID, table.ID
-}
-
 func TestCreateDatabase_NonMasterDenied(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)

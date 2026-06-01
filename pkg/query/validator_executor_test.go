@@ -88,8 +88,8 @@ func TestValidateRequest_ValidatesOrderByFields(t *testing.T) {
 	createTestData(t, db)
 	v := NewValidator(db)
 	req := &QueryRequest{
-		From:   "databases",
-		Select: []string{"id"},
+		From:    "databases",
+		Select:  []string{"id"},
 		OrderBy: []OrderByClause{{Field: "no_such_field", Dir: "asc"}},
 	}
 	err := v.ValidateRequest(context.Background(), req, "user1")
@@ -102,9 +102,9 @@ func TestValidateRequest_ValidatesGroupByFields(t *testing.T) {
 	createTestData(t, db)
 	v := NewValidator(db)
 	req := &QueryRequest{
-		From:     "databases",
-		Select:   []string{"id"},
-		GroupBy:  []string{"bogus_col"},
+		From:    "databases",
+		Select:  []string{"id"},
+		GroupBy: []string{"bogus_col"},
 	}
 	err := v.ValidateRequest(context.Background(), req, "user1")
 	require.Error(t, err)
@@ -116,8 +116,8 @@ func TestValidateRequest_ValidatesAggregateFields(t *testing.T) {
 	createTestData(t, db)
 	v := NewValidator(db)
 	req := &QueryRequest{
-		From:   "databases",
-		Select: []string{"id"},
+		From:      "databases",
+		Select:    []string{"id"},
 		Aggregate: []AggregateFunc{{Func: "count", Field: "invalid_col", As: "cnt"}},
 	}
 	err := v.ValidateRequest(context.Background(), req, "user1")
@@ -359,10 +359,10 @@ func TestSplitJSONBaseField(t *testing.T) {
 	assert.True(t, ok)
 	assert.Equal(t, "data", base)
 
-	base, ok = splitJSONBaseField("data->status")
+	_, ok = splitJSONBaseField("data->status")
 	assert.False(t, ok)
 
-	base, ok = splitJSONBaseField("name")
+	_, ok = splitJSONBaseField("name")
 	assert.False(t, ok)
 }
 
@@ -448,11 +448,11 @@ func TestExecute_QueryWithOrderBy(t *testing.T) {
 
 	executor := NewExecutor(db)
 	result, err := executor.Execute(context.Background(), &QueryRequest{
-		From:   "databases",
-		Select: []string{"name"},
+		From:    "databases",
+		Select:  []string{"name"},
 		OrderBy: []OrderByClause{{Field: "name", Dir: "desc"}},
-		Page:   1,
-		Size:   20,
+		Page:    1,
+		Size:    20,
 	}, "user1")
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(result.Data), 2)
@@ -693,13 +693,13 @@ func TestNewExecutorWithConfig(t *testing.T) {
 func TestWithDB(t *testing.T) {
 	db := setupQueryTestDB(t)
 	executor := NewExecutor(db)
-	copy := executor.WithDB(db)
-	assert.NotNil(t, copy)
-	assert.Equal(t, executor.parser, copy.parser)
-	assert.Equal(t, executor.validator, copy.validator)
-	assert.Equal(t, executor.generator, copy.generator)
-	assert.Equal(t, executor.limits, copy.limits)
-	assert.NotSame(t, executor, copy)
+	execCopy := executor.WithDB(db)
+	assert.NotNil(t, execCopy)
+	assert.Equal(t, executor.parser, execCopy.parser)
+	assert.Equal(t, executor.validator, execCopy.validator)
+	assert.Equal(t, executor.generator, execCopy.generator)
+	assert.Equal(t, executor.limits, execCopy.limits)
+	assert.NotSame(t, executor, execCopy)
 }
 
 func TestExecutorAccessors(t *testing.T) {

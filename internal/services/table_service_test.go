@@ -391,11 +391,11 @@ func TestValidateTableName_Invalid(t *testing.T) {
 
 func TestSanitizeTableInput(t *testing.T) {
 	tests := []struct {
-		name         string
-		inputName    string
-		inputDesc    string
-		expectName   string
-		expectDesc   string
+		name       string
+		inputName  string
+		inputDesc  string
+		expectName string
+		expectDesc string
 	}{
 		{
 			"strips angle brackets and quotes from name",

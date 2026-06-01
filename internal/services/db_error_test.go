@@ -40,16 +40,6 @@ func injectDBQueryError(t *testing.T, db *gorm.DB) {
 	})
 }
 
-func injectDBDeleteError(t *testing.T, db *gorm.DB) {
-	err := db.Callback().Delete().Before("gorm:delete").Register("test_inject_delete_error", func(d *gorm.DB) {
-		d.Error = fmt.Errorf("injected delete error")
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = db.Callback().Delete().Remove("test_inject_delete_error")
-	})
-}
-
 func injectQueryErrorOnNthCall(t *testing.T, db *gorm.DB, n int) {
 	var counter int32
 	err := db.Callback().Query().Before("gorm:query").Register("test_query_nth_error", func(d *gorm.DB) {

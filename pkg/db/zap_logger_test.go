@@ -191,8 +191,8 @@ func TestZapLogger_Trace_RecordNotFound_NotIgnored(t *testing.T) {
 
 func TestZapLevelToGormLevel(t *testing.T) {
 	tests := []struct {
-		zapLevel   zapcore.Level
-		gormLevel  logger.LogLevel
+		zapLevel  zapcore.Level
+		gormLevel logger.LogLevel
 	}{
 		{zapcore.DebugLevel, logger.Info},
 		{zapcore.InfoLevel, logger.Info},

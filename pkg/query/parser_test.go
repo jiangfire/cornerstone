@@ -809,9 +809,9 @@ func TestParseFromMap(t *testing.T) {
 func TestParse_HavingClause(t *testing.T) {
 	p := NewParser()
 	input := map[string]interface{}{
-		"from":     "records",
-		"select":   []string{"category"},
-		"groupBy":  []string{"category"},
+		"from":    "records",
+		"select":  []string{"category"},
+		"groupBy": []string{"category"},
 		"aggregate": []interface{}{
 			map[string]interface{}{"func": "count", "field": "id", "as": "cnt"},
 		},

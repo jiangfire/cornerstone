@@ -188,13 +188,13 @@ func TestMinMaxStringFieldFromMaps(t *testing.T) {
 		{"d": "2024-01-01"},
 		{"d": "2024-12-31"},
 	}
-	min, max := minMaxStringFieldFromMaps(rows, "d")
-	assert.Equal(t, "2024-01-01", min)
-	assert.Equal(t, "2024-12-31", max)
+	gotMin, gotMax := minMaxStringFieldFromMaps(rows, "d")
+	assert.Equal(t, "2024-01-01", gotMin)
+	assert.Equal(t, "2024-12-31", gotMax)
 
-	min, max = minMaxStringFieldFromMaps(rows, "missing")
-	assert.Equal(t, "", min)
-	assert.Equal(t, "", max)
+	gotMin, gotMax = minMaxStringFieldFromMaps(rows, "missing")
+	assert.Equal(t, "", gotMin)
+	assert.Equal(t, "", gotMax)
 
 	rowsWithEmpty := []map[string]interface{}{
 		{"d": "alpha"},
@@ -202,13 +202,13 @@ func TestMinMaxStringFieldFromMaps(t *testing.T) {
 		{"d": "   "},
 		{"d": "zeta"},
 	}
-	min, max = minMaxStringFieldFromMaps(rowsWithEmpty, "d")
-	assert.Equal(t, "alpha", min)
-	assert.Equal(t, "zeta", max)
+	gotMin, gotMax = minMaxStringFieldFromMaps(rowsWithEmpty, "d")
+	assert.Equal(t, "alpha", gotMin)
+	assert.Equal(t, "zeta", gotMax)
 
-	min, max = minMaxStringFieldFromMaps([]map[string]interface{}{}, "d")
-	assert.Equal(t, "", min)
-	assert.Equal(t, "", max)
+	gotMin, gotMax = minMaxStringFieldFromMaps([]map[string]interface{}{}, "d")
+	assert.Equal(t, "", gotMin)
+	assert.Equal(t, "", gotMax)
 }
 
 func TestMysqlDatabaseNameFromDSN(t *testing.T) {
@@ -357,8 +357,8 @@ func TestConfig_Validate_AllBranches(t *testing.T) {
 	assert.Contains(t, badType.Validate().Error(), "source.type")
 
 	bothDSNAndFields := Config{
-		Source: SourceConfig{Type: "mysql", DSN: "dsn", Host: "h", Port: 3306, User: "u", Password: "p", Database: "d"},
-		Data:   DataConfig{BatchSize: 100, MaxConcurrentTables: 1},
+		Source:  SourceConfig{Type: "mysql", DSN: "dsn", Host: "h", Port: 3306, User: "u", Password: "p", Database: "d"},
+		Data:    DataConfig{BatchSize: 100, MaxConcurrentTables: 1},
 		Options: OptionsConfig{CheckpointInterval: 100, RollbackOnFailure: RollbackTable},
 	}
 	err := bothDSNAndFields.Validate()
@@ -366,8 +366,8 @@ func TestConfig_Validate_AllBranches(t *testing.T) {
 	assert.Contains(t, err.Error(), "互斥")
 
 	neitherDSNNorFields := Config{
-		Source: SourceConfig{Type: "mysql"},
-		Data:   DataConfig{BatchSize: 100, MaxConcurrentTables: 1},
+		Source:  SourceConfig{Type: "mysql"},
+		Data:    DataConfig{BatchSize: 100, MaxConcurrentTables: 1},
 		Options: OptionsConfig{CheckpointInterval: 100, RollbackOnFailure: RollbackTable},
 	}
 	err = neitherDSNNorFields.Validate()
@@ -375,8 +375,8 @@ func TestConfig_Validate_AllBranches(t *testing.T) {
 	assert.Contains(t, err.Error(), "必须提供")
 
 	sqliteMissing := Config{
-		Source: SourceConfig{Type: "sqlite", Host: "localhost"},
-		Data:   DataConfig{BatchSize: 100, MaxConcurrentTables: 1},
+		Source:  SourceConfig{Type: "sqlite", Host: "localhost"},
+		Data:    DataConfig{BatchSize: 100, MaxConcurrentTables: 1},
 		Options: OptionsConfig{CheckpointInterval: 100, RollbackOnFailure: RollbackTable},
 	}
 	err = sqliteMissing.Validate()
@@ -384,8 +384,8 @@ func TestConfig_Validate_AllBranches(t *testing.T) {
 	assert.Contains(t, err.Error(), "sqlite")
 
 	nonSqliteMissingFields := Config{
-		Source: SourceConfig{Type: "mysql", Host: "localhost"},
-		Data:   DataConfig{BatchSize: 100, MaxConcurrentTables: 1},
+		Source:  SourceConfig{Type: "mysql", Host: "localhost"},
+		Data:    DataConfig{BatchSize: 100, MaxConcurrentTables: 1},
 		Options: OptionsConfig{CheckpointInterval: 100, RollbackOnFailure: RollbackTable},
 	}
 	err = nonSqliteMissingFields.Validate()

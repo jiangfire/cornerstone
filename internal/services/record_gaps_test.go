@@ -337,9 +337,9 @@ func TestBatchCreateRecords_RequiredFieldMissing(t *testing.T) {
 	require.NoError(t, db.Create(tbl).Error)
 
 	require.NoError(t, db.Create(&models.Field{
-		TableID: tbl.ID,
-		Name:    "title",
-		Type:    "string",
+		TableID:  tbl.ID,
+		Name:     "title",
+		Type:     "string",
 		Required: true,
 	}).Error)
 

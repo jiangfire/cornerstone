@@ -132,14 +132,14 @@ func TestUpdateField_ConfigChanges(t *testing.T) {
 
 	field := createTestField(t, db, table.ID, "score", "number")
 
-	min := 0.0
-	max := 100.0
+	cfgMin := 0.0
+	cfgMax := 100.0
 	updated, err := svc.UpdateField(field.ID, UpdateFieldRequest{
 		Name: "score",
 		Type: "number",
 		Config: FieldConfig{
-			Min: &min,
-			Max: &max,
+			Min: &cfgMin,
+			Max: &cfgMax,
 		},
 	}, master.ID)
 	require.NoError(t, err)
@@ -511,10 +511,10 @@ func TestValidateAttachmentFieldValue_FileSizeExceedsLimit(t *testing.T) {
 	fld := createTestField(t, db, table.ID, "doc", "file")
 
 	largeFile := &models.File{
-		FieldID:  fld.ID,
-		FileName: "big.pdf",
-		FileSize: int64(200 * 1024 * 1024),
-		FileType: "application/pdf",
+		FieldID:    fld.ID,
+		FileName:   "big.pdf",
+		FileSize:   int64(200 * 1024 * 1024),
+		FileType:   "application/pdf",
 		StorageURL: "./uploads/big.pdf",
 	}
 	require.NoError(t, db.Create(largeFile).Error)
