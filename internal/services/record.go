@@ -551,7 +551,7 @@ func (s *RecordService) buildStructuredFilterClauses(
 	readableFields map[string]models.Field,
 	structured map[string]interface{},
 ) ([]recordFilterClause, bool, error) {
-	isSQLite := s.db.Name() == "sqlite"
+	dbType := s.db.Name()
 	clauses := make([]recordFilterClause, 0, len(structured))
 
 	for key, value := range structured {
@@ -565,17 +565,7 @@ func (s *RecordService) buildStructuredFilterClauses(
 			return nil, false, fmt.Errorf("过滤值序列化失败: %w", err)
 		}
 
-		if isSQLite {
-			var scalar interface{}
-			if err := json.Unmarshal(jsonValue, &scalar); err != nil {
-				return nil, false, fmt.Errorf("过滤值格式错误: %w", err)
-			}
-			// JSON path 与字段值都走参数化绑定,字段名只出现在第一个 ? 内,不会与 SQL 字面量混。
-			clauses = append(clauses, recordFilterClause{
-				sql:  "JSON_EXTRACT(data, ?) = ?",
-				args: []interface{}{"$." + fieldName, scalar},
-			})
-		} else {
+		if dbType == "postgres" {
 			// PG: 构造 {"<field>":<value>} 字面量后整体作为 jsonb 参数传入,
 			// 字段名经过 json.Marshal 转义,既能安全表达 Unicode,也不与 SQL 占位符混。
 			filterDoc, err := json.Marshal(map[string]interface{}{fieldName: value})
@@ -585,6 +575,17 @@ func (s *RecordService) buildStructuredFilterClauses(
 			clauses = append(clauses, recordFilterClause{
 				sql:  "data @> ?",
 				args: []interface{}{string(filterDoc)},
+			})
+		} else {
+			// SQLite / MySQL: JSON_EXTRACT
+			var scalar interface{}
+			if err := json.Unmarshal(jsonValue, &scalar); err != nil {
+				return nil, false, fmt.Errorf("过滤值格式错误: %w", err)
+			}
+			// JSON path 与字段值都走参数化绑定,字段名只出现在第一个 ? 内,不会与 SQL 字面量混。
+			clauses = append(clauses, recordFilterClause{
+				sql:  "JSON_EXTRACT(data, ?) = ?",
+				args: []interface{}{"$." + fieldName, scalar},
 			})
 		}
 	}

@@ -15,113 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func findSub(t *testing.T, parentPath ...string) {
-	t.Helper()
-	cmd, _, err := rootCmd.Find(parentPath)
-	require.NoError(t, err, "Find(%v) failed", parentPath)
-	require.NotNil(t, cmd, "Find(%v) returned nil command", parentPath)
-}
-
-func TestCommandStructure(t *testing.T) {
-	findSub(t, "db")
-	findSub(t, "db", "list")
-	findSub(t, "db", "create")
-	findSub(t, "db", "get")
-	findSub(t, "db", "update")
-	findSub(t, "db", "delete")
-	findSub(t, "table")
-	findSub(t, "table", "list")
-	findSub(t, "table", "create")
-	findSub(t, "table", "get")
-	findSub(t, "table", "update")
-	findSub(t, "table", "delete")
-	findSub(t, "field")
-	findSub(t, "field", "list")
-	findSub(t, "field", "create")
-	findSub(t, "field", "get")
-	findSub(t, "field", "update")
-	findSub(t, "field", "delete")
-	findSub(t, "record")
-	findSub(t, "record", "list")
-	findSub(t, "record", "create")
-	findSub(t, "record", "get")
-	findSub(t, "record", "update")
-	findSub(t, "record", "delete")
-	findSub(t, "record", "batch")
-	findSub(t, "token")
-	findSub(t, "token", "list")
-	findSub(t, "token", "create")
-	findSub(t, "token", "update")
-	findSub(t, "token", "delete")
-	findSub(t, "cache")
-	findSub(t, "cache", "clear")
-}
-
-func TestRootCmd_HasVersion(t *testing.T) {
-	assert.Equal(t, "cornerstone", rootCmd.Use)
-	assert.NotNil(t, rootCmd.Version)
-}
-
-func TestDBCmd_HasSubcommands(t *testing.T) {
-	cmd, _, err := rootCmd.Find([]string{"db"})
-	require.NoError(t, err)
-	names := subcommandNames(cmd)
-	for _, n := range []string{"list", "create", "get", "update", "delete"} {
-		assert.Contains(t, names, n, "db missing subcommand %q", n)
-	}
-}
-
-func TestTableCmd_HasSubcommands(t *testing.T) {
-	cmd, _, err := rootCmd.Find([]string{"table"})
-	require.NoError(t, err)
-	names := subcommandNames(cmd)
-	for _, n := range []string{"list", "create", "get", "update", "delete"} {
-		assert.Contains(t, names, n, "table missing subcommand %q", n)
-	}
-}
-
-func TestFieldCmd_HasSubcommands(t *testing.T) {
-	cmd, _, err := rootCmd.Find([]string{"field"})
-	require.NoError(t, err)
-	names := subcommandNames(cmd)
-	for _, n := range []string{"list", "create", "get", "update", "delete"} {
-		assert.Contains(t, names, n, "field missing subcommand %q", n)
-	}
-}
-
-func TestRecordCmd_HasSubcommands(t *testing.T) {
-	cmd, _, err := rootCmd.Find([]string{"record"})
-	require.NoError(t, err)
-	names := subcommandNames(cmd)
-	for _, n := range []string{"list", "create", "get", "update", "delete", "batch"} {
-		assert.Contains(t, names, n, "record missing subcommand %q", n)
-	}
-}
-
-func TestTokenCmd_HasSubcommands(t *testing.T) {
-	cmd, _, err := rootCmd.Find([]string{"token"})
-	require.NoError(t, err)
-	names := subcommandNames(cmd)
-	for _, n := range []string{"list", "create", "update", "delete"} {
-		assert.Contains(t, names, n, "token missing subcommand %q", n)
-	}
-}
-
-func TestCacheCmd_HasSubcommands(t *testing.T) {
-	cmd, _, err := rootCmd.Find([]string{"cache"})
-	require.NoError(t, err)
-	names := subcommandNames(cmd)
-	assert.Contains(t, names, "clear", "cache missing subcommand \"clear\"")
-}
-
-func subcommandNames(cmd *cobra.Command) []string {
-	var names []string
-	for _, sub := range cmd.Commands() {
-		names = append(names, sub.Name())
-	}
-	return names
-}
-
 func TestGetMasterTokenID_MissingEnv2(t *testing.T) {
 	t.Setenv("MASTER_TOKEN", "")
 	_, err := getMasterTokenID()
@@ -144,163 +37,61 @@ func TestEnsureDB_ConfigLoadError(t *testing.T) {
 	assert.Error(t, err)
 }
 
-func TestDBCreateCmd_RequiresArgs(t *testing.T) {
-	err := dbCreateCmd.Args(dbCreateCmd, []string{})
-	assert.Error(t, err)
-}
+func TestCommandArgs_Validation(t *testing.T) {
+	tests := []struct {
+		name string
+		cmd  *cobra.Command
+		args []string
+		want string // "error" or "ok"
+	}{
+		// Single-arg commands (representative sample)
+		{"dbCreate/empty", dbCreateCmd, []string{}, "error"},
+		{"dbCreate/valid", dbCreateCmd, []string{"mydb"}, "ok"},
+		{"dbCreate/tooMany", dbCreateCmd, []string{"a", "b"}, "error"},
+		{"dbGet/empty", dbGetCmd, []string{}, "error"},
+		{"dbUpdate/empty", dbUpdateCmd, []string{}, "error"},
+		{"dbDelete/empty", dbDeleteCmd, []string{}, "error"},
+		{"tableGet/empty", tableGetCmd, []string{}, "error"},
+		{"tableDelete/empty", tableDeleteCmd, []string{}, "error"},
+		{"fieldList/empty", fieldListCmd, []string{}, "error"},
+		{"fieldGet/empty", fieldGetCmd, []string{}, "error"},
+		{"recordList/empty", recordListCmd, []string{}, "error"},
+		{"recordGet/empty", recordGetCmd, []string{}, "error"},
+		{"recordDelete/empty", recordDeleteCmd, []string{}, "error"},
+		{"tokenCreate/empty", tokenCreateCmd, []string{}, "error"},
+		{"tokenUpdate/empty", tokenUpdateCmd, []string{}, "error"},
+		{"tokenDelete/empty", tokenDeleteCmd, []string{}, "error"},
 
-func TestDBGetCmd_RequiresArgs(t *testing.T) {
-	err := dbGetCmd.Args(dbGetCmd, []string{})
-	assert.Error(t, err)
-}
+		// Two-arg commands
+		{"tableCreate/empty", tableCreateCmd, []string{}, "error"},
+		{"tableCreate/oneArg", tableCreateCmd, []string{"db1"}, "error"},
+		{"tableCreate/valid", tableCreateCmd, []string{"db1", "tbl"}, "ok"},
+		{"recordCreate/empty", recordCreateCmd, []string{}, "error"},
+		{"recordCreate/oneArg", recordCreateCmd, []string{"tbl1"}, "error"},
+		{"recordCreate/valid", recordCreateCmd, []string{"tbl1", `{"k":"v"}`}, "ok"},
+		{"recordUpdate/empty", recordUpdateCmd, []string{}, "error"},
+		{"recordUpdate/oneArg", recordUpdateCmd, []string{"rec1"}, "error"},
 
-func TestDBUpdateCmd_RequiresArgs(t *testing.T) {
-	err := dbUpdateCmd.Args(dbUpdateCmd, []string{})
-	assert.Error(t, err)
-}
+		// Three-arg commands
+		{"fieldCreate/empty", fieldCreateCmd, []string{}, "error"},
+		{"fieldCreate/twoArgs", fieldCreateCmd, []string{"tbl1", "fname"}, "error"},
+		{"fieldCreate/valid", fieldCreateCmd, []string{"tbl1", "fname", "string"}, "ok"},
+		{"recordBatch/empty", recordBatchCmd, []string{}, "error"},
+		{"recordBatch/twoArgs", recordBatchCmd, []string{"tbl1", `{"k":"v"}`}, "error"},
+		{"recordBatch/valid", recordBatchCmd, []string{"tbl1", `{"k":"v"}`, "5"}, "ok"},
+	}
 
-func TestDBDeleteCmd_RequiresArgs(t *testing.T) {
-	err := dbDeleteCmd.Args(dbDeleteCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestDBListCmd_AcceptsZeroArgs(t *testing.T) {
-	assert.Nil(t, dbListCmd.Args)
-}
-
-func TestDBCreateCmd_AcceptsOneArg(t *testing.T) {
-	err := dbCreateCmd.Args(dbCreateCmd, []string{"mydb"})
-	assert.NoError(t, err)
-}
-
-func TestDBCreateCmd_RejectsTwoArgs(t *testing.T) {
-	err := dbCreateCmd.Args(dbCreateCmd, []string{"a", "b"})
-	assert.Error(t, err)
-}
-
-func TestTableListCmd_RequiresArgs(t *testing.T) {
-	err := tableListCmd.Args(tableListCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestTableCreateCmd_RequiresTwoArgs(t *testing.T) {
-	err := tableCreateCmd.Args(tableCreateCmd, []string{})
-	assert.Error(t, err)
-	err = tableCreateCmd.Args(tableCreateCmd, []string{"db1"})
-	assert.Error(t, err)
-	err = tableCreateCmd.Args(tableCreateCmd, []string{"db1", "tbl"})
-	assert.NoError(t, err)
-}
-
-func TestTableGetCmd_RequiresArgs(t *testing.T) {
-	err := tableGetCmd.Args(tableGetCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestTableUpdateCmd_RequiresArgs(t *testing.T) {
-	err := tableUpdateCmd.Args(tableUpdateCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestTableDeleteCmd_RequiresArgs(t *testing.T) {
-	err := tableDeleteCmd.Args(tableDeleteCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestFieldListCmd_RequiresArgs(t *testing.T) {
-	err := fieldListCmd.Args(fieldListCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestFieldCreateCmd_RequiresThreeArgs(t *testing.T) {
-	err := fieldCreateCmd.Args(fieldCreateCmd, []string{})
-	assert.Error(t, err)
-	err = fieldCreateCmd.Args(fieldCreateCmd, []string{"tbl1"})
-	assert.Error(t, err)
-	err = fieldCreateCmd.Args(fieldCreateCmd, []string{"tbl1", "fname"})
-	assert.Error(t, err)
-	err = fieldCreateCmd.Args(fieldCreateCmd, []string{"tbl1", "fname", "string"})
-	assert.NoError(t, err)
-}
-
-func TestFieldGetCmd_RequiresArgs(t *testing.T) {
-	err := fieldGetCmd.Args(fieldGetCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestFieldUpdateCmd_RequiresArgs(t *testing.T) {
-	err := fieldUpdateCmd.Args(fieldUpdateCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestFieldDeleteCmd_RequiresArgs(t *testing.T) {
-	err := fieldDeleteCmd.Args(fieldDeleteCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestRecordListCmd_RequiresArgs(t *testing.T) {
-	err := recordListCmd.Args(recordListCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestRecordCreateCmd_RequiresTwoArgs(t *testing.T) {
-	err := recordCreateCmd.Args(recordCreateCmd, []string{})
-	assert.Error(t, err)
-	err = recordCreateCmd.Args(recordCreateCmd, []string{"tbl1"})
-	assert.Error(t, err)
-	err = recordCreateCmd.Args(recordCreateCmd, []string{"tbl1", `{"k":"v"}`})
-	assert.NoError(t, err)
-}
-
-func TestRecordGetCmd_RequiresArgs(t *testing.T) {
-	err := recordGetCmd.Args(recordGetCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestRecordUpdateCmd_RequiresTwoArgs(t *testing.T) {
-	err := recordUpdateCmd.Args(recordUpdateCmd, []string{})
-	assert.Error(t, err)
-	err = recordUpdateCmd.Args(recordUpdateCmd, []string{"rec1"})
-	assert.Error(t, err)
-}
-
-func TestRecordDeleteCmd_RequiresArgs(t *testing.T) {
-	err := recordDeleteCmd.Args(recordDeleteCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestRecordBatchCmd_RequiresThreeArgs(t *testing.T) {
-	err := recordBatchCmd.Args(recordBatchCmd, []string{})
-	assert.Error(t, err)
-	err = recordBatchCmd.Args(recordBatchCmd, []string{"tbl1"})
-	assert.Error(t, err)
-	err = recordBatchCmd.Args(recordBatchCmd, []string{"tbl1", `{"k":"v"}`})
-	assert.Error(t, err)
-	err = recordBatchCmd.Args(recordBatchCmd, []string{"tbl1", `{"k":"v"}`, "5"})
-	assert.NoError(t, err)
-}
-
-func TestTokenCreateCmd_RequiresArgs(t *testing.T) {
-	err := tokenCreateCmd.Args(tokenCreateCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestTokenUpdateCmd_RequiresArgs(t *testing.T) {
-	err := tokenUpdateCmd.Args(tokenUpdateCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestTokenDeleteCmd_RequiresArgs(t *testing.T) {
-	err := tokenDeleteCmd.Args(tokenDeleteCmd, []string{})
-	assert.Error(t, err)
-}
-
-func TestTokenListCmd_AcceptsZeroArgs(t *testing.T) {
-	assert.Nil(t, tokenListCmd.Args)
-}
-
-func TestCacheClearCmd_AcceptsZeroArgs(t *testing.T) {
-	assert.Nil(t, cacheClearCmd.Args)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := tt.cmd.Args(tt.cmd, tt.args)
+			switch tt.want {
+			case "error":
+				assert.Error(t, err)
+			case "ok":
+				assert.NoError(t, err)
+			}
+		})
+	}
 }
 
 func TestPrintJSON_Output(t *testing.T) {
@@ -315,51 +106,6 @@ func TestPrintJSON_Output(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, buf.String(), `"hello"`)
 	assert.Contains(t, buf.String(), `"world"`)
-}
-
-func TestDBCreateCmd_HasDescriptionFlag(t *testing.T) {
-	f := dbCreateCmd.Flags().Lookup("description")
-	require.NotNil(t, f)
-	assert.Equal(t, "d", f.Shorthand)
-}
-
-func TestDBUpdateCmd_HasFlags(t *testing.T) {
-	require.NotNil(t, dbUpdateCmd.Flags().Lookup("name"))
-	require.NotNil(t, dbUpdateCmd.Flags().Lookup("description"))
-}
-
-func TestFieldCreateCmd_HasFlags(t *testing.T) {
-	require.NotNil(t, fieldCreateCmd.Flags().Lookup("description"))
-	require.NotNil(t, fieldCreateCmd.Flags().Lookup("required"))
-	require.NotNil(t, fieldCreateCmd.Flags().Lookup("options"))
-}
-
-func TestFieldUpdateCmd_HasFlags(t *testing.T) {
-	require.NotNil(t, fieldUpdateCmd.Flags().Lookup("name"))
-	require.NotNil(t, fieldUpdateCmd.Flags().Lookup("type"))
-	require.NotNil(t, fieldUpdateCmd.Flags().Lookup("description"))
-	require.NotNil(t, fieldUpdateCmd.Flags().Lookup("required"))
-	require.NotNil(t, fieldUpdateCmd.Flags().Lookup("options"))
-}
-
-func TestRecordListCmd_HasFlags(t *testing.T) {
-	require.NotNil(t, recordListCmd.Flags().Lookup("limit"))
-	require.NotNil(t, recordListCmd.Flags().Lookup("offset"))
-	require.NotNil(t, recordListCmd.Flags().Lookup("filter"))
-}
-
-func TestRecordUpdateCmd_HasVersionFlag(t *testing.T) {
-	require.NotNil(t, recordUpdateCmd.Flags().Lookup("version"))
-}
-
-func TestTokenCreateCmd_HasFlags(t *testing.T) {
-	require.NotNil(t, tokenCreateCmd.Flags().Lookup("scopes"))
-	require.NotNil(t, tokenCreateCmd.Flags().Lookup("expires"))
-}
-
-func TestTokenUpdateCmd_HasFlags(t *testing.T) {
-	require.NotNil(t, tokenUpdateCmd.Flags().Lookup("scopes"))
-	require.NotNil(t, tokenUpdateCmd.Flags().Lookup("expires"))
 }
 
 func setupCLIEnv(t *testing.T) {

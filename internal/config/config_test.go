@@ -93,7 +93,7 @@ func TestValidate_PostgresEmptyURL(t *testing.T) {
 
 func TestValidate_UnsupportedDBType(t *testing.T) {
 	cfg := &Config{
-		Database: DatabaseConfig{Type: "mysql", URL: "some-url"},
+		Database: DatabaseConfig{Type: "oracle", URL: "some-url"},
 		Server:   ServerConfig{Port: "8080"},
 	}
 	err := cfg.Validate()
@@ -121,6 +121,32 @@ func TestIsPostgres(t *testing.T) {
 	cfg := &Config{Database: DatabaseConfig{Type: "postgres"}}
 	assert.True(t, cfg.IsPostgres())
 	assert.False(t, cfg.IsSQLite())
+}
+
+func TestIsMySQL(t *testing.T) {
+	cfg := &Config{Database: DatabaseConfig{Type: "mysql"}}
+	assert.True(t, cfg.IsMySQL())
+	assert.False(t, cfg.IsSQLite())
+	assert.False(t, cfg.IsPostgres())
+}
+
+func TestValidate_MySQL(t *testing.T) {
+	cfg := &Config{
+		Database: DatabaseConfig{Type: "mysql", URL: "user:pass@tcp(localhost:3306)/db"},
+		Server:   ServerConfig{Port: "8080"},
+	}
+	err := cfg.Validate()
+	assert.NoError(t, err)
+}
+
+func TestValidate_MySQLMissingURL(t *testing.T) {
+	cfg := &Config{
+		Database: DatabaseConfig{Type: "mysql", URL: ""},
+		Server:   ServerConfig{Port: "8080"},
+	}
+	err := cfg.Validate()
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "DATABASE_URL")
 }
 
 func TestGetServerAddr(t *testing.T) {

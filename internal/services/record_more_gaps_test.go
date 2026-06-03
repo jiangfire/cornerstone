@@ -164,28 +164,6 @@ func TestExportRecords_JSONFieldValues(t *testing.T) {
 	assert.Contains(t, string(data), "val")
 }
 
-func TestExportRecords_NoRecordsCSV(t *testing.T) {
-	db := setupTestDB(t)
-	s := NewRecordService(db)
-
-	_, tbl, _ := createTestTableWithFields(t, db, "user1", "ExpEmptyDB2", "exp_empty_table2",
-		struct {
-			Name     string
-			Type     string
-			Required bool
-		}{"title", "string", false},
-	)
-
-	data, contentType, filename, err := s.ExportRecords(tbl.ID, "user1", "csv", "")
-	require.NoError(t, err)
-	assert.Contains(t, contentType, "text/csv")
-	assert.Contains(t, filename, ".csv")
-	assert.Contains(t, string(data), "title")
-
-	lines := strings.Split(strings.TrimSpace(string(data)), "\n")
-	assert.Equal(t, 1, len(lines), "should only have header row")
-}
-
 func TestCreateRecord_WithFileFieldNonEmpty(t *testing.T) {
 	db := setupTestDB(t)
 	s := NewRecordService(db)

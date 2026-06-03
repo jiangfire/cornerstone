@@ -110,6 +110,10 @@ func (c *Config) Validate() error {
 		if strings.TrimSpace(c.Database.URL) == "" {
 			return fmt.Errorf("DATABASE_URL 不能为空")
 		}
+	case "mysql":
+		if strings.TrimSpace(c.Database.URL) == "" {
+			return fmt.Errorf("DATABASE_URL 不能为空")
+		}
 	case "sqlite":
 		url := strings.TrimSpace(c.Database.URL)
 		if url == "" {
@@ -118,13 +122,15 @@ func (c *Config) Validate() error {
 			// OK
 		} else if strings.HasPrefix(url, "postgres://") || strings.HasPrefix(url, "postgresql://") {
 			return fmt.Errorf("DATABASE_URL 看起来是 PostgreSQL 连接串，但 DB_TYPE 配置为 sqlite")
+		} else if strings.HasPrefix(url, "mysql://") || strings.HasPrefix(url, "tcp(") {
+			return fmt.Errorf("DATABASE_URL 看起来是 MySQL 连接串，但 DB_TYPE 配置为 sqlite")
 		} else if !filepath.IsAbs(url) && url != ":memory:" {
 			if absPath, err := os.Getwd(); err == nil {
 				c.Database.URL = filepath.Join(absPath, url)
 			}
 		}
 	default:
-		return fmt.Errorf("不支持的数据库类型: %s，支持 postgres 或 sqlite", c.Database.Type)
+		return fmt.Errorf("不支持的数据库类型: %s，支持 sqlite、postgres 或 mysql", c.Database.Type)
 	}
 
 	if strings.TrimSpace(c.Server.Port) == "" {
@@ -150,6 +156,10 @@ func (c *Config) IsSQLite() bool {
 
 func (c *Config) IsPostgres() bool {
 	return c.Database.Type == "postgres"
+}
+
+func (c *Config) IsMySQL() bool {
+	return c.Database.Type == "mysql"
 }
 
 func (c *Config) GetServerAddr() string {

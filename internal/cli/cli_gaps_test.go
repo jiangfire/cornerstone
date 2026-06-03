@@ -160,42 +160,13 @@ func TestLoadMigrationConfigFromCommand_ConfigFileNotFound(t *testing.T) {
 	require.NoError(t, cmd.Flags().Set("config", "/nonexistent/path/config.yaml"))
 	_, _, err := loadMigrationConfigFromCommand(cmd)
 	require.Error(t, err)
+	assert.Contains(t, err.Error(), "config")
 }
-
 func TestLoadMigrationConfigFromCommand_InvalidSourceType(t *testing.T) {
 	cmd := newMigrationCmd()
 	require.NoError(t, cmd.Flags().Set("source-type", "oracle"))
 	require.NoError(t, cmd.Flags().Set("source-dsn", "some-dsn"))
 	_, _, err := loadMigrationConfigFromCommand(cmd)
 	require.Error(t, err)
-}
-
-func TestPrintJSON(t *testing.T) {
-	err := printJSON(map[string]string{"key": "value"})
-	assert.NoError(t, err)
-}
-
-func TestPrintJSON_NilValue(t *testing.T) {
-	err := printJSON(nil)
-	assert.NoError(t, err)
-}
-
-func TestGetMasterTokenID_MissingEnv(t *testing.T) {
-	orig := os.Getenv("MASTER_TOKEN")
-	os.Unsetenv("MASTER_TOKEN")
-	defer os.Setenv("MASTER_TOKEN", orig)
-
-	_, err := getMasterTokenID()
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "MASTER_TOKEN")
-}
-
-func TestGetMasterTokenID_WithEnv(t *testing.T) {
-	orig := os.Getenv("MASTER_TOKEN")
-	os.Setenv("MASTER_TOKEN", "test-token-123")
-	defer os.Setenv("MASTER_TOKEN", orig)
-
-	token, err := getMasterTokenID()
-	require.NoError(t, err)
-	assert.Equal(t, "test-token-123", token)
+	assert.Contains(t, err.Error(), "不支持")
 }

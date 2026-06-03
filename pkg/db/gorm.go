@@ -1,11 +1,14 @@
 package db
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/glebarez/sqlite"
+	"github.com/go-sql-driver/mysql"
 	"github.com/jiangfire/cornerstone/internal/config"
 	"go.uber.org/zap"
+	gormmysql "gorm.io/driver/mysql"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -41,6 +44,14 @@ func IsPostgres() bool {
 	return db.Name() == "postgres"
 }
 
+// IsMySQL 检查当前是否为 MySQL 数据库
+func IsMySQL() bool {
+	if db == nil {
+		return false
+	}
+	return db.Name() == "mysql"
+}
+
 // InitDB 初始化数据库连接
 func InitDB(cfg config.DatabaseConfig) error {
 	var err error
@@ -48,6 +59,8 @@ func InitDB(cfg config.DatabaseConfig) error {
 	switch cfg.Type {
 	case "sqlite":
 		db, err = initSQLite(cfg)
+	case "mysql":
+		db, err = initMySQL(cfg)
 	default:
 		db, err = initPostgres(cfg)
 	}
@@ -75,6 +88,21 @@ func InitDB(cfg config.DatabaseConfig) error {
 	}
 
 	return nil
+}
+
+// initMySQL 初始化 MySQL 连接
+func initMySQL(cfg config.DatabaseConfig) (*gorm.DB, error) {
+	dsn, err := mysql.ParseDSN(cfg.URL)
+	if err != nil {
+		return nil, fmt.Errorf("解析 MySQL DSN 失败: %w", err)
+	}
+	// 确保 time.Time 字段能正确扫描
+	if !dsn.ParseTime {
+		dsn.ParseTime = true
+	}
+	return gorm.Open(gormmysql.Open(dsn.FormatDSN()), &gorm.Config{
+		Logger: NewZapLogger(zap.L()),
+	})
 }
 
 // initPostgres 初始化 PostgreSQL 连接

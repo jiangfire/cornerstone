@@ -25,7 +25,7 @@ func NewExecutor(database *gorm.DB) *Executor {
 		db:        database,
 		parser:    NewParser(),
 		validator: NewValidator(database),
-		generator: NewSQLGenerator(isSQLiteDB(database)),
+		generator: NewSQLGeneratorWithDBType(dbType(database)),
 		limits:    DefaultLimits,
 	}
 }
@@ -36,17 +36,17 @@ func NewExecutorWithConfig(database *gorm.DB, limits QueryLimits, tables Allowed
 		db:        database,
 		parser:    NewParserWithLimits(limits),
 		validator: NewValidatorWithTables(database, tables),
-		generator: NewSQLGenerator(isSQLiteDB(database)),
+		generator: NewSQLGeneratorWithDBType(dbType(database)),
 		limits:    limits,
 	}
 }
 
-// isSQLiteDB 检查数据库是否为 SQLite
-func isSQLiteDB(gormDB *gorm.DB) bool {
+// dbType 获取数据库类型
+func dbType(gormDB *gorm.DB) string {
 	if gormDB == nil {
-		return false
+		return ""
 	}
-	return gormDB.Name() == "sqlite"
+	return gormDB.Name()
 }
 
 // Execute 执行查询

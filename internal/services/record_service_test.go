@@ -2,11 +2,14 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 
+	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
 )
 
@@ -154,10 +157,10 @@ func TestValidateRecordData_PreParsesFieldConfig(t *testing.T) {
 }
 
 // ============================================================
-// 5. BatchCreateRecords 分批事务 (P2)
+// 5. BatchCreateRecords 大批量创建 (P2)
 // ============================================================
 
-func TestBatchCreateRecords_LargeBatchSplitsTransactions(t *testing.T) {
+func TestBatchCreateRecords_LargeBatchSuccess(t *testing.T) {
 	db := setupTestDB(t)
 	s := NewRecordService(db)
 
@@ -169,7 +172,7 @@ func TestBatchCreateRecords_LargeBatchSplitsTransactions(t *testing.T) {
 	// 创建两个字段，确保有字段定义
 	require.NoError(t, db.Create(&models.Field{TableID: tbl.ID, Name: "name", Type: "string"}).Error)
 
-	// 批量创建 150 条（超过默认批次大小 100）
+	// 批量创建 150 条（超过默认批次大小 100），验证大批量场景
 	records, err := s.BatchCreateRecords(CreateRecordRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "batch"},
@@ -239,7 +242,6 @@ func TestBatchCreateRecords_AtomicRollback(t *testing.T) {
 	require.NoError(t, db.Create(dbModel).Error)
 	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "items"}
 	require.NoError(t, db.Create(tbl).Error)
-
 	require.NoError(t, db.Create(&models.Field{TableID: tbl.ID, Name: "name", Type: "string"}).Error)
 
 	// 先正常创建 50 条
@@ -253,18 +255,24 @@ func TestBatchCreateRecords_AtomicRollback(t *testing.T) {
 	require.NoError(t, db.Model(&models.Record{}).Where("table_id = ?", tbl.ID).Count(&beforeCount).Error)
 	require.Equal(t, int64(50), beforeCount)
 
-	// 现在尝试创建 150 条（超过限制但先验证通过），
-	// 由于我们用的单事务批量插入，全部成功
-	records, err := s.BatchCreateRecords(CreateRecordRequest{
+	// 注入 Create 错误，使后续批量创建失败
+	err = db.Callback().Create().Before("gorm:create").Register("test_batch_rollback", func(d *gorm.DB) {
+		d.Error = fmt.Errorf("injected batch create error")
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = db.Callback().Create().Remove("test_batch_rollback") })
+
+	// 尝试创建 100 条，应失败并回滚
+	_, err = s.BatchCreateRecords(CreateRecordRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "batch2"},
-	}, "user1", 150)
-	require.NoError(t, err)
-	assert.Len(t, records, 150)
+	}, "user1", 100)
+	assert.Error(t, err)
 
+	// 验证回滚：数据库中仍只有最初 50 条
 	var afterCount int64
 	require.NoError(t, db.Model(&models.Record{}).Where("table_id = ?", tbl.ID).Count(&afterCount).Error)
-	assert.Equal(t, int64(200), afterCount)
+	assert.Equal(t, int64(50), afterCount, "事务回滚后记录数应保持不变")
 }
 
 // ============================================================
@@ -338,4 +346,164 @@ func TestRecordService_GetRecord_NonexistentRecord(t *testing.T) {
 
 func intPtr(v int) *int {
 	return &v
+}
+
+// ============================================================
+// 从 record_gaps_test.go 合并：validateRecordData 边界
+// ============================================================
+
+func TestValidateRecordData_AttachmentFieldValidation(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	dbModel := &models.Database{Name: "attach_val_db"}
+	require.NoError(t, db.Create(dbModel).Error)
+	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "attach_val_table"}
+	require.NoError(t, db.Create(tbl).Error)
+
+	fileField := &models.Field{
+		TableID: tbl.ID,
+		Name:    "doc",
+		Type:    "file",
+		Options: "{}",
+	}
+	require.NoError(t, db.Create(fileField).Error)
+
+	err := s.validateRecordData(tbl.ID, map[string]interface{}{"doc": 12345}, "", "user1")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "doc")
+}
+
+func TestValidateRecordData_NilValueOnOptionalField(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	dbModel := &models.Database{Name: "nil_val_db"}
+	require.NoError(t, db.Create(dbModel).Error)
+	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "nil_val_table"}
+	require.NoError(t, db.Create(tbl).Error)
+	require.NoError(t, db.Create(&models.Field{
+		TableID: tbl.ID,
+		Name:    "optional_field",
+		Type:    "string",
+		Options: `{"max_length":5}`,
+	}).Error)
+
+	err := s.validateRecordData(tbl.ID, map[string]interface{}{"optional_field": nil}, "", "user1")
+	assert.NoError(t, err)
+}
+
+func TestValidateRecordData_EmptyStringOnOptionalField(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	dbModel := &models.Database{Name: "empty_str_db"}
+	require.NoError(t, db.Create(dbModel).Error)
+	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "empty_str_table"}
+	require.NoError(t, db.Create(tbl).Error)
+	require.NoError(t, db.Create(&models.Field{
+		TableID: tbl.ID,
+		Name:    "opt_str",
+		Type:    "string",
+		Options: `{"max_length":3}`,
+	}).Error)
+
+	err := s.validateRecordData(tbl.ID, map[string]interface{}{"opt_str": ""}, "", "user1")
+	assert.NoError(t, err)
+}
+
+// ============================================================
+// 从 record_gaps_test.go 合并：BatchCreateRecords 边界
+// ============================================================
+
+func TestBatchCreateRecords_AttachmentFieldWithFileIDs(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	dbModel := &models.Database{Name: "batch_attach_db"}
+	require.NoError(t, db.Create(dbModel).Error)
+	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "batch_attach_table"}
+	require.NoError(t, db.Create(tbl).Error)
+
+	require.NoError(t, db.Create(&models.Field{
+		TableID: tbl.ID,
+		Name:    "doc",
+		Type:    "file",
+		Options: "{}",
+	}).Error)
+
+	_, err := s.BatchCreateRecords(CreateRecordRequest{
+		TableID: tbl.ID,
+		Data:    map[string]interface{}{"doc": []string{"fil_123"}},
+	}, "user1", 3)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "批量创建暂不支持 file 字段")
+}
+
+func TestBatchCreateRecords_RequiredFieldMissing(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	dbModel := &models.Database{Name: "batch_req_db"}
+	require.NoError(t, db.Create(dbModel).Error)
+	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "batch_req_table"}
+	require.NoError(t, db.Create(tbl).Error)
+
+	require.NoError(t, db.Create(&models.Field{
+		TableID:  tbl.ID,
+		Name:     "title",
+		Type:     "string",
+		Required: true,
+	}).Error)
+
+	_, err := s.BatchCreateRecords(CreateRecordRequest{
+		TableID: tbl.ID,
+		Data:    map[string]interface{}{},
+	}, "user1", 5)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "必填")
+}
+
+func TestBatchCreateRecords_NonWritableField(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	dbModel := &models.Database{Name: "batch_write_db"}
+	require.NoError(t, db.Create(dbModel).Error)
+	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "batch_write_table"}
+	require.NoError(t, db.Create(tbl).Error)
+	require.NoError(t, db.Create(&models.Field{TableID: tbl.ID, Name: "name", Type: "string"}).Error)
+
+	viewer := &models.Token{
+		Name:     "viewer_batch",
+		IsMaster: false,
+		Scopes:   `{"databases":{},"tables":{}}`,
+	}
+	require.NoError(t, db.Create(viewer).Error)
+	authz.ClearTokenCache()
+
+	_, err := s.BatchCreateRecords(CreateRecordRequest{
+		TableID: tbl.ID,
+		Data:    map[string]interface{}{"name": "test"},
+	}, viewer.ID, 3)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "无权访问该表")
+}
+
+// ============================================================
+// 从 record_gaps_test.go 合并：结构化过滤错误路径
+// ============================================================
+
+func TestBuildStructuredFilterClauses_MalformedJSON(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	fields := []models.Field{{Name: "status", Type: "string"}}
+	readable := map[string]models.Field{"status": {Name: "status"}}
+
+	_, _, err := s.buildStructuredFilterClauses(fields, readable, map[string]interface{}{
+		"status": json.Number("not-a-number"),
+	})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "过滤值序列化失败")
 }

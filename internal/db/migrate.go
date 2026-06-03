@@ -86,6 +86,14 @@ func Migrate() error {
 
 	logger.Info("表结构迁移完成")
 
+	// MySQL: AutoMigrate 会将 jsonb 映射为 LONGTEXT，需要手动修改为 JSON
+	if pkgdb.IsMySQL() {
+		if err := database.Exec("ALTER TABLE records MODIFY data JSON NOT NULL").Error; err != nil {
+			return fmt.Errorf("修改 MySQL records.data 为 JSON 类型失败: %w", err)
+		}
+		logger.Info("MySQL records.data 已修正为 JSON 类型")
+	}
+
 	if err := createIndexes(database); err != nil {
 		return fmt.Errorf("创建索引失败: %w", err)
 	}
@@ -104,24 +112,13 @@ func Migrate() error {
 }
 
 func createIndexes(db *gorm.DB) error {
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_records_table_id ON records(table_id)").Error; err != nil {
-		return err
-	}
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_tables_database_id ON tables(database_id)").Error; err != nil {
-		return err
-	}
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_fields_table_id ON fields(table_id)").Error; err != nil {
-		return err
-	}
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_files_record_id ON files(record_id)").Error; err != nil {
-		return err
-	}
-	if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_files_field_id ON files(field_id)").Error; err != nil {
+	// records(table_id) 需要手动创建索引（Record 模型未标注 index tag）
+	if err := createIndexIfNotExists(db, "records", "idx_records_table_id", "table_id"); err != nil {
 		return err
 	}
 
-	// PostgreSQL: GIN 索引加速 JSONB 查询（data @>、JSON 路径等）
-	if !isSQLite(db) {
+	// PostgreSQL: GIN 索引加速 JSONB 查询（data @>, JSON 路径等）
+	if isPostgres(db) {
 		if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_records_data_gin ON records USING GIN (data)").Error; err != nil {
 			return err
 		}
@@ -130,13 +127,54 @@ func createIndexes(db *gorm.DB) error {
 	return nil
 }
 
-// IsSQLite 检查当前数据库是否为 SQLite
-func IsSQLite() bool {
-	return isSQLite(pkgdb.DB())
+// createIndexIfNotExists 跨数据库兼容的索引创建
+func createIndexIfNotExists(db *gorm.DB, table, indexName, column string) error {
+	exists, err := indexExists(db, table, indexName)
+	if err != nil {
+		return err
+	}
+	if exists {
+		return nil
+	}
+	sql := fmt.Sprintf("CREATE INDEX %s ON %s(%s)", indexName, table, column)
+	return db.Exec(sql).Error
+}
+
+// indexExists 检查索引是否已存在
+func indexExists(db *gorm.DB, table, indexName string) (bool, error) {
+	var count int64
+	switch db.Name() {
+	case "sqlite":
+		// SQLite: 查询 sqlite_master
+		if err := db.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name=?", indexName).Scan(&count).Error; err != nil {
+			return false, err
+		}
+	case "postgres":
+		// PostgreSQL: 查询 pg_indexes
+		if err := db.Raw("SELECT COUNT(*) FROM pg_indexes WHERE indexname=?", indexName).Scan(&count).Error; err != nil {
+			return false, err
+		}
+	case "mysql":
+		// MySQL: 查询 information_schema.STATISTICS
+		if err := db.Raw("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?", table, indexName).Scan(&count).Error; err != nil {
+			return false, err
+		}
+	default:
+		return false, fmt.Errorf("不支持的数据库类型: %s", db.Name())
+	}
+	return count > 0, nil
 }
 
 func isSQLite(db *gorm.DB) bool {
 	return db.Name() == "sqlite"
+}
+
+func isMySQL(db *gorm.DB) bool {
+	return db.Name() == "mysql"
+}
+
+func isPostgres(db *gorm.DB) bool {
+	return db.Name() == "postgres"
 }
 
 // CleanupExpiredTokens 清理过期的 Token

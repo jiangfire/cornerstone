@@ -113,7 +113,7 @@ func TestIsSQLite(t *testing.T) {
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = pkgdb.CloseDB() })
 
-	assert.True(t, IsSQLite())
+	assert.True(t, pkgdb.IsSQLite())
 }
 
 func TestCreateIndexes(t *testing.T) {

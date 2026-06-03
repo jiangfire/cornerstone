@@ -8,6 +8,30 @@
 #
 # 创建/管理 .env 时参考根目录 .env.example。真实凭据请勿提交到仓库。
 
+# 使用 MySQL 替代 PostgreSQL：
+#   1. 取消下方 mysql 服务的注释
+#   2. 注释掉 postgres 服务
+#   3. 修改 app 服务的 DATABASE_URL 为 MySQL 连接串
+#   4. 设置 DB_TYPE=mysql
+#
+# services:
+#   mysql:
+#     image: mysql:8.0
+#     container_name: cornerstone-mysql
+#     restart: unless-stopped
+#     environment:
+#       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?MYSQL_ROOT_PASSWORD is required}
+#       MYSQL_DATABASE: ${MYSQL_DATABASE:-cornerstone}
+#     volumes:
+#       - mysql_data:/var/lib/mysql
+#     healthcheck:
+#       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+#       interval: 10s
+#       timeout: 5s
+#       retries: 5
+#     networks:
+#       - cornerstone-network
+
 services:
   postgres:
     image: postgres:15-alpine
@@ -72,6 +96,8 @@ services:
 volumes:
   postgres_data:
     driver: local
+  # mysql_data:
+  #   driver: local
 
 networks:
   cornerstone-network:

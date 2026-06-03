@@ -1,12 +1,13 @@
 package services
 
 import (
-	"path/filepath"
-	"testing"
-
+	"encoding/json"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
+	"os"
+	"path/filepath"
+	"testing"
 
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
@@ -298,4 +299,78 @@ func TestGetMaxUploadSizeBytes(t *testing.T) {
 
 	maxSize := svc.getMaxUploadSizeBytes()
 	assert.Equal(t, int64(50*1024*1024), maxSize)
+}
+
+func TestDeleteFile_Success(t *testing.T) {
+	db := setupTestDB(t)
+	database := &models.Database{Name: "DelFileDB"}
+	require.NoError(t, db.Create(database).Error)
+	table := &models.Table{DatabaseID: database.ID, Name: "del_table"}
+	require.NoError(t, db.Create(table).Error)
+
+	fld := createTestField(t, db, table.ID, "doc", "file")
+	data := map[string]interface{}{"doc": []string{}}
+	dataJSON, _ := json.Marshal(data)
+	record := &models.Record{TableID: table.ID, Data: string(dataJSON)}
+	require.NoError(t, db.Create(record).Error)
+
+	tmpFile := "./uploads/test_delete_file.txt"
+	require.NoError(t, os.MkdirAll("./uploads", 0o750))
+	require.NoError(t, os.WriteFile(tmpFile, []byte("test"), 0o644))
+	t.Cleanup(func() { os.Remove(tmpFile) })
+
+	file := &models.File{
+		RecordID:   record.ID,
+		FieldID:    fld.ID,
+		FileName:   "test_delete_file.txt",
+		FileSize:   4,
+		FileType:   "text/plain",
+		StorageURL: tmpFile,
+	}
+	require.NoError(t, db.Create(file).Error)
+
+	svc := NewFileService(db)
+	err := svc.DeleteFile(file.ID, "user1")
+	require.NoError(t, err)
+
+	var count int64
+	db.Model(&models.File{}).Where("id = ?", file.ID).Count(&count)
+	assert.Equal(t, int64(0), count)
+
+	_, statErr := os.Stat(tmpFile)
+	assert.True(t, os.IsNotExist(statErr))
+}
+
+func TestRemoveFileReferenceFromRecord(t *testing.T) {
+	db := setupTestDB(t)
+	database := &models.Database{Name: "RemoveRefDB"}
+	require.NoError(t, db.Create(database).Error)
+	table := &models.Table{DatabaseID: database.ID, Name: "ref_table"}
+	require.NoError(t, db.Create(table).Error)
+
+	fld := createTestField(t, db, table.ID, "doc", "file")
+	file := createTestFile(t, db, "", fld.ID)
+
+	data := map[string]interface{}{"doc": []string{file.ID}}
+	dataJSON, _ := json.Marshal(data)
+	record := &models.Record{TableID: table.ID, Data: string(dataJSON)}
+	require.NoError(t, db.Create(record).Error)
+
+	file.RecordID = record.ID
+	require.NoError(t, db.Save(file).Error)
+
+	svc := NewFileService(db)
+	err := svc.removeFileReferenceFromRecord(&models.File{
+		ID:       file.ID,
+		RecordID: record.ID,
+		FieldID:  fld.ID,
+	})
+	require.NoError(t, err)
+
+	var updated models.Record
+	require.NoError(t, db.Where("id = ?", record.ID).First(&updated).Error)
+	payload := parseRecordPayload(updated.Data)
+	arr, ok := payload["doc"].([]interface{})
+	require.True(t, ok)
+	assert.Empty(t, arr)
 }

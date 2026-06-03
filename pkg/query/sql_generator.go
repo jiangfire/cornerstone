@@ -7,18 +7,31 @@ import (
 
 // SQLGenerator SQL 生成器
 type SQLGenerator struct {
-	isSQLite bool
-	maxRows  int64
+	dbType  string // "sqlite", "postgres", "mysql"
+	maxRows int64
 }
 
-// NewSQLGenerator 创建 SQL 生成器
+// NewSQLGenerator 创建 SQL 生成器（兼容旧接口，接收 isSQLite bool）
 func NewSQLGenerator(isSQLite bool) *SQLGenerator {
-	return &SQLGenerator{isSQLite: isSQLite, maxRows: DefaultLimits.MaxRows}
+	dbType := "postgres"
+	if isSQLite {
+		dbType = "sqlite"
+	}
+	return &SQLGenerator{dbType: dbType, maxRows: DefaultLimits.MaxRows}
 }
 
-// NewSQLGeneratorWithConfig 创建带自定义 maxRows 的 SQL 生成器
+// NewSQLGeneratorWithDBType 创建带数据库类型的 SQL 生成器
+func NewSQLGeneratorWithDBType(dbType string) *SQLGenerator {
+	return &SQLGenerator{dbType: dbType, maxRows: DefaultLimits.MaxRows}
+}
+
+// NewSQLGeneratorWithConfig 创建带自定义 maxRows 的 SQL 生成器（兼容旧接口）
 func NewSQLGeneratorWithConfig(isSQLite bool, maxRows int64) *SQLGenerator {
-	return &SQLGenerator{isSQLite: isSQLite, maxRows: maxRows}
+	dbType := "postgres"
+	if isSQLite {
+		dbType = "sqlite"
+	}
+	return &SQLGenerator{dbType: dbType, maxRows: maxRows}
 }
 
 // Generate 生成 SQL 查询
@@ -250,12 +263,17 @@ func (g *SQLGenerator) generateAggregate(agg AggregateFunc) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("aggregate.field %w", err)
 		}
-		if g.isSQLite {
+		if g.dbType == "sqlite" {
 			// SQLite 没有原生 STDDEV，用公式计算
 			// stddev = sqrt(avg(x^2) - avg(x)^2)
 			return fmt.Sprintf("SQRT(AVG(%s * %s) - AVG(%s) * AVG(%s)) AS %s", fieldExpr, fieldExpr, fieldExpr, fieldExpr, g.quoteIdentifier(agg.As)), nil
 		}
-		return fmt.Sprintf("%s(%s) AS %s", funcName, fieldExpr, g.quoteIdentifier(agg.As)), nil
+		// MySQL 8.0+ 不支持 STDDEV（Oracle 兼容别名），映射为 STDDEV_SAMP
+		mysqlFunc := funcName
+		if g.dbType == "mysql" && funcName == "STDDEV" {
+			mysqlFunc = "STDDEV_SAMP"
+		}
+		return fmt.Sprintf("%s(%s) AS %s", mysqlFunc, fieldExpr, g.quoteIdentifier(agg.As)), nil
 
 	case "VARIANCE", "VAR_POP", "VAR_SAMP":
 		if field == "" || field == "*" {
@@ -265,12 +283,17 @@ func (g *SQLGenerator) generateAggregate(agg AggregateFunc) (string, error) {
 		if err != nil {
 			return "", fmt.Errorf("aggregate.field %w", err)
 		}
-		if g.isSQLite {
+		if g.dbType == "sqlite" {
 			// SQLite 没有原生 VARIANCE，用公式计算
 			// variance = avg(x^2) - avg(x)^2
 			return fmt.Sprintf("(AVG(%s * %s) - AVG(%s) * AVG(%s)) AS %s", fieldExpr, fieldExpr, fieldExpr, fieldExpr, g.quoteIdentifier(agg.As)), nil
 		}
-		return fmt.Sprintf("%s(%s) AS %s", funcName, fieldExpr, g.quoteIdentifier(agg.As)), nil
+		// MySQL 8.0+ 不支持 VARIANCE（Oracle 兼容别名），映射为 VAR_SAMP
+		mysqlFunc := funcName
+		if g.dbType == "mysql" && funcName == "VARIANCE" {
+			mysqlFunc = "VAR_SAMP"
+		}
+		return fmt.Sprintf("%s(%s) AS %s", mysqlFunc, fieldExpr, g.quoteIdentifier(agg.As)), nil
 
 	default:
 		// 标准聚合函数: COUNT, SUM, AVG, MIN, MAX
@@ -565,12 +588,14 @@ func (g *SQLGenerator) generateJSONFieldExpression(jsonField, path string) (stri
 	if err := ValidateJSONPath(path); err != nil {
 		return "", err
 	}
-	if g.isSQLite {
-		// SQLite: JSON_EXTRACT(data, '$.status')
+	switch g.dbType {
+	case "sqlite", "mysql":
+		// SQLite / MySQL: JSON_EXTRACT(data, '$.status')
 		return fmt.Sprintf("JSON_EXTRACT(%s, '$.%s')", g.quoteQualifiedIdentifier(jsonField), path), nil
+	default:
+		// PostgreSQL: data->>'status' 返回 text
+		return fmt.Sprintf("%s->>'%s'", g.quoteQualifiedIdentifier(jsonField), path), nil
 	}
-	// PostgreSQL: data->>'status' 返回 text
-	return fmt.Sprintf("%s->>'%s'", g.quoteQualifiedIdentifier(jsonField), path), nil
 }
 
 func isJSONColumnCandidate(field string) bool {
@@ -644,8 +669,10 @@ func (g *SQLGenerator) quoteIdentifier(name string) string {
 	if name == "*" {
 		return name
 	}
-	// 使用双引号引用标识符（PostgreSQL 标准）
-	// SQLite 也支持双引号
+	// MySQL 使用反引号，PostgreSQL/SQLite 使用双引号
+	if g.dbType == "mysql" {
+		return "`" + strings.ReplaceAll(name, "`", "``") + "`"
+	}
 	return "\"" + strings.ReplaceAll(name, "\"", "\"\"") + "\""
 }
 

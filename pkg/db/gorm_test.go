@@ -74,6 +74,14 @@ func TestIsPostgres_NilDB(t *testing.T) {
 	assert.False(t, IsPostgres())
 }
 
+func TestIsMySQL_NilDB(t *testing.T) {
+	orig := db
+	db = nil
+	t.Cleanup(func() { db = orig })
+
+	assert.False(t, IsMySQL())
+}
+
 func TestInitDB_SqliteMemory(t *testing.T) {
 	initTestLogger(t)
 

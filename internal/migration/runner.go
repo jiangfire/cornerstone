@@ -843,14 +843,15 @@ func (r *Runner) loadAllSourceRows(sourceTable string, schema *source.TableSchem
 func (r *Runner) fetchTargetPayloadByCursor(targetTableID, cursorColumn string, cursorValue interface{}) (map[string]interface{}, error) {
 	query := r.db.Model(&models.Record{}).Select("data").Where("table_id = ? AND deleted_at IS NULL", targetTableID)
 	switch r.db.Name() {
-	case "sqlite":
-		query = query.Where("JSON_EXTRACT(data, ?) = ?", "$."+cursorColumn, cursorValue)
-	default:
+	case "postgres":
 		payload, err := json.Marshal(map[string]interface{}{cursorColumn: cursorValue})
 		if err != nil {
 			return nil, err
 		}
 		query = query.Where("data @> ?", string(payload))
+	default:
+		// SQLite / MySQL: JSON_EXTRACT
+		query = query.Where("JSON_EXTRACT(data, ?) = ?", "$."+cursorColumn, cursorValue)
 	}
 
 	var raw string
@@ -1046,14 +1047,15 @@ func normalizeCursorValue(value interface{}) interface{} {
 func (r *Runner) recordExists(tableID, fieldName string, fieldValue interface{}) (bool, error) {
 	query := r.db.Model(&models.Record{}).Where("table_id = ? AND deleted_at IS NULL", tableID)
 	switch r.db.Name() {
-	case "sqlite":
-		query = query.Where("JSON_EXTRACT(data, ?) = ?", "$."+fieldName, fieldValue)
-	default:
+	case "postgres":
 		payload, err := json.Marshal(map[string]interface{}{fieldName: fieldValue})
 		if err != nil {
 			return false, err
 		}
 		query = query.Where("data @> ?", string(payload))
+	default:
+		// SQLite / MySQL: JSON_EXTRACT
+		query = query.Where("JSON_EXTRACT(data, ?) = ?", "$."+fieldName, fieldValue)
 	}
 
 	var count int64

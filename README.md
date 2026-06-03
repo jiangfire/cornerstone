@@ -1,14 +1,18 @@
 # Cornerstone
 
-> 轻量数据资产平台：CLI + REST API + 外部迁移 + AI 助手 + MCP 协议
+> 自托管结构化数据平台。单个二进制，零外部依赖，CLI + REST API 双模交互。
 
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?style=flat&logo=go)](https://golang.org/)
 [![License](https://img.shields.io/badge/License-AGPL--3.0-blue.svg)](LICENSE)
 [![Tests](https://github.com/jiangfire/cornerstone/actions/workflows/ci.yml/badge.svg)](https://github.com/jiangfire/cornerstone/actions/workflows/ci.yml)
 
+Cornerstone 面向需要**轻量、可控、可编程**数据管理的开发者和团队。它提供数据库级别的结构定义（库/表/字段/记录）和细粒度权限控制，同时支持外部数据库迁移、AI 助手和 MCP 协议集成。
+
+相比 Airtable/Notion 等 SaaS，Cornerstone 让你**完全掌控数据**；相比自建数据库 + ORM，它让你**几分钟内获得完整的数据管理后台**。
+
 ---
 
-## 安装
+## 快速开始
 
 ### Docker（推荐）
 
@@ -16,17 +20,37 @@
 docker compose up -d --build
 ```
 
-### 下载二进制
-
-从 [Releases](https://github.com/jiangfire/cornerstone/releases) 下载对应平台的二进制文件。
-
 ### 从源码构建
 
 ```bash
-make build          # 构建当前平台二进制
-make test           # 运行测试
-make dev            # 启动开发服务器
+make build    # 构建二进制
+make dev      # 启动开发服务器
 ```
+
+然后使用 CLI 或 REST API 管理数据：
+
+```bash
+# CLI
+cornerstone db create mydb
+cornerstone table create <db-id> users
+cornerstone field create <table-id> name string --required
+cornerstone record create <table-id> '{"name":"张三"}'
+
+# REST API
+curl http://localhost:8080/api/v1/databases \
+  -H "Authorization: Bearer <token>"
+```
+
+---
+
+## 核心特性
+
+- **双模交互**：CLI 适合脚本自动化，REST API 适合应用集成
+- **细粒度权限**：Token 级别的数据库/表级权限控制
+- **外部迁移**：MySQL / PostgreSQL / SQLite 一键迁移到 Cornerstone
+- **AI Ready**：内置 AI 助手，支持 MCP 协议，AI Agent 可直接操作数据
+- **Query DSL**：类 SQL 的 JSON 查询语言，支持过滤、排序、聚合、JOIN
+- **轻量部署**：单个二进制，SQLite 即可运行，资源占用极低
 
 ---
 
@@ -36,7 +60,7 @@ make dev            # 启动开发服务器
 
 | 变量 | 说明 | 默认值 |
 |------|------|--------|
-| `DB_TYPE` | `sqlite` 或 `postgres` | `sqlite` |
+| `DB_TYPE` | `sqlite`、`postgres` 或 `mysql`（MySQL 8.0+） | `sqlite` |
 | `DATABASE_URL` | 数据库连接串 | `./cornerstone.db` |
 | `DB_MAX_OPEN` | 数据库最大打开连接数 | `10` |
 | `DB_MAX_IDLE` | 数据库最大空闲连接数 | `5` |
@@ -59,125 +83,40 @@ make dev            # 启动开发服务器
 ## CLI 使用
 
 ```bash
-cornerstone [command]
-```
-
-### 服务器
-
-```bash
 cornerstone serve                    # 启动 HTTP API + MCP 服务器
-```
 
-### 数据库管理
+# 数据管理
+cornerstone db list
+cornerstone db create <name> [-d description]
+cornerstone db get|update|delete <id>
 
-```bash
-cornerstone db list                  # 列出所有数据库
-cornerstone db create <name>         # 创建数据库
-  -d, --description string           数据库描述
-cornerstone db get <id>              # 获取数据库详情
-cornerstone db update <id> -n <name> # 更新数据库
-  -d, --description string           新描述
-cornerstone db delete <id>           # 删除数据库
-```
+cornerstone table list <db-id>
+cornerstone table create <db-id> <name>
+cornerstone table get|update|delete <id>
 
-### 表管理
+cornerstone field list <table-id>
+cornerstone field create <table-id> <name> <type> [-r] [-d desc]
+cornerstone field get|update|delete <id>
 
-```bash
-cornerstone table list <database-id>     # 列出表
-cornerstone table create <db-id> <name>  # 创建表
-  -d, --description string               表描述
-cornerstone table get <id>               # 获取表详情
-cornerstone table update <id> -n <name>  # 更新表
-  -d, --description string               新描述
-cornerstone table delete <id>            # 删除表
-```
+cornerstone record list <table-id> [-l limit] [-o offset] [-f filter]
+cornerstone record create <table-id> '<json>'
+cornerstone record get|update|delete <id>
+cornerstone record batch <table-id> '<json>' <count>
 
-### 字段管理
+# Token 与权限
+cornerstone token list
+cornerstone token create <name> [-s scopes] [-e expires]
+cornerstone token update|delete <id>
 
-```bash
-cornerstone field list <table-id>                 # 列出字段
-cornerstone field create <table-id> <name> <type> # 创建字段
-  -d, --description string                        字段描述
-  -r, --required                                  是否必填
-  -o, --options string                            选项（逗号分隔）
-cornerstone field get <id>                        # 获取字段详情
-cornerstone field update <id> -n <name>           # 更新字段
-  -t, --type string                               新类型
-  -d, --description string                        新描述
-  -r, --required                                  是否必填
-  -o, --options string                            选项（逗号分隔）
-cornerstone field delete <id>                     # 删除字段
-```
+# 外部数据库迁移
+cornerstone migration run [-c config] [--source-type mysql|postgres|sqlite] [--source-dsn ...] [--target-db ...]
+cornerstone migration preview
+cornerstone migration template
 
-### 记录管理
-
-```bash
-cornerstone record list <table-id>              # 列出记录
-  -l, --limit int                                每页数量（默认 20）
-  -o, --offset int                               偏移量（默认 0）
-  -f, --filter string                            过滤条件（JSON）
-cornerstone record create <table-id> '<json>'   # 创建记录
-cornerstone record get <id>                     # 获取记录
-cornerstone record update <id> '<json>'         # 更新记录
-  -v, --version int                              乐观锁版本号
-cornerstone record delete <id>                  # 删除记录
-cornerstone record batch <table-id> '<json>' <count> # 批量创建
-```
-
-### Token 管理
-
-```bash
-cornerstone token list              # 列出 Token
-cornerstone token create <name>     # 创建 Token
-  -s, --scopes string               权限范围（JSON）
-  -e, --expires string              过期时间（RFC3339）
-cornerstone token update <id>       # 更新 Token
-  -s, --scopes string               权限范围（JSON）
-  -e, --expires string              过期时间（RFC3339）
-cornerstone token delete <id>       # 删除 Token
-```
-
-### 外部数据库迁移
-
-将外部关系型数据库（MySQL / PostgreSQL / SQLite）的结构和数据迁移到 Cornerstone：
-
-```bash
-cornerstone migration run                    # 执行迁移
-  -c, --config string                        迁移配置文件路径
-  --source-type string                       源库类型：mysql|postgres|sqlite
-  --source-dsn string                        源库连接 DSN
-  --target-db string                         目标 Cornerstone Database 名称
-  --include-tables string                    要迁移的表（逗号分隔）
-  --exclude-tables string                    排除的表（逗号分隔）
-  --with-data                                迁移数据（默认 true）
-  --skip-data                                仅迁移结构
-  --batch-size int                           批量读取大小（默认 500）
-  --dry-run                                  空跑模式，仅输出计划
-  --resume string                            从指定任务 ID 恢复
-  --continue-on-error                        单表错误后继续其他表
-  --pagination-strategy string               分页策略：cursor|offset
-  --cursor-column string                     游标列
-  --checkpoint-interval int                  位点持久化间隔（默认 100）
-  --rollback-on-failure string               失败回滚策略：table|none
-  --max-concurrent-tables int                并发迁移表数（默认 1）
-cornerstone migration preview                # 预览迁移计划
-cornerstone migration template               # 输出配置模板
-cornerstone migration config create          # 创建配置模板文件
-cornerstone migration config validate        # 校验配置文件
-cornerstone migration config list            # 列出配置
-```
-
-### 缓存管理
-
-```bash
-cornerstone cache clear                 # 清空所有缓存（字段缓存 + Token 缓存）
-```
-
-### 其他
-
-```bash
-cornerstone migrate                 # 执行数据库迁移（表结构）
-cornerstone --version               # 显示版本
+# 其他
+cornerstone cache clear
+cornerstone migrate                  # 执行数据库结构迁移
+cornerstone --version
 ```
 
 ---
@@ -270,14 +209,7 @@ Database ──1:N──> Table ──1:N──> Field
                   Table ──1:N──> Record ──1:N──> File
 ```
 
-| 模型 | ID 前缀 | 说明 |
-|------|---------|------|
-| Token | `tok_` | API 认证令牌，Master Token 拥有全部权限 |
-| Database | `db_` | 数据库 |
-| Table | `tbl_` | 表 |
-| Field | `fld_` | 字段（string / text / number / boolean / date / datetime / file / json / list） |
-| Record | `rec_` | 记录（JSONB 存储，乐观锁） |
-| File | `fil_` | 文件附件 |
+你可以通过 API 或 CLI 自由定义数据库、表、字段结构，无需预编译迁移脚本。记录以 JSONB 存储，支持乐观锁版本控制。文件附件与记录关联，支持权限隔离。
 
 ---
 
@@ -302,7 +234,7 @@ X-API-Key: <token>
 
 ## MCP 协议
 
-Cornerstone 通过 `/mcp` 端点暴露 MCP（Model Context Protocol）接口，AI Agent 可直接操作数据。
+Cornerstone 原生支持 [MCP（Model Context Protocol）](https://modelcontextprotocol.io/)，AI Agent 可以通过标准协议直接读取和写入你的数据，无需编写自定义集成代码。
 
 连接方式：
 - **SSE 事件流**：`GET /mcp`（`Accept: text/event-stream`）
@@ -321,13 +253,13 @@ curl -X POST http://localhost:8080/api/v1/ai/chat \
   -d '{"message": "帮我创建一个用户表"}'
 ```
 
-支持自然语言建库、建表、查询数据、生成测试数据。
+支持自然语言建库、建表、查询数据、生成测试数据。AI 助手理解 Cornerstone 的数据模型和 API，可以直接调用内部工具完成操作。
 
 ---
 
 ## Query DSL
 
-通过 JSON 描述查询，支持过滤、排序、聚合、JOIN。详见 [Query DSL 文档](docs/Query.md)。
+通过 JSON 描述查询，支持过滤、排序、聚合、JOIN。无需手写 SQL，即可实现复杂的数据查询。详见 [Query DSL 文档](docs/Query.md)。
 
 ---
 
@@ -353,9 +285,7 @@ go test ./... -coverprofile=coverage.out # 生成覆盖率报告
 go tool cover -func=coverage.out        # 查看函数级覆盖率
 ```
 
-关键业务链覆盖率：authz 90%+, config 91%+, middleware 93%+, handlers 90%+, services 85%+, query 86%+, migration 85%+。
-
-CI 中还包含 MySQL 8.4 和 PostgreSQL 16 的迁移集成测试，以及 golangci-lint、govulncheck 和 Trivy 安全扫描。
+核心包测试覆盖率 80%+，CI 包含 MySQL/PostgreSQL 迁移集成测试、golangci-lint、govulncheck 和 Trivy 安全扫描。
 
 ---
 
