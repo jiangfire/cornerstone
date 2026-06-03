@@ -165,14 +165,6 @@ func indexExists(db *gorm.DB, table, indexName string) (bool, error) {
 	return count > 0, nil
 }
 
-func isSQLite(db *gorm.DB) bool {
-	return db.Name() == "sqlite"
-}
-
-func isMySQL(db *gorm.DB) bool {
-	return db.Name() == "mysql"
-}
-
 func isPostgres(db *gorm.DB) bool {
 	return db.Name() == "postgres"
 }
