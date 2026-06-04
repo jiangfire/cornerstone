@@ -82,13 +82,21 @@ func TestRunnerPreviewAndRun(t *testing.T) {
 	assert.Len(t, fields, 4)
 
 	var records []models.Record
-	require.NoError(t, targetDB.Where("table_id = ?", table.ID).Order("created_at asc").Find(&records).Error)
+	require.NoError(t, targetDB.Where("table_id = ?", table.ID).Find(&records).Error)
 	require.Len(t, records, 2)
 
-	payload := map[string]any{}
-	require.NoError(t, json.Unmarshal([]byte(records[0].Data), &payload))
-	assert.Equal(t, "alice", payload["name"])
-	assert.Equal(t, "2026-05-31T10:00:00Z", payload["created_at"])
+	// 不依赖数据库插入顺序，按 name 查找对应记录
+	recordMap := make(map[string]map[string]any)
+	for _, rec := range records {
+		payload := map[string]any{}
+		require.NoError(t, json.Unmarshal([]byte(rec.Data), &payload))
+		recordMap[payload["name"].(string)] = payload
+	}
+
+	require.Contains(t, recordMap, "alice")
+	assert.Equal(t, "2026-05-31T10:00:00Z", recordMap["alice"]["created_at"])
+	require.Contains(t, recordMap, "bob")
+	assert.Equal(t, "2026-05-31T11:00:00Z", recordMap["bob"]["created_at"])
 }
 
 func TestRunnerResume_FromCheckpoint(t *testing.T) {

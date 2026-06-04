@@ -1,6 +1,7 @@
 package db
 
 import (
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,6 +11,13 @@ import (
 	"github.com/jiangfire/cornerstone/internal/config"
 	pkglog "github.com/jiangfire/cornerstone/pkg/log"
 )
+
+func skipIfNotSQLite(t *testing.T) {
+	dbType := os.Getenv("DB_TYPE")
+	if dbType != "" && dbType != "sqlite" {
+		t.Skip("Skipping SQLite-specific test on " + dbType)
+	}
+}
 
 func initTestLogger(t *testing.T) {
 	t.Helper()
@@ -45,6 +53,7 @@ func TestSetDB_And_DB(t *testing.T) {
 }
 
 func TestIsSQLite_True(t *testing.T) {
+	skipIfNotSQLite(t)
 	initTestLogger(t)
 
 	err := InitDB(config.DatabaseConfig{
@@ -83,6 +92,7 @@ func TestIsMySQL_NilDB(t *testing.T) {
 }
 
 func TestInitDB_SqliteMemory(t *testing.T) {
+	skipIfNotSQLite(t)
 	initTestLogger(t)
 
 	err := InitDB(config.DatabaseConfig{
@@ -96,6 +106,7 @@ func TestInitDB_SqliteMemory(t *testing.T) {
 }
 
 func TestCloseDB_AfterInitDB(t *testing.T) {
+	skipIfNotSQLite(t)
 	initTestLogger(t)
 
 	err := InitDB(config.DatabaseConfig{
@@ -118,6 +129,7 @@ func TestCloseDB_Nil(t *testing.T) {
 }
 
 func TestInitDB_MemoryConnectionPool(t *testing.T) {
+	skipIfNotSQLite(t)
 	initTestLogger(t)
 
 	err := InitDB(config.DatabaseConfig{

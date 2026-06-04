@@ -23,21 +23,38 @@ func init() {
 func setupAuthDB(t *testing.T) (*gin.Engine, *models.Token, *models.Token) {
 	t.Helper()
 
-	err := pkgdb.InitDB(config.DatabaseConfig{Type: "sqlite", URL: ":memory:"})
+	dbType := os.Getenv("DB_TYPE")
+	databaseURL := os.Getenv("DATABASE_URL")
+	if dbType == "" {
+		dbType = "sqlite"
+		databaseURL = ":memory:"
+	}
+
+	err := pkgdb.InitDB(config.DatabaseConfig{Type: dbType, URL: databaseURL})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = pkgdb.CloseDB() })
 
 	d := pkgdb.DB()
 	err = d.AutoMigrate(&models.Token{}, &models.Database{}, &models.Table{}, &models.Field{}, &models.Record{}, &models.File{})
 	require.NoError(t, err)
 
-	master := &models.Token{Name: "master", IsMaster: true, Scopes: "{}"}
+	master := &models.Token{Name: "master", IsMaster: true, Scopes: "{}", CreatedAt: time.Now()}
 	require.NoError(t, d.Create(master).Error)
 
-	worker := &models.Token{Name: "worker", IsMaster: false, Scopes: `{"databases":{},"tables":{}}`}
+	worker := &models.Token{Name: "worker", IsMaster: false, Scopes: `{"databases":{},"tables":{}}`, CreatedAt: time.Now()}
 	require.NoError(t, d.Create(worker).Error)
 
 	pkgdb.SetDB(d)
+
+	// 清理函数：硬删除所有测试数据
+	t.Cleanup(func() {
+		d.Unscoped().Where("1 = 1").Delete(&models.File{})
+		d.Unscoped().Where("1 = 1").Delete(&models.Record{})
+		d.Unscoped().Where("1 = 1").Delete(&models.Field{})
+		d.Unscoped().Where("1 = 1").Delete(&models.Table{})
+		d.Unscoped().Where("1 = 1").Delete(&models.Database{})
+		d.Unscoped().Where("1 = 1").Delete(&models.Token{})
+		_ = pkgdb.CloseDB()
+	})
 
 	r := gin.New()
 	return r, master, worker

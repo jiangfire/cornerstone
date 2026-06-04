@@ -2,6 +2,7 @@ package db
 
 import (
 	"fmt"
+	"os"
 	"testing"
 	"time"
 
@@ -15,11 +16,31 @@ import (
 
 func setupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
-	err := pkgdb.InitDB(config.DatabaseConfig{Type: "sqlite", URL: ":memory:"})
+
+	dbType := os.Getenv("DB_TYPE")
+	databaseURL := os.Getenv("DATABASE_URL")
+	if dbType == "" {
+		dbType = "sqlite"
+		databaseURL = ":memory:"
+	}
+
+	err := pkgdb.InitDB(config.DatabaseConfig{Type: dbType, URL: databaseURL})
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = pkgdb.CloseDB() })
+
 	db := pkgdb.DB()
 	require.NoError(t, db.AutoMigrate(&models.Token{}, &models.Database{}, &models.Table{}, &models.Field{}, &models.Record{}, &models.File{}))
+
+	// 清理函数：硬删除所有测试数据
+	t.Cleanup(func() {
+		db.Unscoped().Where("1 = 1").Delete(&models.File{})
+		db.Unscoped().Where("1 = 1").Delete(&models.Record{})
+		db.Unscoped().Where("1 = 1").Delete(&models.Field{})
+		db.Unscoped().Where("1 = 1").Delete(&models.Table{})
+		db.Unscoped().Where("1 = 1").Delete(&models.Database{})
+		db.Unscoped().Where("1 = 1").Delete(&models.Token{})
+		_ = pkgdb.CloseDB()
+	})
+
 	return db
 }
 
@@ -68,8 +89,8 @@ func TestRetry_AllFail(t *testing.T) {
 func TestCleanupExpiredTokens_WithExpired(t *testing.T) {
 	setupTestDB(t)
 	past := time.Now().Add(-time.Hour)
-	pkgdb.DB().Create(&models.Token{Name: "expired", IsMaster: false, Scopes: "{}", ExpiresAt: &past})
-	pkgdb.DB().Create(&models.Token{Name: "valid", IsMaster: false, Scopes: "{}"})
+	pkgdb.DB().Create(&models.Token{Name: "expired", IsMaster: false, Scopes: "{}", ExpiresAt: &past, CreatedAt: time.Now()})
+	pkgdb.DB().Create(&models.Token{Name: "valid", IsMaster: false, Scopes: "{}", CreatedAt: time.Now()})
 
 	err := CleanupExpiredTokens()
 	require.NoError(t, err)
@@ -81,8 +102,8 @@ func TestCleanupExpiredTokens_WithExpired(t *testing.T) {
 
 func TestCleanupExpiredTokens_NoExpired(t *testing.T) {
 	setupTestDB(t)
-	pkgdb.DB().Create(&models.Token{Name: "valid1", IsMaster: false, Scopes: "{}"})
-	pkgdb.DB().Create(&models.Token{Name: "valid2", IsMaster: false, Scopes: "{}"})
+	pkgdb.DB().Create(&models.Token{Name: "valid1", IsMaster: false, Scopes: "{}", CreatedAt: time.Now()})
+	pkgdb.DB().Create(&models.Token{Name: "valid2", IsMaster: false, Scopes: "{}", CreatedAt: time.Now()})
 
 	err := CleanupExpiredTokens()
 	require.NoError(t, err)
@@ -93,7 +114,14 @@ func TestCleanupExpiredTokens_NoExpired(t *testing.T) {
 }
 
 func TestMigrate(t *testing.T) {
-	err := pkgdb.InitDB(config.DatabaseConfig{Type: "sqlite", URL: ":memory:"})
+	dbType := os.Getenv("DB_TYPE")
+	databaseURL := os.Getenv("DATABASE_URL")
+	if dbType == "" {
+		dbType = "sqlite"
+		databaseURL = ":memory:"
+	}
+
+	err := pkgdb.InitDB(config.DatabaseConfig{Type: dbType, URL: databaseURL})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = pkgdb.CloseDB() })
 
@@ -109,6 +137,11 @@ func TestMigrate(t *testing.T) {
 }
 
 func TestIsSQLite(t *testing.T) {
+	dbType := os.Getenv("DB_TYPE")
+	if dbType != "" && dbType != "sqlite" {
+		t.Skip("Skipping IsSQLite test on non-SQLite database")
+	}
+
 	err := pkgdb.InitDB(config.DatabaseConfig{Type: "sqlite", URL: ":memory:"})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = pkgdb.CloseDB() })

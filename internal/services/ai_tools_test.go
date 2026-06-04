@@ -1,6 +1,7 @@
 package services
 
 import (
+	"encoding/json"
 	"math/rand"
 	"testing"
 	"time"
@@ -175,7 +176,9 @@ func TestExecuteAITool_UpdateRecord(t *testing.T) {
 
 	var updated models.Record
 	db.Where("id = ?", record.ID).First(&updated)
-	assert.Contains(t, updated.Data, `"age":31`)
+	updatedPayload := map[string]any{}
+	require.NoError(t, json.Unmarshal([]byte(updated.Data), &updatedPayload))
+	assert.Equal(t, float64(31), updatedPayload["age"])
 }
 
 func TestExecuteAITool_DeleteRecord(t *testing.T) {

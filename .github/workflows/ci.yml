@@ -83,7 +83,7 @@ jobs:
           done
 
       - name: Run tests
-        run: go test -v -race ./...
+        run: go test -v -race -p 1 ./...
 
   test-postgres:
     name: Tests (PostgreSQL 16)
@@ -126,7 +126,7 @@ jobs:
           done
 
       - name: Run tests
-        run: go test -v -race ./...
+        run: go test -v -race -p 1 ./...
 
   migration-integration:
     name: Migration Integration

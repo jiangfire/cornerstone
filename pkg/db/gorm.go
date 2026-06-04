@@ -100,9 +100,20 @@ func initMySQL(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	if !dsn.ParseTime {
 		dsn.ParseTime = true
 	}
-	return gorm.Open(gormmysql.Open(dsn.FormatDSN()), &gorm.Config{
+	db, err := gorm.Open(gormmysql.Open(dsn.FormatDSN()), &gorm.Config{
 		Logger: NewZapLogger(zap.L()),
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	// MySQL 8.0 默认启用 NO_ZERO_DATE，会导致 time.Time 零值插入失败
+	// 设置全局 sql_mode 允许零值日期，确保测试兼容性
+	if err := db.Exec("SET GLOBAL sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'").Error; err != nil {
+		return nil, fmt.Errorf("设置 MySQL sql_mode 失败: %w", err)
+	}
+
+	return db, nil
 }
 
 // initPostgres 初始化 PostgreSQL 连接
