@@ -589,7 +589,7 @@ func TestGap_RemoveFileRef_Success(t *testing.T) {
 	_, _, fld, rec := createGapFileChain(t, db)
 
 	fileID := models.GenerateID("fil")
-	rec.Data = `{"attachment":"` + fileID + `"}`
+	rec.Data = models.JSONField(`{"attachment":"` + fileID + `"}`)
 	require.NoError(t, db.Save(rec).Error)
 
 	file := &models.File{

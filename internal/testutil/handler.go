@@ -146,7 +146,7 @@ func CreateRecordDirect(t *testing.T, database *gorm.DB, tableID string, data ma
 	t.Helper()
 	dataJSON, err := json.Marshal(data)
 	require.NoError(t, err)
-	record := &models.Record{TableID: tableID, Data: string(dataJSON), Version: 1}
+	record := &models.Record{TableID: tableID, Data: models.JSONField(dataJSON), Version: 1}
 	require.NoError(t, database.Create(record).Error)
 	return record
 }

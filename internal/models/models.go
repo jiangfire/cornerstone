@@ -6,7 +6,31 @@ import (
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 )
+
+// JSONField 是跨数据库兼容的 JSON 字段类型。
+// GORM AutoMigrate 会根据实际数据库选择对应类型：
+// PostgreSQL → JSONB，MySQL → JSON，SQLite → TEXT
+// 定义为 string 的派生类型，用法上与 string 基本相同（显式转换即可）。
+type JSONField string
+
+// GormDataType 返回通用数据类型标识。
+func (JSONField) GormDataType() string {
+	return "text"
+}
+
+// GormDBDataType 返回特定数据库的列类型。
+func (JSONField) GormDBDataType(db *gorm.DB, field *schema.Field) string {
+	switch db.Name() {
+	case "postgres":
+		return "jsonb"
+	case "mysql":
+		return "json"
+	default:
+		return "text"
+	}
+}
 
 // Token API Token 表 (tok_前缀)
 type Token struct {
@@ -105,7 +129,7 @@ func (f *Field) BeforeCreate(tx *gorm.DB) (err error) {
 type Record struct {
 	ID        string         `gorm:"type:varchar(50);primaryKey" json:"id"`
 	TableID   string         `gorm:"type:varchar(50);not null" json:"table_id"`
-	Data      string         `gorm:"type:jsonb;not null" json:"data"`
+	Data      JSONField      `gorm:"not null" json:"data"`
 	Version   int            `gorm:"type:integer;default:1" json:"version"`
 	CreatedAt time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`

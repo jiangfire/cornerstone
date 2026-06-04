@@ -311,7 +311,7 @@ func TestDeleteFile_Success(t *testing.T) {
 	fld := createTestField(t, db, table.ID, "doc", "file")
 	data := map[string]interface{}{"doc": []string{}}
 	dataJSON, _ := json.Marshal(data)
-	record := &models.Record{TableID: table.ID, Data: string(dataJSON)}
+	record := &models.Record{TableID: table.ID, Data: models.JSONField(dataJSON)}
 	require.NoError(t, db.Create(record).Error)
 
 	tmpFile := "./uploads/test_delete_file.txt"
@@ -353,7 +353,7 @@ func TestRemoveFileReferenceFromRecord(t *testing.T) {
 
 	data := map[string]interface{}{"doc": []string{file.ID}}
 	dataJSON, _ := json.Marshal(data)
-	record := &models.Record{TableID: table.ID, Data: string(dataJSON)}
+	record := &models.Record{TableID: table.ID, Data: models.JSONField(dataJSON)}
 	require.NoError(t, db.Create(record).Error)
 
 	file.RecordID = record.ID

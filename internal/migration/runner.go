@@ -500,7 +500,7 @@ func (r *Runner) insertRecordBatch(targetTableID string, payloads []string) erro
 		for _, payload := range payloads {
 			records = append(records, models.Record{
 				TableID: targetTableID,
-				Data:    payload,
+				Data:    models.JSONField(payload),
 				Version: 1,
 			})
 		}

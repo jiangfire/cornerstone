@@ -86,14 +86,6 @@ func Migrate() error {
 
 	logger.Info("表结构迁移完成")
 
-	// MySQL: AutoMigrate 会将 jsonb 映射为 LONGTEXT，需要手动修改为 JSON
-	if pkgdb.IsMySQL() {
-		if err := database.Exec("ALTER TABLE records MODIFY data JSON NOT NULL").Error; err != nil {
-			return fmt.Errorf("修改 MySQL records.data 为 JSON 类型失败: %w", err)
-		}
-		logger.Info("MySQL records.data 已修正为 JSON 类型")
-	}
-
 	if err := createIndexes(database); err != nil {
 		return fmt.Errorf("创建索引失败: %w", err)
 	}

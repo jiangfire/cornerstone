@@ -481,7 +481,7 @@ func (s *RecordService) ensureWritableFields(data map[string]interface{}, writab
 	return nil
 }
 
-func parseRecordPayload(raw string) map[string]interface{} {
+func parseRecordPayload(raw models.JSONField) map[string]interface{} {
 	payload := make(map[string]interface{})
 	if raw == "" {
 		return payload
@@ -507,12 +507,12 @@ func (s *RecordService) filterReadableData(fields []models.Field, readableFields
 	return filtered
 }
 
-func marshalRecordPayload(payload map[string]interface{}) (string, error) {
+func marshalRecordPayload(payload map[string]interface{}) (models.JSONField, error) {
 	dataJSON, err := json.Marshal(payload)
 	if err != nil {
 		return "", fmt.Errorf("数据序列化失败: %w", err)
 	}
-	return string(dataJSON), nil
+	return models.JSONField(dataJSON), nil
 }
 
 // recordFilterClause 是一个可复用的 WHERE 片段,既用于分页查询,也用于 COUNT。
@@ -710,7 +710,7 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 	// 4. 创建记录并绑定附件
 	record := models.Record{
 		TableID: req.TableID,
-		Data:    string(dataJSON),
+		Data:    models.JSONField(dataJSON),
 		Version: 1,
 	}
 
@@ -1213,7 +1213,7 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 			for j := i; j < end; j++ {
 				batch = append(batch, models.Record{
 					TableID: req.TableID,
-					Data:    string(dataJSON),
+					Data:    models.JSONField(dataJSON),
 					Version: 1,
 				})
 			}
