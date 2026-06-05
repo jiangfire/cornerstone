@@ -83,7 +83,7 @@ jobs:
           done
 
       - name: Run tests
-        run: go test -v -race -p 1 ./...
+        run: go test -v -race -p 1 -timeout 15m ./...
 
   test-postgres:
     name: Tests (PostgreSQL 16)
@@ -126,7 +126,46 @@ jobs:
           done
 
       - name: Run tests
-        run: go test -v -race -p 1 ./...
+        run: go test -v -race -p 1 -timeout 15m ./...
+
+  test-redis:
+    name: Tests (Redis Cache)
+    runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      REDIS_URL: redis://127.0.0.1:6379/0
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.4'
+          cache: false
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Wait for Redis
+        run: |
+          for i in {1..30}; do
+            (echo > /dev/tcp/127.0.0.1/6379) >/dev/null 2>&1 && break
+            sleep 2
+          done
+
+      - name: Run tests with Redis cache backend
+        run: go test -v -race -p 1 -timeout 15m ./...
 
   migration-integration:
     name: Migration Integration

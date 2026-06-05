@@ -87,6 +87,7 @@ type Table struct {
 	CreatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
+	Database    Database       `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;foreignKey:DatabaseID" json:"-"`
 }
 
 func (Table) TableName() string {
@@ -112,6 +113,7 @@ type Field struct {
 	CreatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
+	Table       Table          `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;foreignKey:TableID" json:"-"`
 }
 
 func (Field) TableName() string {
@@ -134,6 +136,7 @@ type Record struct {
 	CreatedAt time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
 	UpdatedAt time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
 	DeletedAt gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
+	Table     Table          `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;foreignKey:TableID" json:"-"`
 }
 
 func (Record) TableName() string {

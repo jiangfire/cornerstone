@@ -16,6 +16,10 @@ import (
 // TTL 5 分钟，在大多数业务场景下 Token 和 Scopes 不会频繁变更。
 var tokenCache = cache.NewString[*Authorizer]("token", 5*time.Minute)
 
+func init() {
+	cache.Register(tokenCache)
+}
+
 const (
 	ActionRead   = "read"
 	ActionWrite  = "write"
