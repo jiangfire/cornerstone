@@ -808,7 +808,13 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 			// 3c. 关键字回退: 先用 SQL LIKE 预筛(限上限+1 行用于检测溢出),
 			// 再做权限感知 in-memory 过滤,确保隐藏字段不能通过模糊匹配泄漏
 			likePattern := "%" + filter + "%"
-			narrowQ := s.db.Where("table_id = ? AND deleted_at IS NULL AND data LIKE ?", req.TableID, likePattern).
+			var likeSQL string
+			if s.db.Name() == "postgres" {
+				likeSQL = "table_id = ? AND deleted_at IS NULL AND data::text LIKE ?"
+			} else {
+				likeSQL = "table_id = ? AND deleted_at IS NULL AND data LIKE ?"
+			}
+			narrowQ := s.db.Where(likeSQL, req.TableID, likePattern).
 				Order("created_at DESC").Limit(maxKeywordScanRecords + 1)
 			var narrowed []models.Record
 			if err := narrowQ.Find(&narrowed).Error; err != nil {
