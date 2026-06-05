@@ -28,6 +28,11 @@ func SetDB(d *gorm.DB) {
 	db = d
 }
 
+// IsInitialized 检查数据库是否已初始化
+func IsInitialized() bool {
+	return db != nil
+}
+
 // IsSQLite 检查当前是否为 SQLite 数据库
 func IsSQLite() bool {
 	if db == nil {

@@ -2,7 +2,6 @@ package testutil
 
 import (
 	"os"
-	"sync"
 	"testing"
 	"time"
 
@@ -24,11 +23,6 @@ var autoMigrateModels = []any{
 	&models.Record{},
 	&models.File{},
 }
-
-var (
-	testDBOnce    sync.Once
-	testDBInitErr error
-)
 
 func SetupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
@@ -65,21 +59,28 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		return db
 	}
 
-	// PostgreSQL / MySQL：所有测试共享同一个数据库实例，只初始化一次
-	testDBOnce.Do(func() {
-		testDBInitErr = pkgdb.InitDB(config.DatabaseConfig{
+	// PostgreSQL / MySQL：所有测试共享同一个数据库实例
+	// 如果连接被之前的测试关闭（如模拟 DB 错误的测试），需要重新初始化
+	needsInit := true
+	if pkgdb.IsInitialized() {
+		db := pkgdb.DB()
+		if sqlDB, err := db.DB(); err == nil && sqlDB.Ping() == nil {
+			needsInit = false
+		}
+	}
+	if needsInit {
+		_ = pkgdb.CloseDB() // 清理可能已损坏的旧连接
+		err := pkgdb.InitDB(config.DatabaseConfig{
 			Type:        dbType,
 			URL:         databaseURL,
 			MaxOpen:     10,
 			MaxIdle:     5,
 			MaxLifetime: 3600,
 		})
-		if testDBInitErr != nil {
-			return
-		}
-		testDBInitErr = pkgdb.DB().AutoMigrate(autoMigrateModels...)
-	})
-	require.NoError(t, testDBInitErr)
+		require.NoError(t, err)
+		err = pkgdb.DB().AutoMigrate(autoMigrateModels...)
+		require.NoError(t, err)
+	}
 
 	db := pkgdb.DB()
 
