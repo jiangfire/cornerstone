@@ -95,6 +95,11 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 // cleanupTables 使用 db.Exec raw SQL 清空所有测试表，绕过 GORM callback/hook，
 // 避免被测试注册的 mock callback 干扰。同时验证表已清空并清理全局缓存。
 func cleanupTables(db *gorm.DB, t *testing.T) {
+	// 如果底层连接已被之前的测试关闭（如模拟 DB 错误的测试），跳过清理
+	if sqlDB, err := db.DB(); err != nil || sqlDB.Ping() != nil {
+		return
+	}
+
 	// 按外键依赖顺序清理（先子表后父表）
 	tables := []string{"files", "records", "fields", "tables", "databases", "tokens"}
 	for _, table := range tables {
