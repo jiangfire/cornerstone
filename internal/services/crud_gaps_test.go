@@ -217,7 +217,7 @@ func TestGetActiveField_SoftDeleted(t *testing.T) {
 // ============================================================
 
 func TestUpdateTable_NoAccess(t *testing.T) {
-	db, _, database, _ := setupCrudTestEnv(t)
+	db, database, _, _ := setupCrudTestEnv(t)
 	svc := NewTableService(db)
 
 	table := &models.Table{DatabaseID: database.ID, Name: "upd_noaccess"}
@@ -670,7 +670,7 @@ func TestBuildDeletedTableName_VeryLongID(t *testing.T) {
 // ============================================================
 
 func TestDeleteField_NonMasterViewer(t *testing.T) {
-	db, _, database, _ := setupCrudTestEnv(t)
+	db, database, _, _ := setupCrudTestEnv(t)
 	svc := NewFieldService(db)
 
 	table := &models.Table{DatabaseID: database.ID, Name: "del_viewer_table"}
@@ -693,7 +693,7 @@ func TestDeleteField_NonMasterViewer(t *testing.T) {
 // ============================================================
 
 func TestUpdateTable_ViewerNoManage(t *testing.T) {
-	db, _, database, _ := setupCrudTestEnv(t)
+	db, database, _, _ := setupCrudTestEnv(t)
 	svc := NewTableService(db)
 
 	table := &models.Table{DatabaseID: database.ID, Name: "upd_viewer_tbl"}

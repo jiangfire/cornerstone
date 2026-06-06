@@ -70,6 +70,7 @@ func TestTokenService_DeleteToken_DBErrorOnDelete(t *testing.T) {
 	d.Callback().Delete().Before("gorm:delete").Register("test:force_delete_err", func(gdb *gorm.DB) {
 		gdb.Error = fmt.Errorf("forced delete error")
 	})
+	t.Cleanup(func() { _ = d.Callback().Delete().Remove("test:force_delete_err") })
 
 	err := svc.DeleteToken(master.ID, target.ID, true)
 	assert.Error(t, err)
@@ -98,6 +99,7 @@ func TestTokenService_UpdateToken_DBErrorOnUpdate(t *testing.T) {
 	d.Callback().Update().Before("gorm:update").Register("test:force_update_err", func(gdb *gorm.DB) {
 		gdb.Error = fmt.Errorf("forced update error")
 	})
+	t.Cleanup(func() { _ = d.Callback().Update().Remove("test:force_update_err") })
 
 	_, err := svc.UpdateToken(worker.ID, `{"databases":{}}`, nil)
 	assert.Error(t, err)
@@ -118,6 +120,7 @@ func TestTokenService_UpdateToken_DBErrorOnRequery(t *testing.T) {
 			gdb.Error = fmt.Errorf("forced requery error")
 		}
 	})
+	t.Cleanup(func() { _ = d.Callback().Query().Remove("test:force_requery_err") })
 
 	_, err := svc.UpdateToken(worker.ID, `{"databases":{}}`, nil)
 	assert.Error(t, err)

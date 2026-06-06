@@ -1,6 +1,7 @@
 package testutil
 
 import (
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -80,6 +81,8 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		require.NoError(t, err)
 		err = pkgdb.DB().AutoMigrate(autoMigrateModels...)
 		require.NoError(t, err)
+		// 前一个测试关闭了连接导致 cleanupTables 被跳过，重新初始化后立即清理残余数据
+		cleanupTables(pkgdb.DB(), t)
 	}
 
 	db := pkgdb.DB()
@@ -100,10 +103,24 @@ func cleanupTables(db *gorm.DB, t *testing.T) {
 		return
 	}
 
-	// 按外键依赖顺序清理（先子表后父表）
+	// MySQL 使用 SET FOREIGN_KEY_CHECKS=0 禁用外键检查，再按任意顺序截断
+	// PostgreSQL/SQLite 使用 TRUNCATE ... CASCADE 或直接 DELETE
+	if pkgdb.IsMySQL() {
+		if err := db.Exec("SET FOREIGN_KEY_CHECKS = 0").Error; err != nil {
+			t.Logf("failed to disable FK checks: %v", err)
+			return
+		}
+		defer func() {
+			if err := db.Exec("SET FOREIGN_KEY_CHECKS = 1").Error; err != nil {
+				t.Logf("failed to re-enable FK checks: %v", err)
+			}
+		}()
+	}
+
 	tables := []string{"files", "records", "fields", "tables", "databases", "tokens"}
 	for _, table := range tables {
-		if err := db.Exec("DELETE FROM " + table).Error; err != nil {
+		query := quoteIdentifier(db, table)
+		if err := db.Exec("DELETE FROM " + query).Error; err != nil {
 			t.Logf("failed to delete from %s: %v", table, err)
 		}
 	}
@@ -137,4 +154,13 @@ func SetupTestDBWithTokens(t *testing.T, tokenIDs ...string) *gorm.DB {
 	}
 
 	return db
+}
+
+// quoteIdentifier 根据数据库类型返回正确引用的标识符。
+// MySQL 使用反引号，PostgreSQL/SQLite 使用双引号。
+func quoteIdentifier(db *gorm.DB, name string) string {
+	if pkgdb.IsMySQL() {
+		return fmt.Sprintf("`%s`", name)
+	}
+	return fmt.Sprintf("%q", name)
 }
