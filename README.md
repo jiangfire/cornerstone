@@ -213,6 +213,32 @@ Database ──1:N──> Table ──1:N──> Field
 
 ---
 
+## 性能与数据库选择
+
+Cornerstone 支持 SQLite、MySQL 8.0+ 和 PostgreSQL。不同后端的定位不同：
+
+| 后端 | 建议用途 | 性能结论 |
+|------|----------|----------|
+| SQLite | 本地开发、CI 快速回归、小规模自托管 | 启动成本低，适合 smoke benchmark；不建议承载 JSON-heavy 生产查询 |
+| PostgreSQL | JSON 条件查询较多的生产部署 | 当前 benchmark 中 JSON 查询表现最稳定，推荐作为 JSON-heavy 默认生产后端 |
+| MySQL 8.0+ | 需要 MySQL 生态兼容的生产部署 | 普通列表路径已优化；JSON 热字段需要 generated column 或 `JSON_VALUE()` 表达式索引 |
+
+已落地的关键优化：
+
+- 记录列表主路径使用复合索引 `idx_records_table_deleted_created(table_id, deleted_at, created_at DESC)`。
+- MySQL 记录列表使用 `FORCE INDEX (idx_records_table_deleted_created)` 稳定普通分页 / COUNT 执行计划。
+- `record_field_indexes` 派生索引表已用于动态字段等值过滤的正确性基础，并覆盖 create/update/delete/batch 写入同步与历史回填。
+- 独立 Performance workflow 会在 SQLite / MySQL / PostgreSQL 上运行 benchmark，并上传 `auth.txt`、`services.txt`、`query.txt`、`explain.txt` artifact。
+
+当前 MySQL JSON 结论：
+
+- `JSON_EXTRACT(data, ?) = ?` 仍是逐行 JSON 函数过滤，不能作为高性能 MySQL JSON 查询方案长期依赖。
+- `record_field_indexes` 当前查询形态可运行，但在现有 benchmark 中慢于 raw `JSON_EXTRACT`，不应作为 MySQL 性能收益承诺。
+- 少量稳定热点字段优先使用 generated column 或 `JSON_VALUE()` 表达式索引，再配合 `(table_id, deleted_at, derived_col, created_at DESC)` 这类复合索引。
+- 相关 MySQL 能力参考官方文档：[JSON_VALUE() 与 JSON 表达式索引](https://dev.mysql.com/doc/refman/8.0/en/json-search-functions.html)、[generated column 二级索引](https://dev.mysql.com/doc/refman/8.0/en/create-table-secondary-indexes.html)。
+
+---
+
 ## 认证
 
 所有 API 请求（除 `/health`、`/ready`、`/metrics`）需携带 Token：
@@ -286,6 +312,18 @@ go tool cover -func=coverage.out        # 查看函数级覆盖率
 ```
 
 核心包测试覆盖率 80%+，CI 包含 MySQL/PostgreSQL 迁移集成测试、golangci-lint、govulncheck 和 Trivy 安全扫描。
+
+### 性能基准
+
+```bash
+go test ./internal/middleware -run ^$ -bench BenchmarkValidateToken -benchmem -count 1
+go test ./internal/services -run ^$ -bench BenchmarkFieldServiceListFields -benchmem -count 1
+go test ./internal/services -run ^$ -bench BenchmarkRecordServiceListRecords -benchmem -count 1
+go test ./pkg/query -run ^$ -bench BenchmarkExecutorExecute -benchmem -count 1
+go test ./internal/services -run TestExplainPlanListRecords -v
+```
+
+默认使用本地 SQLite。设置 `DB_TYPE` 和 `DATABASE_URL` 后，同一套 benchmark 可切换到 MySQL 或 PostgreSQL。GitHub Actions 中的 [Performance workflow](https://github.com/jiangfire/cornerstone/actions/workflows/perf.yml) 会自动跑三套数据库后端并保留原始 benchmark / EXPLAIN artifact。
 
 ---
 
