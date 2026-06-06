@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/jiangfire/cornerstone/pkg/db"
 	"github.com/jiangfire/cornerstone/pkg/dto"
@@ -108,10 +109,5 @@ func extractToken(c *gin.Context) string {
 }
 
 func validateToken(token string) (*models.Token, error) {
-	var t models.Token
-	err := db.DB().Where("token = ?", token).First(&t).Error
-	if err != nil {
-		return nil, err
-	}
-	return &t, nil
+	return authz.FindTokenByValue(db.DB(), token)
 }

@@ -1,0 +1,196 @@
+name: Performance
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 2 * * 1'
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+permissions:
+  contents: read
+
+jobs:
+  perf-sqlite:
+    name: Perf (SQLite)
+    runs-on: ubuntu-latest
+    env:
+      DB_TYPE: sqlite
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.4'
+          cache: false
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run benchmarks
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          go test ./internal/middleware -run '^$' -bench BenchmarkValidateToken -benchmem -count 1 | tee artifacts/auth.txt
+          go test ./internal/services -run '^$' -bench 'Benchmark(FieldServiceListFields|RecordServiceListRecords)' -benchmem -count 1 | tee artifacts/services.txt
+          go test ./pkg/query -run '^$' -bench BenchmarkExecutorExecute -benchmem -count 1 | tee artifacts/query.txt
+          go test ./internal/services -run TestExplainPlanListRecords -count 1 -v | tee artifacts/explain.txt
+
+      - name: Publish summary
+        shell: bash
+        run: |
+          {
+            echo "## SQLite"
+            echo '```text'
+            grep '^Benchmark' artifacts/*.txt || true
+            grep 'list records plan:' artifacts/explain.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: perf-sqlite
+          path: artifacts/
+
+  perf-mysql:
+    name: Perf (MySQL 8.0)
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: cornerstone_perf
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DB_TYPE: mysql
+      DATABASE_URL: root:root@tcp(127.0.0.1:3306)/cornerstone_perf?parseTime=true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.4'
+          cache: false
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Wait for MySQL
+        shell: bash
+        run: |
+          for i in {1..30}; do
+            (echo > /dev/tcp/127.0.0.1/3306) >/dev/null 2>&1 && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: Run benchmarks
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          go test ./internal/middleware -run '^$' -bench BenchmarkValidateToken -benchmem -count 1 | tee artifacts/auth.txt
+          go test ./internal/services -run '^$' -bench 'Benchmark(FieldServiceListFields|RecordServiceListRecords)' -benchmem -count 1 | tee artifacts/services.txt
+          go test ./pkg/query -run '^$' -bench BenchmarkExecutorExecute -benchmem -count 1 | tee artifacts/query.txt
+          go test ./internal/services -run TestExplainPlanListRecords -count 1 -v | tee artifacts/explain.txt
+
+      - name: Publish summary
+        shell: bash
+        run: |
+          {
+            echo "## MySQL"
+            echo '```text'
+            grep '^Benchmark' artifacts/*.txt || true
+            grep 'list records plan:' artifacts/explain.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: perf-mysql
+          path: artifacts/
+
+  perf-postgres:
+    name: Perf (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cornerstone_perf
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U postgres -d cornerstone_perf"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      DB_TYPE: postgres
+      DATABASE_URL: host=127.0.0.1 port=5432 user=postgres password=postgres dbname=cornerstone_perf sslmode=disable
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.4'
+          cache: false
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Wait for PostgreSQL
+        shell: bash
+        run: |
+          for i in {1..30}; do
+            (echo > /dev/tcp/127.0.0.1/5432) >/dev/null 2>&1 && exit 0
+            sleep 2
+          done
+          exit 1
+
+      - name: Run benchmarks
+        shell: bash
+        run: |
+          mkdir -p artifacts
+          go test ./internal/middleware -run '^$' -bench BenchmarkValidateToken -benchmem -count 1 | tee artifacts/auth.txt
+          go test ./internal/services -run '^$' -bench 'Benchmark(FieldServiceListFields|RecordServiceListRecords)' -benchmem -count 1 | tee artifacts/services.txt
+          go test ./pkg/query -run '^$' -bench BenchmarkExecutorExecute -benchmem -count 1 | tee artifacts/query.txt
+          go test ./internal/services -run TestExplainPlanListRecords -count 1 -v | tee artifacts/explain.txt
+
+      - name: Publish summary
+        shell: bash
+        run: |
+          {
+            echo "## PostgreSQL"
+            echo '```text'
+            grep '^Benchmark' artifacts/*.txt || true
+            grep 'list records plan:' artifacts/explain.txt || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v6
+        with:
+          name: perf-postgres
+          path: artifacts/

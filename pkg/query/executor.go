@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	stdjson "encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/jiangfire/cornerstone/pkg/db"
 	"gorm.io/gorm"
@@ -51,6 +53,8 @@ func dbType(gormDB *gorm.DB) string {
 
 // Execute 执行查询
 func (e *Executor) Execute(ctx context.Context, req *QueryRequest, userID string) (*QueryResult, error) {
+	req = cloneQueryRequest(req)
+
 	// 1. 规范化和验证请求
 	if err := e.Prepare(ctx, req, userID); err != nil {
 		return nil, err
@@ -98,11 +102,16 @@ func (e *Executor) Prepare(ctx context.Context, req *QueryRequest, userID string
 		return err
 	}
 
-	if err := e.validator.ValidateRequest(ctx, req, userID); err != nil {
+	scope, err := e.validator.newAccessScope(userID)
+	if err != nil {
 		return fmt.Errorf("权限验证失败: %w", err)
 	}
 
-	if err := e.validator.AutoFilterByPermission(req, userID); err != nil {
+	if err := e.validator.validateRequestWithScope(ctx, req, userID, scope); err != nil {
+		return fmt.Errorf("权限验证失败: %w", err)
+	}
+
+	if err := e.validator.autoFilterByPermissionWithScope(req, scope); err != nil {
 		return err
 	}
 
@@ -158,7 +167,7 @@ func (e *Executor) ExecuteBatchRaw(ctx context.Context, jsonData []byte, userID 
 
 // executeQuery 执行查询并返回结果
 func (e *Executor) executeQuery(ctx context.Context, query *SQLQuery) ([]map[string]interface{}, error) {
-	rows, err := e.db.Raw(query.SQL, query.Params...).Rows()
+	rows, err := e.db.WithContext(ctx).Raw(query.SQL, query.Params...).Rows()
 	if err != nil {
 		return nil, err
 	}
@@ -170,7 +179,7 @@ func (e *Executor) executeQuery(ctx context.Context, query *SQLQuery) ([]map[str
 // executeCount 执行 COUNT 查询
 func (e *Executor) executeCount(ctx context.Context, query *SQLQuery) (int64, error) {
 	var total int64
-	err := e.db.Raw(query.SQL, query.Params...).Scan(&total).Error
+	err := e.db.WithContext(ctx).Raw(query.SQL, query.Params...).Scan(&total).Error
 	if err != nil {
 		return 0, err
 	}
@@ -184,38 +193,31 @@ func (e *Executor) scanRows(rows *sql.Rows) ([]map[string]interface{}, error) {
 		return nil, err
 	}
 
-	results := make([]map[string]interface{}, 0)
+	results := make([]map[string]interface{}, 0, 16)
+	values := make([]interface{}, len(columns))
+	valuePtrs := make([]interface{}, len(columns))
+	for i := range columns {
+		valuePtrs[i] = &values[i]
+	}
 
 	for rows.Next() {
-		// 创建扫描目标
-		values := make([]interface{}, len(columns))
-		valuePtrs := make([]interface{}, len(columns))
-		for i := range columns {
-			valuePtrs[i] = &values[i]
-		}
-
 		// 扫描行
 		if err := rows.Scan(valuePtrs...); err != nil {
 			return nil, err
 		}
 
 		// 构建结果映射
-		row := make(map[string]interface{})
+		row := make(map[string]interface{}, len(columns))
 		for i, col := range columns {
 			val := values[i]
 
 			// 处理字节数组（如 JSONB）
 			if b, ok := val.([]byte); ok {
-				// 尝试解析为 JSON
-				var jsonVal interface{}
-				if err := json.Unmarshal(b, &jsonVal); err == nil {
-					row[col] = jsonVal
-				} else {
-					row[col] = string(b)
-				}
+				row[col] = decodeScannedBytes(b)
 			} else {
 				row[col] = val
 			}
+			values[i] = nil
 		}
 
 		results = append(results, row)
@@ -228,8 +230,63 @@ func (e *Executor) scanRows(rows *sql.Rows) ([]map[string]interface{}, error) {
 	return results, nil
 }
 
+func decodeScannedBytes(b []byte) interface{} {
+	if !looksLikeJSONValue(b) {
+		return string(b)
+	}
+
+	var jsonVal interface{}
+	if err := stdjson.Unmarshal(b, &jsonVal); err == nil {
+		return jsonVal
+	}
+	return string(b)
+}
+
+func looksLikeJSONValue(b []byte) bool {
+	if len(b) == 0 {
+		return false
+	}
+
+	switch b[0] {
+	case '{', '[', '"':
+		return true
+	case 't':
+		return string(b) == "true"
+	case 'f':
+		return string(b) == "false"
+	case 'n':
+		return string(b) == "null"
+	case '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', '9':
+		return looksLikeJSONNumber(b)
+	default:
+		return false
+	}
+}
+
+func looksLikeJSONNumber(b []byte) bool {
+	s := string(b)
+	if strings.ContainsAny(s, " :-/") {
+		return false
+	}
+
+	seenDigit := false
+	for i := 0; i < len(s); i++ {
+		ch := s[i]
+		switch {
+		case ch >= '0' && ch <= '9':
+			seenDigit = true
+		case ch == '-' && i == 0:
+		case ch == '.' || ch == 'e' || ch == 'E' || ch == '+':
+		default:
+			return false
+		}
+	}
+	return seenDigit
+}
+
 // Validate 验证查询请求（不执行）
 func (e *Executor) Validate(ctx context.Context, req *QueryRequest, userID string) error {
+	req = cloneQueryRequest(req)
 	return e.Prepare(ctx, req, userID)
 }
 
@@ -240,6 +297,7 @@ func (e *Executor) Explain(req *QueryRequest) (*SQLQuery, error) {
 
 // ExplainAuthorized 在权限过滤后的上下文中生成 SQL
 func (e *Executor) ExplainAuthorized(ctx context.Context, req *QueryRequest, userID string) (*SQLQuery, error) {
+	req = cloneQueryRequest(req)
 	if err := e.Prepare(ctx, req, userID); err != nil {
 		return nil, err
 	}
@@ -352,6 +410,85 @@ func (e *Executor) expandWildcardSelections(req *QueryRequest) {
 			req.Select = fields
 		}
 	}
+}
+
+func cloneQueryRequest(req *QueryRequest) *QueryRequest {
+	if req == nil {
+		return nil
+	}
+
+	cloned := *req
+	cloned.Select = append([]string(nil), req.Select...)
+	cloned.GroupBy = append([]string(nil), req.GroupBy...)
+	cloned.Aggregate = append([]AggregateFunc(nil), req.Aggregate...)
+	cloned.OrderBy = append([]OrderByClause(nil), req.OrderBy...)
+	cloned.Join = cloneJoinClauses(req.Join)
+	cloned.Where = cloneWhereClause(req.Where)
+	cloned.Having = cloneWhereClause(req.Having)
+	cloned.Union = cloneQueryRequestSlice(req.Union)
+	cloned.Intersect = cloneQueryRequestSlice(req.Intersect)
+	cloned.Filter = cloneStringAnyMap(req.Filter)
+	return &cloned
+}
+
+func cloneQueryRequestSlice(items []QueryRequest) []QueryRequest {
+	if len(items) == 0 {
+		return nil
+	}
+	cloned := make([]QueryRequest, len(items))
+	for i := range items {
+		item := cloneQueryRequest(&items[i])
+		cloned[i] = *item
+	}
+	return cloned
+}
+
+func cloneJoinClauses(items []JoinClause) []JoinClause {
+	if len(items) == 0 {
+		return nil
+	}
+	cloned := make([]JoinClause, len(items))
+	for i := range items {
+		cloned[i] = items[i]
+		cloned[i].Select = append([]string(nil), items[i].Select...)
+	}
+	return cloned
+}
+
+func cloneWhereClause(where *WhereClause) *WhereClause {
+	if where == nil {
+		return nil
+	}
+	cloned := &WhereClause{
+		And: cloneConditions(where.And),
+		Or:  cloneConditions(where.Or),
+		Raw: cloneStringAnyMap(where.Raw),
+	}
+	return cloned
+}
+
+func cloneConditions(items []Condition) []Condition {
+	if len(items) == 0 {
+		return nil
+	}
+	cloned := make([]Condition, len(items))
+	for i := range items {
+		cloned[i] = items[i]
+		cloned[i].And = cloneConditions(items[i].And)
+		cloned[i].Or = cloneConditions(items[i].Or)
+	}
+	return cloned
+}
+
+func cloneStringAnyMap(src map[string]interface{}) map[string]interface{} {
+	if len(src) == 0 {
+		return nil
+	}
+	cloned := make(map[string]interface{}, len(src))
+	for key, value := range src {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 // GlobalExecutor 全局执行器实例（单例模式）

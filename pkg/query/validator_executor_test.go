@@ -3,6 +3,7 @@ package query
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -13,6 +14,8 @@ import (
 	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/jiangfire/cornerstone/internal/testutil"
 )
+
+type queryContextKey string
 
 func setupQueryTestDB(t *testing.T) *gorm.DB {
 	return testutil.SetupTestDBWithTokens(t, "user1")
@@ -440,6 +443,29 @@ func TestExecute_QueryWithSelectFields(t *testing.T) {
 	}
 }
 
+func TestExecute_ReusedRequestDoesNotAccumulatePermissionFilters(t *testing.T) {
+	db := setupQueryTestDB(t)
+	createTestData(t, db)
+	authz.ClearTokenCache()
+
+	executor := NewExecutor(db)
+	req := &QueryRequest{
+		From:   "databases",
+		Select: []string{"id", "name"},
+		Page:   1,
+		Size:   20,
+	}
+
+	for i := 0; i < 3; i++ {
+		result, err := executor.Execute(context.Background(), req, "user1")
+		require.NoError(t, err)
+		assert.GreaterOrEqual(t, result.Total, int64(1))
+	}
+
+	assert.Nil(t, req.Where)
+	assert.Equal(t, []string{"id", "name"}, req.Select)
+}
+
 func TestExecute_QueryWithOrderBy(t *testing.T) {
 	db := setupQueryTestDB(t)
 	require.NoError(t, db.Create(&models.Database{Name: "aaa"}).Error)
@@ -620,6 +646,66 @@ func TestPrepare_NormalizesAndValidates(t *testing.T) {
 	assert.Contains(t, req.Select, "id")
 }
 
+func TestExecute_PropagatesContextToDB(t *testing.T) {
+	db := setupQueryTestDB(t)
+	createTestData(t, db)
+	authz.ClearTokenCache()
+
+	callbackName := fmt.Sprintf("test:ctx:%s", t.Name())
+	var seen []string
+	require.NoError(t, db.Callback().Row().Before("gorm:row").Register(callbackName, func(tx *gorm.DB) {
+		if value, ok := tx.Statement.Context.Value(queryContextKey("trace_id")).(string); ok {
+			seen = append(seen, value)
+		}
+	}))
+	t.Cleanup(func() {
+		_ = db.Callback().Row().Remove(callbackName)
+	})
+
+	executor := NewExecutor(db)
+	ctx := context.WithValue(context.Background(), queryContextKey("trace_id"), "trace-query-ctx")
+	_, err := executor.Execute(ctx, &QueryRequest{
+		From:   "databases",
+		Select: []string{"id", "name"},
+		Page:   1,
+		Size:   20,
+	}, "user1")
+	require.NoError(t, err)
+	require.NotEmpty(t, seen)
+	assert.Equal(t, "trace-query-ctx", seen[0])
+}
+
+func TestValidatorAccessScope_CachesAccessibleTableIDs(t *testing.T) {
+	db := setupQueryTestDB(t)
+	dbModel, firstTable := createTestData(t, db)
+
+	token := &models.Token{
+		ID:       "scope_cache_user",
+		Token:    "cs_scope_cache_user",
+		Name:     "scope-cache",
+		IsMaster: false,
+		Scopes:   `{"databases":{"` + dbModel.ID + `":"viewer"}}`,
+	}
+	require.NoError(t, db.Create(token).Error)
+	authz.ClearTokenCache()
+
+	v := NewValidator(db)
+	scope, err := v.newAccessScope(token.ID)
+	require.NoError(t, err)
+
+	firstIDs, err := scope.accessibleTableIDs()
+	require.NoError(t, err)
+	require.Contains(t, firstIDs, firstTable.ID)
+
+	secondTable := &models.Table{DatabaseID: dbModel.ID, Name: "items_2"}
+	require.NoError(t, db.Create(secondTable).Error)
+
+	secondIDs, err := scope.accessibleTableIDs()
+	require.NoError(t, err)
+	assert.Equal(t, firstIDs, secondIDs)
+	assert.NotContains(t, secondIDs, secondTable.ID)
+}
+
 func TestNormalize_SetsDefaults(t *testing.T) {
 	db := setupQueryTestDB(t)
 	executor := NewExecutor(db)
@@ -709,4 +795,30 @@ func TestExecutorAccessors(t *testing.T) {
 	assert.NotNil(t, executor.GetValidator())
 	assert.NotNil(t, executor.GetGenerator())
 	assert.Equal(t, db, executor.DB())
+}
+
+func TestScanRows_DecodesJSONAndPlainBytes(t *testing.T) {
+	db := setupQueryTestDB(t)
+	executor := NewExecutor(db)
+
+	rows, err := db.Raw(`SELECT CAST('{"status":"paid"}' AS BLOB) AS payload, CAST('plain-text' AS BLOB) AS label`).Rows()
+	require.NoError(t, err)
+	defer rows.Close()
+
+	result, err := executor.scanRows(rows)
+	require.NoError(t, err)
+	require.Len(t, result, 1)
+
+	payload, ok := result[0]["payload"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "paid", payload["status"])
+	assert.Equal(t, "plain-text", result[0]["label"])
+}
+
+func TestDecodeScannedBytes_Heuristics(t *testing.T) {
+	assert.Equal(t, "plain-text", decodeScannedBytes([]byte("plain-text")))
+	assert.Equal(t, "2026-06-06 10:00:00", decodeScannedBytes([]byte("2026-06-06 10:00:00")))
+	assert.Equal(t, float64(42), decodeScannedBytes([]byte("42")))
+	assert.Equal(t, true, decodeScannedBytes([]byte("true")))
+	assert.Equal(t, "paid", decodeScannedBytes([]byte(`"paid"`)))
 }

@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -754,6 +755,13 @@ func TestContainsRole(t *testing.T) {
 	assert.True(t, containsRole([]string{"owner", "admin"}, "Owner"))
 	assert.False(t, containsRole([]string{"owner", "admin"}, "editor"))
 	assert.False(t, containsRole([]string{}, "owner"))
+}
+
+func TestRequiredActionForRoles(t *testing.T) {
+	assert.Equal(t, authz.ActionRead, requiredActionForRoles([]string{"owner", "admin", "editor", "viewer"}))
+	assert.Equal(t, authz.ActionWrite, requiredActionForRoles([]string{"owner", "admin", "editor"}))
+	assert.Equal(t, authz.ActionManage, requiredActionForRoles([]string{"owner", "admin"}))
+	assert.Equal(t, authz.ActionRead, requiredActionForRoles(nil))
 }
 
 // ============================================================

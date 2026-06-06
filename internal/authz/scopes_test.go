@@ -1,18 +1,42 @@
 package authz
 
 import (
+	"path/filepath"
 	"testing"
 
+	"github.com/glebarez/sqlite"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 
 	"github.com/jiangfire/cornerstone/internal/models"
-	"github.com/jiangfire/cornerstone/internal/testutil"
 )
 
 func setupDB(t *testing.T) *gorm.DB {
-	return testutil.SetupTestDB(t)
+	t.Helper()
+
+	dbPath := filepath.Join(t.TempDir(), "authz-test.sqlite")
+	db, err := gorm.Open(sqlite.Open(dbPath), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
+	require.NoError(t, err)
+	require.NoError(t, db.AutoMigrate(
+		&models.Token{},
+		&models.Database{},
+		&models.Table{},
+		&models.Field{},
+		&models.Record{},
+		&models.File{},
+	))
+
+	t.Cleanup(func() {
+		if sqlDB, err := db.DB(); err == nil {
+			_ = sqlDB.Close()
+		}
+	})
+
+	return db
 }
 
 func createMasterToken(t *testing.T, d *gorm.DB) *models.Token {
@@ -569,6 +593,30 @@ func TestInvalidateTokenCache(t *testing.T) {
 	a, err := NewAuthorizer(d, tok.ID)
 	require.NoError(t, err)
 	assert.False(t, a.IsMaster())
+}
+
+func TestFindTokenByValue_UsesInvalidateTokenCache(t *testing.T) {
+	d := setupDB(t)
+	tok := createNonMasterToken(t, d, "{}")
+	ClearTokenCache()
+
+	cached, err := FindTokenByValue(d, tok.Token)
+	require.NoError(t, err)
+	require.NotNil(t, cached)
+	assert.Equal(t, tok.ID, cached.ID)
+
+	tok.Scopes = `{"databases":{"db_x":"viewer"},"tables":{}}`
+	require.NoError(t, d.Save(tok).Error)
+
+	stale, err := FindTokenByValue(d, tok.Token)
+	require.NoError(t, err)
+	assert.Equal(t, "{}", stale.Scopes)
+
+	InvalidateTokenCache(tok.ID)
+
+	fresh, err := FindTokenByValue(d, tok.Token)
+	require.NoError(t, err)
+	assert.Equal(t, tok.Scopes, fresh.Scopes)
 }
 
 func TestClearTokenCache(t *testing.T) {

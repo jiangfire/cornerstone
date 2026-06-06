@@ -97,7 +97,9 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 
 // cleanupTables 使用 db.Exec raw SQL 清空所有测试表，绕过 GORM callback/hook，
 // 避免被测试注册的 mock callback 干扰。同时验证表已清空并清理全局缓存。
-func cleanupTables(db *gorm.DB, t *testing.T) {
+func cleanupTables(db *gorm.DB, tb testing.TB) {
+	tb.Helper()
+
 	// 如果底层连接已被之前的测试关闭（如模拟 DB 错误的测试），跳过清理
 	if sqlDB, err := db.DB(); err != nil || sqlDB.Ping() != nil {
 		return
@@ -107,12 +109,12 @@ func cleanupTables(db *gorm.DB, t *testing.T) {
 	// PostgreSQL/SQLite 使用 TRUNCATE ... CASCADE 或直接 DELETE
 	if pkgdb.IsMySQL() {
 		if err := db.Exec("SET FOREIGN_KEY_CHECKS = 0").Error; err != nil {
-			t.Logf("failed to disable FK checks: %v", err)
+			tb.Logf("failed to disable FK checks: %v", err)
 			return
 		}
 		defer func() {
 			if err := db.Exec("SET FOREIGN_KEY_CHECKS = 1").Error; err != nil {
-				t.Logf("failed to re-enable FK checks: %v", err)
+				tb.Logf("failed to re-enable FK checks: %v", err)
 			}
 		}()
 	}
@@ -121,7 +123,7 @@ func cleanupTables(db *gorm.DB, t *testing.T) {
 	for _, table := range tables {
 		query := quoteIdentifier(db, table)
 		if err := db.Exec("DELETE FROM " + query).Error; err != nil {
-			t.Logf("failed to delete from %s: %v", table, err)
+			tb.Logf("failed to delete from %s: %v", table, err)
 		}
 	}
 
@@ -132,9 +134,9 @@ func cleanupTables(db *gorm.DB, t *testing.T) {
 	var count int64
 	for _, m := range []any{&models.File{}, &models.Record{}, &models.Field{}, &models.Table{}, &models.Database{}, &models.Token{}} {
 		if err := db.Model(m).Unscoped().Count(&count).Error; err != nil {
-			t.Logf("failed to count %T: %v", m, err)
+			tb.Logf("failed to count %T: %v", m, err)
 		} else {
-			assert.Zero(t, count, "%T not empty after cleanup", m)
+			assert.Zero(tb, count, "%T not empty after cleanup", m)
 		}
 	}
 }

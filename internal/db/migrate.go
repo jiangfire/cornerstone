@@ -104,8 +104,8 @@ func Migrate() error {
 }
 
 func createIndexes(db *gorm.DB) error {
-	// records(table_id) 需要手动创建索引（Record 模型未标注 index tag）
-	if err := createIndexIfNotExists(db, "records", "idx_records_table_id", "table_id"); err != nil {
+	// records 列表主路径需要覆盖 table_id + deleted_at + created_at 排序
+	if err := createIndexIfNotExists(db, "records", "idx_records_table_deleted_created", "table_id, deleted_at, created_at DESC"); err != nil {
 		return err
 	}
 

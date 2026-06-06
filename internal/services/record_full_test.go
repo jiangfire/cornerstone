@@ -2,6 +2,7 @@ package services
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -949,6 +950,28 @@ func TestCheckTableAccess_NonMasterTokenDenied(t *testing.T) {
 	err := s.checkTableAccess(tbl.ID, viewer.ID, []string{"owner", "admin", "editor"})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "无权访问该表")
+}
+
+func TestCheckTableAccess_ViewerAllowedForRead(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	dbModel := &models.Database{Name: "viewer_access_db"}
+	require.NoError(t, db.Create(dbModel).Error)
+	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "viewer_table"}
+	require.NoError(t, db.Create(tbl).Error)
+	require.NoError(t, db.Create(&models.Field{TableID: tbl.ID, Name: "title", Type: "string"}).Error)
+
+	viewer := &models.Token{
+		Name:     "viewer_can_read",
+		IsMaster: false,
+		Scopes:   fmt.Sprintf(`{"databases":{"%s":"viewer"},"tables":{"%s":{"role":"viewer"}}}`, dbModel.ID, tbl.ID),
+	}
+	require.NoError(t, db.Create(viewer).Error)
+	authz.ClearTokenCache()
+
+	err := s.checkTableAccess(tbl.ID, viewer.ID, []string{"owner", "admin", "editor", "viewer"})
+	require.NoError(t, err)
 }
 
 func TestCheckTableAccess_DeletedDatabase(t *testing.T) {

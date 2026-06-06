@@ -175,6 +175,10 @@ func (g *SQLGenerator) GenerateCount(req *QueryRequest) (*SQLQuery, error) {
 		return nil, fmt.Errorf("查询请求不能为空")
 	}
 
+	if g.canUseDirectCount(req) {
+		return g.generateDirectCount(req)
+	}
+
 	baseReq := *req
 	baseReq.Page = 0
 	baseReq.Size = -1
@@ -189,6 +193,44 @@ func (g *SQLGenerator) GenerateCount(req *QueryRequest) (*SQLQuery, error) {
 		SQL:    "SELECT COUNT(*) as total FROM (" + baseQuery.SQL + ") AS query_count",
 		Params: baseQuery.Params,
 	}, nil
+}
+
+func (g *SQLGenerator) canUseDirectCount(req *QueryRequest) bool {
+	if req == nil {
+		return false
+	}
+	if len(req.Union) > 0 || len(req.Intersect) > 0 {
+		return false
+	}
+	if len(req.GroupBy) > 0 || len(req.Aggregate) > 0 || req.Having != nil {
+		return false
+	}
+	return true
+}
+
+func (g *SQLGenerator) generateDirectCount(req *QueryRequest) (*SQLQuery, error) {
+	query := &SQLQuery{
+		Params: make([]interface{}, 0),
+	}
+
+	fromClause := g.generateFrom(req)
+	joinClause, err := g.generateJoins(req)
+	if err != nil {
+		return nil, err
+	}
+
+	whereClause, whereParams, err := g.generateWhere(req.Where)
+	if err != nil {
+		return nil, err
+	}
+	query.Params = append(query.Params, whereParams...)
+
+	sql := "SELECT COUNT(*) FROM" + fromClause[len(" FROM"):] + joinClause
+	if whereClause != "" {
+		sql += " WHERE " + whereClause
+	}
+	query.SQL = sql
+	return query, nil
 }
 
 // generateSelect 生成 SELECT 子句

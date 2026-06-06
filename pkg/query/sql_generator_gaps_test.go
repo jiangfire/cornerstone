@@ -949,3 +949,49 @@ func TestGenerateFieldExpression_DataArrowNestedPathPostgres(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, `"data"->>'user.name'`, sql)
 }
+
+func TestGenerateCount_SimpleQuerySkipsProjectedFields(t *testing.T) {
+	g := NewSQLGenerator(true)
+	req := &QueryRequest{
+		From:   "records",
+		Select: []string{"id", "data.status", "created_at"},
+		Where: &WhereClause{
+			And: []Condition{
+				{Field: "table_id", Op: "eq", Value: "tbl_1"},
+				{Field: "data.status", Op: "eq", Value: "paid"},
+			},
+		},
+		OrderBy: []OrderByClause{{Field: "created_at", Dir: "desc"}},
+		Page:    1,
+		Size:    50,
+	}
+
+	query, err := g.GenerateCount(req)
+	require.NoError(t, err)
+	assert.Contains(t, query.SQL, `SELECT COUNT(*) FROM "records"`)
+	assert.NotContains(t, query.SQL, "query_count")
+	assert.NotContains(t, query.SQL, "ORDER BY")
+	assert.NotContains(t, query.SQL, `SELECT "id", JSON_EXTRACT`)
+	assert.Contains(t, query.SQL, `JSON_EXTRACT("data", '$.status') = ?`)
+}
+
+func TestGenerateCount_GroupedQueryKeepsSubquery(t *testing.T) {
+	g := NewSQLGenerator(true)
+	req := &QueryRequest{
+		From:    "records",
+		Select:  []string{"table_id"},
+		GroupBy: []string{"table_id"},
+		Aggregate: []AggregateFunc{
+			{Func: "count", Field: "*", As: "cnt"},
+		},
+		Having: &WhereClause{
+			And: []Condition{{Field: "cnt", Op: "gt", Value: float64(1)}},
+		},
+	}
+
+	query, err := g.GenerateCount(req)
+	require.NoError(t, err)
+	assert.Contains(t, query.SQL, "query_count")
+	assert.Contains(t, query.SQL, "GROUP BY")
+	assert.Contains(t, query.SQL, "HAVING")
+}

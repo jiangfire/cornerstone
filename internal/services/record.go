@@ -3,7 +3,6 @@ package services
 import (
 	"bytes"
 	"encoding/csv"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"math/rand"
@@ -13,6 +12,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
+	json "github.com/jiangfire/cornerstone/pkg/jsonx"
 	"gorm.io/gorm"
 )
 
@@ -136,13 +136,7 @@ func (s *RecordService) checkTableAccess(tableID, userID string, requiredRoles [
 	if err != nil {
 		return err
 	}
-	action := authz.ActionRead
-	switch {
-	case containsRole(requiredRoles, "owner") || containsRole(requiredRoles, "admin"):
-		action = authz.ActionManage
-	case containsRole(requiredRoles, "editor"):
-		action = authz.ActionWrite
-	}
+	action := requiredActionForRoles(requiredRoles)
 	if !authorizer.CanAccessTable(tableID, action) {
 		return errors.New("无权访问该表")
 	}
@@ -486,7 +480,7 @@ func parseRecordPayload(raw models.JSONField) map[string]interface{} {
 	if raw == "" {
 		return payload
 	}
-	_ = json.Unmarshal([]byte(raw), &payload)
+	_ = json.UnmarshalString(string(raw), &payload)
 	return payload
 }
 
@@ -508,7 +502,7 @@ func (s *RecordService) filterReadableData(fields []models.Field, readableFields
 }
 
 func marshalRecordPayload(payload map[string]interface{}) (models.JSONField, error) {
-	dataJSON, err := json.Marshal(payload)
+	dataJSON, err := json.MarshalString(payload)
 	if err != nil {
 		return "", fmt.Errorf("数据序列化失败: %w", err)
 	}
@@ -529,7 +523,7 @@ func tryParseStructuredFilter(filter string) (map[string]interface{}, bool) {
 		return nil, false
 	}
 	var structured map[string]interface{}
-	if err := json.Unmarshal([]byte(filter), &structured); err != nil {
+	if err := json.UnmarshalString(filter, &structured); err != nil {
 		return nil, false
 	}
 	if len(structured) == 0 {
@@ -582,7 +576,6 @@ func (s *RecordService) buildStructuredFilterClauses(
 			if err := json.Unmarshal(jsonValue, &scalar); err != nil {
 				return nil, false, fmt.Errorf("过滤值格式错误: %w", err)
 			}
-			// JSON path 与字段值都走参数化绑定,字段名只出现在第一个 ? 内,不会与 SQL 字面量混。
 			clauses = append(clauses, recordFilterClause{
 				sql:  "JSON_EXTRACT(data, ?) = ?",
 				args: []interface{}{"$." + fieldName, scalar},
@@ -702,7 +695,7 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 	}
 
 	// 3. 序列化数据
-	dataJSON, err := json.Marshal(normalizedData)
+	dataJSON, err := json.MarshalString(normalizedData)
 	if err != nil {
 		return nil, fmt.Errorf("数据序列化失败: %w", err)
 	}
@@ -1067,7 +1060,7 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 	}
 
 	// 5. 序列化数据
-	dataJSON, err := json.Marshal(currentData)
+	dataJSON, err := json.MarshalString(currentData)
 	if err != nil {
 		return nil, fmt.Errorf("数据序列化失败: %w", err)
 	}
@@ -1081,7 +1074,7 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 		}
 
 		updateResult := updateQuery.Updates(map[string]interface{}{
-			"data":    string(dataJSON),
+			"data":    dataJSON,
 			"version": gorm.Expr("version + 1"),
 		})
 		if updateResult.Error != nil {
@@ -1149,7 +1142,7 @@ func (s *RecordService) DeleteRecord(recordID, userID string) error {
 	}
 	if record.Data != "" {
 		var deletedData map[string]interface{}
-		if err := json.Unmarshal([]byte(record.Data), &deletedData); err == nil {
+		if err := json.UnmarshalString(string(record.Data), &deletedData); err == nil {
 			payload["data"] = deletedData
 		}
 	}
@@ -1200,7 +1193,7 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 	}
 
 	// 3. 序列化数据
-	dataJSON, err := json.Marshal(normalizedData)
+	dataJSON, err := json.MarshalString(normalizedData)
 	if err != nil {
 		return nil, fmt.Errorf("数据序列化失败: %w", err)
 	}

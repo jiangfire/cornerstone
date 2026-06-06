@@ -276,18 +276,25 @@ func (s *FieldService) checkTableAccess(tableID, userID string, requiredRoles []
 	if err != nil {
 		return err
 	}
-	action := authz.ActionRead
-	switch {
-	case containsRole(requiredRoles, "owner") || containsRole(requiredRoles, "admin"):
-		action = authz.ActionManage
-	case containsRole(requiredRoles, "editor"):
-		action = authz.ActionWrite
-	}
+	action := requiredActionForRoles(requiredRoles)
 	if !authorizer.CanAccessTable(tableID, action) {
 		return errors.New("无权访问该表")
 	}
 
 	return nil
+}
+
+func requiredActionForRoles(roles []string) string {
+	switch {
+	case containsRole(roles, "viewer"):
+		return authz.ActionRead
+	case containsRole(roles, "editor"):
+		return authz.ActionWrite
+	case containsRole(roles, "owner") || containsRole(roles, "admin"):
+		return authz.ActionManage
+	default:
+		return authz.ActionRead
+	}
 }
 
 func containsRole(roles []string, role string) bool {
@@ -392,12 +399,24 @@ func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, erro
 	if err != nil {
 		return nil, fmt.Errorf("数据库查询失败: %w", err)
 	}
+	if len(fields) == 0 {
+		return []FieldResponse{}, nil
+	}
+
+	fieldIDs := make([]string, len(fields))
+	for i, field := range fields {
+		fieldIDs[i] = field.ID
+	}
+	readResults, err := s.CheckFieldPermissions(userID, fieldIDs, "read")
+	if err != nil {
+		return nil, err
+	}
 
 	// 3. 转换为响应格式
 	result := make([]FieldResponse, len(fields))
 	index := 0
 	for _, f := range fields {
-		if err := s.CheckFieldPermission(userID, f.ID, "read"); err != nil {
+		if !readResults[f.ID] {
 			continue
 		}
 

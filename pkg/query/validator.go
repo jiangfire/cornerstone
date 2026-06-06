@@ -15,6 +15,19 @@ type Validator struct {
 	allowedTables AllowedTables
 }
 
+type validatorAccessScope struct {
+	authorizer *authz.Authorizer
+
+	databaseIDs       []string
+	databaseIDsLoaded bool
+
+	tableIDs       []string
+	tableIDsLoaded bool
+
+	recordIDs       []string
+	recordIDsLoaded bool
+}
+
 func NewValidator(db *gorm.DB) *Validator {
 	return &Validator{
 		db:            db,
@@ -30,11 +43,19 @@ func NewValidatorWithTables(db *gorm.DB, tables AllowedTables) *Validator {
 }
 
 func (v *Validator) ValidateRequest(ctx context.Context, req *QueryRequest, userID string) error {
+	scope, err := v.newAccessScope(userID)
+	if err != nil {
+		return err
+	}
+	return v.validateRequestWithScope(ctx, req, userID, scope)
+}
+
+func (v *Validator) validateRequestWithScope(ctx context.Context, req *QueryRequest, userID string, scope *validatorAccessScope) error {
 	if req == nil {
 		return errors.New("查询请求不能为空")
 	}
 
-	if err := v.CheckTableAccess(ctx, userID, req.From); err != nil {
+	if err := v.checkTableAccessWithScope(ctx, req.From, scope); err != nil {
 		return err
 	}
 
@@ -42,46 +63,46 @@ func (v *Validator) ValidateRequest(ctx context.Context, req *QueryRequest, user
 		if field == "*" {
 			continue
 		}
-		if err := v.checkFieldReference(ctx, userID, req.From, req.Join, field); err != nil {
+		if err := v.checkFieldReferenceWithScope(ctx, req.From, req.Join, field, scope); err != nil {
 			return err
 		}
 	}
 
 	for _, join := range req.Join {
-		if err := v.CheckTableAccess(ctx, userID, join.Table); err != nil {
+		if err := v.checkTableAccessWithScope(ctx, join.Table, scope); err != nil {
 			return err
 		}
 		for _, field := range join.Select {
 			if field == "*" {
 				continue
 			}
-			if err := v.checkFieldReference(ctx, userID, join.Table, req.Join, field); err != nil {
+			if err := v.checkFieldReferenceWithScope(ctx, join.Table, req.Join, field, scope); err != nil {
 				return err
 			}
 		}
 	}
 
 	if req.Where != nil {
-		if err := v.validateWhereFields(ctx, userID, req.From, req.Join, req.Where); err != nil {
+		if err := v.validateWhereFieldsWithScope(ctx, req.From, req.Join, req.Where, scope); err != nil {
 			return err
 		}
 	}
 
 	for _, order := range req.OrderBy {
-		if err := v.checkFieldReference(ctx, userID, req.From, req.Join, order.Field); err != nil {
+		if err := v.checkFieldReferenceWithScope(ctx, req.From, req.Join, order.Field, scope); err != nil {
 			return err
 		}
 	}
 
 	for _, group := range req.GroupBy {
-		if err := v.checkFieldReference(ctx, userID, req.From, req.Join, group); err != nil {
+		if err := v.checkFieldReferenceWithScope(ctx, req.From, req.Join, group, scope); err != nil {
 			return err
 		}
 	}
 
 	for _, agg := range req.Aggregate {
 		if agg.Field != "" && agg.Field != "*" {
-			if err := v.checkFieldReference(ctx, userID, req.From, req.Join, agg.Field); err != nil {
+			if err := v.checkFieldReferenceWithScope(ctx, req.From, req.Join, agg.Field, scope); err != nil {
 				return err
 			}
 		}
@@ -91,13 +112,21 @@ func (v *Validator) ValidateRequest(ctx context.Context, req *QueryRequest, user
 }
 
 func (v *Validator) validateWhereFields(ctx context.Context, userID string, table string, joins []JoinClause, where *WhereClause) error {
+	scope, err := v.newAccessScope(userID)
+	if err != nil {
+		return err
+	}
+	return v.validateWhereFieldsWithScope(ctx, table, joins, where, scope)
+}
+
+func (v *Validator) validateWhereFieldsWithScope(ctx context.Context, table string, joins []JoinClause, where *WhereClause, scope *validatorAccessScope) error {
 	for _, cond := range where.And {
-		if err := v.validateConditionFields(ctx, userID, table, joins, cond); err != nil {
+		if err := v.validateConditionFieldsWithScope(ctx, table, joins, cond, scope); err != nil {
 			return err
 		}
 	}
 	for _, cond := range where.Or {
-		if err := v.validateConditionFields(ctx, userID, table, joins, cond); err != nil {
+		if err := v.validateConditionFieldsWithScope(ctx, table, joins, cond, scope); err != nil {
 			return err
 		}
 	}
@@ -105,19 +134,27 @@ func (v *Validator) validateWhereFields(ctx context.Context, userID string, tabl
 }
 
 func (v *Validator) validateConditionFields(ctx context.Context, userID string, table string, joins []JoinClause, cond Condition) error {
+	scope, err := v.newAccessScope(userID)
+	if err != nil {
+		return err
+	}
+	return v.validateConditionFieldsWithScope(ctx, table, joins, cond, scope)
+}
+
+func (v *Validator) validateConditionFieldsWithScope(ctx context.Context, table string, joins []JoinClause, cond Condition, scope *validatorAccessScope) error {
 	if cond.Field != "" {
-		if err := v.checkFieldReference(ctx, userID, table, joins, cond.Field); err != nil {
+		if err := v.checkFieldReferenceWithScope(ctx, table, joins, cond.Field, scope); err != nil {
 			return err
 		}
 	}
 
 	for _, nested := range cond.And {
-		if err := v.validateConditionFields(ctx, userID, table, joins, nested); err != nil {
+		if err := v.validateConditionFieldsWithScope(ctx, table, joins, nested, scope); err != nil {
 			return err
 		}
 	}
 	for _, nested := range cond.Or {
-		if err := v.validateConditionFields(ctx, userID, table, joins, nested); err != nil {
+		if err := v.validateConditionFieldsWithScope(ctx, table, joins, nested, scope); err != nil {
 			return err
 		}
 	}
@@ -145,6 +182,14 @@ func (v *Validator) resolveReferenceTable(baseTable string, joins []JoinClause, 
 }
 
 func (v *Validator) checkFieldReference(ctx context.Context, userID, baseTable string, joins []JoinClause, field string) error {
+	scope, err := v.newAccessScope(userID)
+	if err != nil {
+		return err
+	}
+	return v.checkFieldReferenceWithScope(ctx, baseTable, joins, field, scope)
+}
+
+func (v *Validator) checkFieldReferenceWithScope(ctx context.Context, baseTable string, joins []JoinClause, field string, scope *validatorAccessScope) error {
 	field = strings.TrimSpace(field)
 	if field == "" || field == "*" {
 		return nil
@@ -153,33 +198,38 @@ func (v *Validator) checkFieldReference(ctx context.Context, userID, baseTable s
 	parts := strings.Split(field, ".")
 	if len(parts) >= 2 {
 		if refTable := v.resolveReferenceTable(baseTable, joins, parts[0]); refTable != "" {
-			if err := v.CheckTableAccess(ctx, userID, refTable); err != nil {
+			if err := v.checkTableAccessWithScope(ctx, refTable, scope); err != nil {
 				return err
 			}
-			return v.CheckFieldAccess(ctx, userID, refTable, strings.Join(parts[1:], "."))
+			return v.CheckFieldAccess(ctx, "", refTable, strings.Join(parts[1:], "."))
 		}
 
 		if v.allowedTables.IsFieldAllowed(baseTable, parts[0]) {
-			return v.CheckFieldAccess(ctx, userID, baseTable, field)
+			return v.CheckFieldAccess(ctx, "", baseTable, field)
 		}
 	}
 
-	return v.CheckFieldAccess(ctx, userID, baseTable, field)
+	return v.CheckFieldAccess(ctx, "", baseTable, field)
 }
 
 func (v *Validator) CheckTableAccess(ctx context.Context, userID string, table string) error {
+	scope, err := v.newAccessScope(userID)
+	if err != nil {
+		return err
+	}
+	return v.checkTableAccessWithScope(ctx, table, scope)
+}
+
+func (v *Validator) checkTableAccessWithScope(ctx context.Context, table string, scope *validatorAccessScope) error {
 	if !v.allowedTables.IsTableAllowed(table) {
 		return fmt.Errorf("表 '%s' 不在允许访问的列表中", table)
 	}
 
 	switch table {
 	case "databases", "records", "tables", "fields", "files":
-		return v.checkDataAccess(ctx, userID)
+		return v.checkDataAccess(ctx, scope)
 	case "tokens":
-		authorizer, err := authz.NewAuthorizer(v.db, userID)
-		if err != nil {
-			return err
-		}
+		authorizer := scope.authorizer
 		if !authorizer.IsMaster() {
 			return errors.New("无权访问 tokens")
 		}
@@ -213,8 +263,8 @@ func splitJSONBaseField(field string) (string, bool) {
 	return "", false
 }
 
-func (v *Validator) checkDataAccess(ctx context.Context, userID string) error {
-	ids, err := v.getAccessibleDatabaseIDs(userID)
+func (v *Validator) checkDataAccess(ctx context.Context, scope *validatorAccessScope) error {
+	ids, err := scope.accessibleDatabaseIDs()
 	if err != nil {
 		return fmt.Errorf("检查数据访问权限失败: %w", err)
 	}
@@ -238,10 +288,11 @@ func qualifyBaseField(table, field string) string {
 
 func (v *Validator) GetAllowedTables(ctx context.Context, userID string) ([]string, error) {
 	allowed := make([]string, 0)
-	authorizer, err := authz.NewAuthorizer(v.db, userID)
+	scope, err := v.newAccessScope(userID)
 	if err != nil {
 		return nil, err
 	}
+	authorizer := scope.authorizer
 	for table := range v.allowedTables {
 		if table == "tokens" && !authorizer.IsMaster() {
 			continue
@@ -252,13 +303,21 @@ func (v *Validator) GetAllowedTables(ctx context.Context, userID string) ([]stri
 }
 
 func (v *Validator) AutoFilterByPermission(req *QueryRequest, userID string) error {
+	scope, err := v.newAccessScope(userID)
+	if err != nil {
+		return err
+	}
+	return v.autoFilterByPermissionWithScope(req, scope)
+}
+
+func (v *Validator) autoFilterByPermissionWithScope(req *QueryRequest, scope *validatorAccessScope) error {
 	if req.Where == nil {
 		req.Where = &WhereClause{}
 	}
 
 	switch req.From {
 	case "databases":
-		dbIDs, err := v.getAccessibleDatabaseIDs(userID)
+		dbIDs, err := scope.accessibleDatabaseIDs()
 		if err != nil {
 			return err
 		}
@@ -267,7 +326,7 @@ func (v *Validator) AutoFilterByPermission(req *QueryRequest, userID string) err
 		}
 		appendInCondition(req.Where, qualifyBaseField(req.From, "id"), dbIDs)
 	case "records":
-		tableIDs, err := v.getAccessibleTableIDs(userID)
+		tableIDs, err := scope.accessibleTableIDs()
 		if err != nil {
 			return err
 		}
@@ -276,7 +335,7 @@ func (v *Validator) AutoFilterByPermission(req *QueryRequest, userID string) err
 		}
 		appendInCondition(req.Where, qualifyBaseField(req.From, "table_id"), tableIDs)
 	case "tables":
-		dbIDs, err := v.getAccessibleDatabaseIDs(userID)
+		dbIDs, err := scope.accessibleDatabaseIDs()
 		if err != nil {
 			return err
 		}
@@ -285,7 +344,7 @@ func (v *Validator) AutoFilterByPermission(req *QueryRequest, userID string) err
 		}
 		appendInCondition(req.Where, qualifyBaseField(req.From, "database_id"), dbIDs)
 	case "fields":
-		tableIDs, err := v.getAccessibleTableIDs(userID)
+		tableIDs, err := scope.accessibleTableIDs()
 		if err != nil {
 			return err
 		}
@@ -294,7 +353,7 @@ func (v *Validator) AutoFilterByPermission(req *QueryRequest, userID string) err
 		}
 		appendInCondition(req.Where, qualifyBaseField(req.From, "table_id"), tableIDs)
 	case "files":
-		recordIDs, err := v.getAccessibleRecordIDs(userID)
+		recordIDs, err := scope.accessibleRecordIDs()
 		if err != nil {
 			return err
 		}
@@ -313,27 +372,78 @@ func (v *Validator) AutoFilterByPermission(req *QueryRequest, userID string) err
 }
 
 func (v *Validator) getAccessibleDatabaseIDs(userID string) ([]string, error) {
-	authorizer, err := authz.NewAuthorizer(v.db, userID)
+	scope, err := v.newAccessScope(userID)
 	if err != nil {
 		return nil, err
 	}
-	return authorizer.AccessibleDatabaseIDs()
+	return scope.accessibleDatabaseIDs()
 }
 
 func (v *Validator) getAccessibleTableIDs(userID string) ([]string, error) {
-	authorizer, err := authz.NewAuthorizer(v.db, userID)
+	scope, err := v.newAccessScope(userID)
 	if err != nil {
 		return nil, err
 	}
-	return authorizer.AccessibleTableIDs()
+	return scope.accessibleTableIDs()
 }
 
 func (v *Validator) getAccessibleRecordIDs(userID string) ([]string, error) {
+	scope, err := v.newAccessScope(userID)
+	if err != nil {
+		return nil, err
+	}
+	return scope.accessibleRecordIDs()
+}
+
+func (v *Validator) newAccessScope(userID string) (*validatorAccessScope, error) {
 	authorizer, err := authz.NewAuthorizer(v.db, userID)
 	if err != nil {
 		return nil, err
 	}
-	return authorizer.AccessibleRecordIDs()
+
+	return &validatorAccessScope{authorizer: authorizer}, nil
+}
+
+func (s *validatorAccessScope) accessibleDatabaseIDs() ([]string, error) {
+	if s.databaseIDsLoaded {
+		return s.databaseIDs, nil
+	}
+
+	ids, err := s.authorizer.AccessibleDatabaseIDs()
+	if err != nil {
+		return nil, err
+	}
+	s.databaseIDs = ids
+	s.databaseIDsLoaded = true
+	return s.databaseIDs, nil
+}
+
+func (s *validatorAccessScope) accessibleTableIDs() ([]string, error) {
+	if s.tableIDsLoaded {
+		return s.tableIDs, nil
+	}
+
+	ids, err := s.authorizer.AccessibleTableIDs()
+	if err != nil {
+		return nil, err
+	}
+	s.tableIDs = ids
+	s.tableIDsLoaded = true
+	return s.tableIDs, nil
+}
+
+func (s *validatorAccessScope) accessibleRecordIDs() ([]string, error) {
+	if s.recordIDsLoaded {
+		return s.recordIDs, nil
+	}
+
+	ids, err := s.authorizer.AccessibleRecordIDs()
+	if err != nil {
+		return nil, err
+	}
+	s.recordIDs = ids
+	s.recordIDsLoaded = true
+	return s.recordIDs, nil
 }
 
 func appendInCondition(where *WhereClause, field string, values []string) {

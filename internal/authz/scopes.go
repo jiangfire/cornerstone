@@ -12,12 +12,37 @@ import (
 	"gorm.io/gorm"
 )
 
-// tokenCache 缓存 Token 及其解析后的权限配置，减少每次请求都查 DB 的开销。
-// TTL 5 分钟，在大多数业务场景下 Token 和 Scopes 不会频繁变更。
-var tokenCache = cache.NewString[*Authorizer]("token", 5*time.Minute)
+// jsonToken 用于 Authorizer 的 JSON 序列化/反序列化
+type jsonToken struct {
+	Token  models.Token `json:"token"`
+	Scopes ScopeConfig  `json:"scopes"`
+}
+
+func (a Authorizer) MarshalJSON() ([]byte, error) {
+	return json.Marshal(jsonToken{Token: a.token, Scopes: a.scopes})
+}
+
+func (a *Authorizer) UnmarshalJSON(data []byte) error {
+	var aux jsonToken
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	a.token = aux.Token
+	a.scopes = aux.Scopes
+	return nil
+}
+
+// authorizerCache 缓存按 tokenID 构建好的权限上下文。
+var authorizerCache = cache.NewString[*Authorizer]("authorizer", 5*time.Minute)
+
+// tokenByIDCache / tokenByValueCache 缓存 Token 记录，分别服务于权限构建和认证入口。
+var tokenByIDCache = cache.NewString[models.Token]("token-by-id", 5*time.Minute)
+var tokenByValueCache = cache.NewString[models.Token]("token-by-value", 5*time.Minute)
 
 func init() {
-	cache.Register(tokenCache)
+	cache.Register(authorizerCache)
+	cache.Register(tokenByIDCache)
+	cache.Register(tokenByValueCache)
 }
 
 const (
@@ -69,10 +94,37 @@ func NewAuthorizer(db *gorm.DB, tokenID string) (*Authorizer, error) {
 	}
 
 	// 尝试从缓存读取
-	if a, ok := tokenCache.Get(tokenID); ok {
+	if a, ok := authorizerCache.Get(tokenID); ok {
 		// 缓存中的 Authorizer 需要指向当前的 db（连接可能变化，如测试时）
 		// 所以只缓存 token 和 scopes，db 仍然用传入的
 		return &Authorizer{db: db, token: a.token, scopes: a.scopes}, nil
+	}
+
+	token, err := findTokenByID(db, tokenID)
+	if err != nil {
+		return nil, err
+	}
+	scopes, err := parseScopes(token.Scopes)
+	if err != nil {
+		return nil, err
+	}
+
+	authorizer := &Authorizer{db: db, token: *token, scopes: scopes}
+	authorizerCache.Set(tokenID, authorizer)
+	return authorizer, nil
+}
+
+func cacheTokenRecord(token models.Token) {
+	tokenByIDCache.Set(token.ID, token)
+	if token.Token != "" {
+		tokenByValueCache.Set(token.Token, token)
+	}
+}
+
+func findTokenByID(db *gorm.DB, tokenID string) (*models.Token, error) {
+	if token, ok := tokenByIDCache.Get(tokenID); ok {
+		cached := token
+		return &cached, nil
 	}
 
 	var token models.Token
@@ -83,14 +135,26 @@ func NewAuthorizer(db *gorm.DB, tokenID string) (*Authorizer, error) {
 		return nil, fmt.Errorf("查询 Token 失败: %w", err)
 	}
 
-	scopes, err := parseScopes(token.Scopes)
-	if err != nil {
+	cacheTokenRecord(token)
+	return &token, nil
+}
+
+func FindTokenByValue(db *gorm.DB, tokenValue string) (*models.Token, error) {
+	if db == nil {
+		return nil, errors.New("数据库未初始化")
+	}
+	if token, ok := tokenByValueCache.Get(tokenValue); ok {
+		cached := token
+		return &cached, nil
+	}
+
+	var token models.Token
+	if err := db.Where("token = ?", tokenValue).First(&token).Error; err != nil {
 		return nil, err
 	}
 
-	authorizer := &Authorizer{db: db, token: token, scopes: scopes}
-	tokenCache.Set(tokenID, authorizer)
-	return authorizer, nil
+	cacheTokenRecord(token)
+	return &token, nil
 }
 
 func parseScopes(raw string) (ScopeConfig, error) {
@@ -365,10 +429,19 @@ func (a *Authorizer) AccessibleRecordIDs() ([]string, error) {
 
 // InvalidateTokenCache 失效指定 Token 的缓存。
 func InvalidateTokenCache(tokenID string) {
-	tokenCache.Delete(tokenID)
+	if authorizer, ok := authorizerCache.Get(tokenID); ok {
+		tokenByValueCache.Delete(authorizer.token.Token)
+	}
+	if token, ok := tokenByIDCache.Get(tokenID); ok {
+		tokenByValueCache.Delete(token.Token)
+	}
+	authorizerCache.Delete(tokenID)
+	tokenByIDCache.Delete(tokenID)
 }
 
 // ClearTokenCache 清空所有 Token 缓存。
 func ClearTokenCache() {
-	tokenCache.Clear()
+	authorizerCache.Clear()
+	tokenByIDCache.Clear()
+	tokenByValueCache.Clear()
 }
