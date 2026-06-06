@@ -264,3 +264,202 @@ SEARCH records USING INDEX idx_records_table_deleted_created (table_id=? AND del
 - benchmark 夹具已泛化为跨数据库版本；本地默认 SQLite，CI/CD 可直接复用到 MySQL/PostgreSQL。
 - 独立性能工作流 `perf.yml` 已补齐，可在推送到 `main/master` 后查看三套数据库的 benchmark 与 explain 结果。
 - 下一步建议进入 **阶段 3.x**，优先继续处理 Query / JSON 过滤本身的结构性成本，并根据 GitHub Actions 中的跨数据库趋势结果决定是否做更激进的结构化索引或派生列设计。
+
+## 跨数据库对比分析补充（2026-06-06）
+
+> **一句话结论**：当前已经可以在 CI/CD 中稳定产出 SQLite、MySQL、PostgreSQL 三套 benchmark；如果后续数据源场景以 JSON 过滤和记录列表为主，**PostgreSQL（PostgreSQL 数据库）目前明显更适合作为主生产后端**，而 MySQL/SQLite 的 JSON 路径应优先考虑派生列（generated/derived columns，指从 JSON 中拆出来的可索引物理列）或专用索引策略。
+
+### 跨数据库基准快照
+
+说明：
+
+- 数据来自 GitHub Actions `Performance` workflow 成功运行 `27053743084`。
+- 当前数据集是 **可复现的 benchmark 灌数集**，适合看相对趋势，不应直接等同于真实生产绝对延迟。
+- `ns/op` 越低越好；`B/op` 和 `allocs/op` 越低说明 Go 侧固定开销越小。
+
+| 场景 | SQLite | MySQL 8.0 | PostgreSQL 16 | 观察 |
+|---|---|---|---|---|
+| `BenchmarkValidateToken` | `176.2 ns/op` | `175.8 ns/op` | `183.4 ns/op` | 三者接近，认证缓存已把数据库差异基本抹平 |
+| `RecordServiceListRecords/no_filter` | `2.42 ms/op` | `21.27 ms/op` | `4.46 ms/op` | **MySQL 明显最慢**，即使不带 JSON 过滤也落后 PostgreSQL |
+| `RecordServiceListRecords/structured_filter` | `15.88 ms/op` | `25.72 ms/op` | `5.68 ms/op` | PostgreSQL 对结构化 JSON 过滤优势最明显 |
+| `FieldServiceListFields` | `1.67 ms/op` | `2.93 ms/op` | `1.81 ms/op` | MySQL 略慢，但不是主要瓶颈 |
+| `ExecutorExecute/records_by_table` | `2.72 ms/op` | `6.40 ms/op` | `2.59 ms/op` | Query DSL 普通列表里 MySQL 也明显落后 |
+| `ExecutorExecute/records_json_filter` | `22.26 ms/op` | `21.58 ms/op` | `3.10 ms/op` | **JSON 过滤能力差异非常大**，PostgreSQL 显著领先 |
+
+### 查询计划对比
+
+| 数据库 | 计划摘要 | 当前判断 |
+|---|---|---|
+| SQLite | `SEARCH records USING INDEX idx_records_table_deleted_created (table_id=? AND deleted_at=?)` | 主路径复合索引已命中，但 `JSON_EXTRACT` 仍然是行级解析成本 |
+| MySQL | `Index range scan on records using idx_records_table_deleted_created` + `Limit 50` | **MySQL 也命中了主路径复合索引**，所以慢因不应简单归咎为“没走索引” |
+| PostgreSQL | `Index Scan using idx_records_table_deleted_created on records`，JSON 路径可额外受益于 `idx_records_data_gin` | 普通列表和 JSON 过滤都具备更强索引基础 |
+
+### 为什么 MySQL 记录列表明显慢于 PostgreSQL
+
+#### 已确认事实
+
+| 事实 | 证据 |
+|---|---|
+| 两者都命中了 `idx_records_table_deleted_created(table_id, deleted_at, created_at DESC)` | `EXPLAIN ANALYZE` / `EXPLAIN` 输出已验证 |
+| 差距不只出现在 JSON 过滤场景 | `no_filter` 下 MySQL `21.27 ms`，PostgreSQL `4.46 ms` |
+| JSON 过滤场景差距更大 | `records_json_filter` 下 MySQL `21.58 ms`，PostgreSQL `3.10 ms` |
+| PostgreSQL 具备 `jsonb` + `GIN`（广义倒排索引，用于加速包含匹配和键值检索）基础设施 | `internal/models/models.go`、`internal/db/migrate.go` |
+| MySQL/SQLite 当前路径是 `JSON_EXTRACT(data, ?) = ?` | `internal/services/record.go` |
+
+#### 当前最可信的原因拆解
+
+| 原因 | 解释 | 置信度 |
+|---|---|---|
+| JSON 存储与索引模型差异 | PostgreSQL 使用 `jsonb`（二进制 JSON）且已建 `GIN` 索引；MySQL 当前只有 `json` 原列，没有针对高频 JSON 键的专门索引 | 高 |
+| MySQL 行物化成本更高 | 即使列表主路径先靠复合索引筛出候选行，后续取整行、读取 `data`、再在数据库或应用侧做 JSON 处理，MySQL 当前形态成本更高 | 中 |
+| PostgreSQL 对当前查询形状更友好 | 当前 `WHERE table_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT ?` 加上可选 `data @> ?`，PostgreSQL 的执行器和成本模型在这个形状上表现更稳定 | 中 |
+| 当前 SQL 投影仍偏宽 | `ListRecords` / `Query Executor` 会把 `data` 等宽字段一起拉回，MySQL 对宽行扫描更敏感；这一点需要进一步用“窄投影 vs 全投影” benchmark 证实 | 中 |
+
+#### 不应过早下结论的点
+
+- **目前还不能把 MySQL 慢完全归结为驱动问题**。现有证据首先指向数据库执行与 JSON 行处理成本，而不是 Go MySQL driver 本身。
+- **也不能仅凭一次 CI 结果就决定全面放弃 MySQL**。但至少在“JSON-heavy（以 JSON 条件为主）读路径”上，MySQL 需要额外结构化优化，否则很难接近 PostgreSQL。
+- **当前 benchmark 是合成数据集**。如果真实线上过滤键更集中，MySQL 通过派生列和复合索引仍可能把差距显著缩小。
+
+### JSON 过滤是否要拆派生列或专用索引
+
+#### 结论先行
+
+| 数据库 | 建议 |
+|---|---|
+| PostgreSQL | **先不急着拆派生列**。优先继续利用 `jsonb` + `GIN`，只对极高频、强选择性的字段补表达式索引或普通 BTREE（B-tree，平衡树索引） |
+| MySQL | **建议对高频 JSON 过滤键拆派生列 / generated column 并建索引**，否则 `JSON_EXTRACT(data, ...) = ?` 很难在数据量增长后维持稳定延迟 |
+| SQLite | 若只是本地开发和 CI 快速回归，可保留当前通用 JSON 路径；若 SQLite 未来也承担实际生产过滤压力，同样要把高频键拆成物化列 |
+
+#### 原因说明
+
+| 数据库 | 当前实现 | 主要问题 | 更合适的策略 |
+|---|---|---|---|
+| PostgreSQL | `data @> ?` + `jsonb` + `idx_records_data_gin` | 仍需确认所有高频谓词都能稳定命中 `GIN`，少数排序/范围条件未必适合仅靠 `GIN` | 保持 JSONB 主体模型，只为热点键补充定向索引 |
+| MySQL | `JSON_EXTRACT(data, ?) = ?` | 对 JSON 路径做函数求值，通常难以像普通列那样高效利用组合索引 | 把 `status`、`category`、`owner_id`、数值型评分等高频键拆成 generated column，再建 `(table_id, deleted_at, derived_col, created_at DESC)` |
+| SQLite | `JSON_EXTRACT(data, ?) = ?`，底层 `data` 为 `TEXT` | JSON1（SQLite JSON 扩展）本质上更偏函数式解析，数据量变大时 CPU 成本很难压住 | 继续作为 correctness/perf smoke baseline；若必须承压，再考虑影子列 |
+
+#### 派生列的使用门槛
+
+只有满足下面条件的 JSON 键，才值得升级为派生列：
+
+1. 该键出现在较高比例的线上/目标查询里。
+2. 该键选择性足够高，索引后能明显缩小候选行。
+3. 该键语义稳定，不会频繁改名或变更类型。
+4. 该键值得承担额外写放大和迁移复杂度。
+
+## 后续详细执行计划
+
+### 目标
+
+把“已经能稳定跑 benchmark”推进到“能解释差异、能持续比较、能针对不同数据库给出可实施优化方案”。
+
+### 阶段化计划
+
+| 阶段 | 动作 | 输出物 | 验收标准 |
+|---|---|---|---|
+| P0 | 固化跨数据库基线，把 SQLite/MySQL/PostgreSQL 结果写入文档并沉淀 PR summary 模板 | 文档更新、PR summary 模板 | 团队可以直接看到单次变更前后的跨库快照 |
+| P1 | 拆解 MySQL 列表慢因：增加“窄投影 vs 宽投影”“仅数据库过滤 vs Go 端 JSON decode” benchmark | 新 benchmark、Explain 对照结果 | 能区分是数据库扫描慢、宽行物化慢，还是应用解码慢 |
+| P2 | 梳理高频 JSON 键并做候选清单 | 键清单、出现频率、选择性假设 | 至少产出一批值得索引化的字段候选 |
+| P3 | 为 MySQL 设计 generated column + 复合索引方案 | 设计文档、迁移草案、TDD 用例 | 对热点键可生成明确 DDL（数据定义语言）方案 |
+| P4 | 验证 PostgreSQL 当前 `GIN` 是否已覆盖真实热点谓词，必要时补表达式索引 | Explain/Analyze 结果、索引方案 | PostgreSQL 保持领先且不过度设计 |
+| P5 | 定义 SQLite 的职责边界 | 文档说明 | SQLite 仅作为本地/CI 基线，还是也要承担生产过滤，边界明确 |
+| P6 | 将 before/after 对比纳入 PR 和 CI/CD | PR summary、Actions artifact、summary 规范 | 每次性能改造都可回溯结果、命令和执行计划 |
+
+### P1：MySQL 慢因拆解的具体测试项
+
+| 测试项 | 目的 | 预期能回答的问题 |
+|---|---|---|
+| `ListRecords` 窄投影 benchmark（只取 `id/table_id/created_at`） | 排除宽字段影响 | MySQL 是否主要慢在宽行读取 |
+| `ListRecords` 全投影 benchmark（含 `data/version/timestamps`） | 对照现状 | 当前主路径是否主要受 JSON 大字段拖累 |
+| `Query Executor` 仅过滤不解码 benchmark | 分离 DB 与 Go 端成本 | 慢点在数据库执行还是 `scanRows`/JSON decode |
+| MySQL `EXPLAIN ANALYZE` 对比不同 `LIMIT` | 观察 top-N 和回表代价 | 慢是否与分页深度相关 |
+| 同条件 PostgreSQL 对照 | 防止误把通用成本当成 MySQL 特例 | 哪些差距是数据库专有的 |
+
+### P1 首轮诊断 benchmark 记录（2026-06-06）
+
+已完成内容：
+
+- `internal/services/perf_benchmark_test.go`
+  - 新增 `no_filter_db_narrow_projection`
+  - 新增 `no_filter_db_wide_projection`
+  - 新增 `no_filter_go_response_shaping`
+  - 新增 `structured_filter_db_narrow_projection`
+  - 新增 `structured_filter_db_wide_projection`
+- `pkg/query/perf_benchmark_test.go`
+  - 新增 `records_json_filter_id_only`
+  - 新增 `records_json_filter_full_data_projection`
+
+这样做的目的不是追求更多 benchmark 名字，而是把以下三类成本拆开：
+
+1. **数据库候选行获取成本**：只取窄字段，观察索引扫描 + 最小回表开销。
+2. **宽行物化成本**：把 `data` 一起投影出来，观察宽字段是否明显拖慢数据库。
+3. **Go 侧 JSON/响应整形成本**：脱离数据库过滤后，只看 `parseRecordPayload + filterReadableData + response` 组装成本。
+
+本地 SQLite 首轮结果（Windows / PowerShell / 2026-06-06）：
+
+| 场景 | 结果 | 观察 |
+|---|---|---|
+| `RecordServiceListRecords/no_filter` | `1425928 ns/op` | 端到端基线 |
+| `RecordServiceListRecords/no_filter_db_narrow_projection` | `147897 ns/op` | 纯数据库窄投影很快 |
+| `RecordServiceListRecords/no_filter_db_wide_projection` | `263182 ns/op` | 加上 `data` 后数据库读取开销上升，但仍明显低于端到端 |
+| `RecordServiceListRecords/no_filter_go_response_shaping` | `281578 ns/op` | Go 侧 JSON 解码与响应整形有稳定成本，但不是全部成本来源 |
+| `RecordServiceListRecords/structured_filter` | `8098706 ns/op` | 结构化过滤端到端仍明显更慢 |
+| `RecordServiceListRecords/structured_filter_db_narrow_projection` | `1067977 ns/op` | 结构化过滤时，数据库过滤本身已显著放大 |
+| `RecordServiceListRecords/structured_filter_db_wide_projection` | `1177650 ns/op` | 宽投影有影响，但不是结构化过滤慢的主因 |
+| `ExecutorExecute/records_json_filter` | `12506741 ns/op` | 当前 Query DSL JSON 过滤端到端基线 |
+| `ExecutorExecute/records_json_filter_id_only` | `12393429 ns/op` | 去掉 `data` 全列投影后，耗时几乎不变 |
+| `ExecutorExecute/records_json_filter_full_data_projection` | `12514896 ns/op` | 投影 `data` 会增加分配，但对总耗时影响有限 |
+
+首轮结论：
+
+- 对 `ListRecords/no_filter` 而言，**数据库窄/宽投影 + Go 侧整形之和仍小于端到端耗时**，说明权限、COUNT、GORM 语句构建和结果拼装仍有固定税。
+- 对 `structured_filter` 和 `records_json_filter` 而言，**数据库 JSON 过滤本身仍是主瓶颈**；至少在 SQLite 基线下，是否把整列 `data` 投影回应用侧，不会改变主耗时级别。
+- 因此下一步把同一组拆解 benchmark 带到 **MySQL / PostgreSQL CI** 是必要的：如果 MySQL 上 `db_wide_projection` 明显高于 PostgreSQL，就更像“宽行物化/回表”问题；如果 `db_narrow_projection` 也显著慢，就更像 JSON 谓词执行与执行器成本问题。
+
+建议的复测命令：
+
+```powershell
+go test ./internal/services -run ^$ -bench BenchmarkRecordServiceListRecords -benchmem -count 1
+go test ./pkg/query -run ^$ -bench BenchmarkExecutorExecute -benchmem -count 1
+```
+
+### P3：MySQL/SQLite JSON 结构化优化候选
+
+| 场景 | 建议索引方向 | 说明 |
+|---|---|---|
+| 单字段精确匹配，如 `status = "published"` | `(table_id, deleted_at, status_derived, created_at DESC)` | 同时兼顾主路径筛选和排序 |
+| 多字段联合过滤，如 `status + category` | 按真实查询频率选择复合索引顺序 | 不建议无证据地为所有键做大而全索引 |
+| 数值范围过滤，如 `score >= 80` | 数值型 generated column + BTREE | 不能继续让字符串化 JSON 比较承担主路径 |
+| 模糊搜索 | 不建议继续挂在 JSON 通用路径 | 应拆到专用全文检索或搜索接口，而不是依赖 `JSON_EXTRACT` |
+
+### 文档与 PR Summary 的整理建议
+
+**建议整理，而且应作为固定交付物，而不是补充材料。**
+
+推荐把每次性能改造的输出统一为以下三层：
+
+| 层级 | 放置位置 | 必须包含的内容 |
+|---|---|---|
+| 长期基线文档 | `docs/Performance-Plan-2026-06.md` | 跨数据库 benchmark 表、Explain 结论、已知瓶颈、后续计划 |
+| 单次改造摘要 | PR summary / PR 描述 | 变更目标、before/after 数据、命令、workflow run 链接、风险说明 |
+| 原始产物 | GitHub Actions artifacts | `auth.txt`、`services.txt`、`query.txt`、`explain.txt` 原文，便于追溯 |
+
+建议 PR summary 固定包含下面几项：
+
+| 项目 | 内容 |
+|---|---|
+| 背景 | 为什么要做这次性能改造 |
+| 范围 | 改了哪些模块，没改哪些模块 |
+| Benchmark before/after | 至少列出受影响场景的前后数据 |
+| Explain plan | 关键 SQL 是否命中目标索引 |
+| DB 维度差异 | SQLite/MySQL/PostgreSQL 是否都验证过 |
+| 风险 | 是否引入新索引、写放大、兼容性变化 |
+| 未解决问题 | 如 Redis CI 失败这类与本次性能无关但仍待处理的问题 |
+
+### 当前建议的决策
+
+1. **生产优先后端**：若目标场景确实以 JSON 条件查询和列表读取为主，优先把 PostgreSQL 作为默认推荐部署后端。
+2. **MySQL 优化方向**：不要继续只靠 `JSON_EXTRACT` 硬扛；进入下一轮时，应优先做 generated column 候选设计和对照 benchmark。
+3. **SQLite 定位**：继续保留为本地与 CI 快速回归基线，不把它当作 JSON-heavy 生产能力的真实性能代表。
+4. **交付规范**：后续每次性能改造都要同步更新本文档和 PR summary，避免 benchmark 结果只留在 Actions 页面里。
