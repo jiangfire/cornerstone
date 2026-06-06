@@ -68,26 +68,6 @@ type Authorizer struct {
 	scopes ScopeConfig
 }
 
-// jsonToken 用于 Authorizer 的 JSON 序列化/反序列化
-type jsonToken struct {
-	Token  models.Token `json:"token"`
-	Scopes ScopeConfig  `json:"scopes"`
-}
-
-func (a Authorizer) MarshalJSON() ([]byte, error) {
-	return json.Marshal(jsonToken{Token: a.token, Scopes: a.scopes})
-}
-
-func (a *Authorizer) UnmarshalJSON(data []byte) error {
-	var aux jsonToken
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-	a.token = aux.Token
-	a.scopes = aux.Scopes
-	return nil
-}
-
 func NewAuthorizer(db *gorm.DB, tokenID string) (*Authorizer, error) {
 	if db == nil {
 		return nil, errors.New("数据库未初始化")
