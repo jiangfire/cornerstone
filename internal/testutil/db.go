@@ -17,15 +17,6 @@ import (
 	pkgdb "github.com/jiangfire/cornerstone/pkg/db"
 )
 
-var autoMigrateModels = []any{
-	&models.Token{},
-	&models.Database{},
-	&models.Table{},
-	&models.Field{},
-	&models.Record{},
-	&models.File{},
-}
-
 func SetupTestDB(t *testing.T) *gorm.DB {
 	t.Helper()
 
