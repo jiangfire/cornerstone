@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/jiangfire/cornerstone/internal/config"
+	internaldb "github.com/jiangfire/cornerstone/internal/db"
 	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/jiangfire/cornerstone/pkg/cache"
 	pkgdb "github.com/jiangfire/cornerstone/pkg/db"
@@ -48,8 +49,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		require.NoError(t, err)
 
 		db := pkgdb.DB()
-		err = db.AutoMigrate(autoMigrateModels...)
-		require.NoError(t, err)
+		require.NoError(t, internaldb.Migrate())
 
 		// 清理函数：硬删除所有测试数据，并关闭连接
 		t.Cleanup(func() {
@@ -79,8 +79,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 			MaxLifetime: 3600,
 		})
 		require.NoError(t, err)
-		err = pkgdb.DB().AutoMigrate(autoMigrateModels...)
-		require.NoError(t, err)
+		require.NoError(t, internaldb.Migrate())
 		// 前一个测试关闭了连接导致 cleanupTables 被跳过，重新初始化后立即清理残余数据
 		cleanupTables(pkgdb.DB(), t)
 	}
