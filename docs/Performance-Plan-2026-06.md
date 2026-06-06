@@ -799,40 +799,40 @@ go test ./internal/services -run ^$ -bench BenchmarkRecordServiceListRecords -be
 go test ./...
 ```
 
-### CI/Performance 验证结果（GitHub Actions `27060717416` / `27060717431`）
+### CI/Performance 验证结果（GitHub Actions `27061420249` / `27061420256`）
 
 运行地址：
 
-- Performance: `https://github.com/jiangfire/cornerstone/actions/runs/27060717416`
-- CI: `https://github.com/jiangfire/cornerstone/actions/runs/27060717431`
+- CI: `https://github.com/jiangfire/cornerstone/actions/runs/27061420249`
+- Performance: `https://github.com/jiangfire/cornerstone/actions/runs/27061420256`
 
 #### 验证状态
 
 | Workflow | 状态 | 说明 |
 |---|---|---|
 | `Performance` | 成功 | SQLite / MySQL 8.0 / PostgreSQL 16 三个 perf job 全部完成，并上传 artifact |
-| `CI` | 失败，已定位并修复 | MySQL / PostgreSQL / migration / lint / build / vuln 成功；SQLite 与 Redis 在 `go test -race` 下被重型 `TestExplainPlanListRecordsWithNoiseTables` 拖到超时，已改为 race CI 默认跳过这些 EXPLAIN 诊断测试 |
+| `CI` | 成功 | SQLite / MySQL / PostgreSQL / Redis / migration / lint / build / vuln 全部通过；上一轮 `27060717431` 的 SQLite 与 Redis `-race` 超时已由本轮验证修复 |
 
 #### 跨数据库 benchmark 摘要
 
 | 场景 | SQLite | MySQL 8.0 | PostgreSQL 16 | 观察 |
 |---|---:|---:|---:|---|
-| `RecordServiceListRecords/no_filter` | `2.048 ms` | `6.702 ms` | `4.646 ms` | MySQL 普通列表仍在 `~6-7 ms` 波动区间，主路径已能产出但不稳定 |
-| `RecordServiceListRecords/structured_filter` | `13.157 ms` | `30.684 ms` | `6.198 ms` | MySQL 结构化过滤本轮明显退化，派生索引表没有带来预期收益 |
-| `structured_filter_db_narrow_projection` | `2.606 ms` | `6.280 ms` | `1.883 ms` | PostgreSQL 仍领先；MySQL JSON/派生路径仍偏慢 |
-| `mysql_structured_filter_raw_sql` | 不适用 | `2.887 ms` | 不适用 | 当前数据集上 raw `JSON_EXTRACT` 反而快于派生索引表实验 |
-| `mysql_structured_filter_record_field_index` | 不适用 | `9.791 ms` | 不适用 | 派生索引表查询可运行，但当前 SQL 形态不是有效优化 |
-| `mysql_structured_filter_generated_columns` | 不适用 | `0.562 ms` | 不适用 | generated column 仍是已验证最快 MySQL JSON 热字段方案 |
+| `RecordServiceListRecords/no_filter` | `2.610 ms` | `6.897 ms` | `4.910 ms` | MySQL 普通列表仍在 `~6-7 ms` 波动区间，主路径已稳定产出 |
+| `RecordServiceListRecords/structured_filter` | `18.121 ms` | `30.299 ms` | `6.625 ms` | MySQL 结构化过滤仍明显慢于 PostgreSQL，派生索引表没有带来预期收益 |
+| `structured_filter_db_narrow_projection` | `3.325 ms` | `6.121 ms` | `1.908 ms` | PostgreSQL 仍领先；MySQL JSON/派生路径仍偏慢 |
+| `mysql_structured_filter_raw_sql` | 不适用 | `3.753 ms` | 不适用 | 当前数据集上 raw `JSON_EXTRACT` 仍快于派生索引表实验 |
+| `mysql_structured_filter_record_field_index` | 不适用 | `9.941 ms` | 不适用 | 派生索引表查询可运行，但当前 SQL 形态不是有效优化 |
+| `mysql_structured_filter_generated_columns` | 不适用 | `0.589 ms` | 不适用 | generated column 仍是已验证最快 MySQL JSON 热字段方案 |
 
 #### MySQL `EXPLAIN ANALYZE` 结论
 
 | 场景 | 计划摘要 | 结论 |
 |---|---|---|
 | plain list | `Index range scan on records using idx_records_table_deleted_created` | 普通列表主路径仍能命中复合索引 |
-| forced composite | `Covering index lookup on records using idx_records_table_deleted_created` | 强制覆盖索引形态仍更快，engine 时间约 `0.047..0.108 ms` |
-| raw structured filter | 先走 `idx_records_table_deleted_created`，再执行 `json_extract(...)` 过滤 | engine 时间约 `0.074..120 ms`，仍是逐行 JSON 函数路径 |
-| record field index | `idx_rfi_text_lookup` 命中后被 `UNION ALL materialize`、`Sort`、`Group aggregate`，再与 `records` 回连 | engine 时间约 `235..236 ms`，物化/排序/聚合抵消了索引收益 |
-| generated columns | `Covering index lookup on idx_records_bench_status_category_created` | engine 时间约 `0.556..0.630 ms`，仍是 MySQL 最强证据 |
+| forced composite | `Covering index lookup on records using idx_records_table_deleted_created` | 强制覆盖索引形态仍更快，engine 时间约 `0.029..0.283 ms` |
+| raw structured filter | 先走 `idx_records_table_deleted_created`，再执行 `json_extract(...)` 过滤 | engine 时间约 `0.160..81.3 ms`，仍是逐行 JSON 函数路径 |
+| record field index | `idx_rfi_text_lookup` 命中后被 `UNION ALL materialize`、`Sort`、`Group aggregate`，再与 `records` 回连 | engine 时间约 `165..167 ms`，物化/排序/聚合和回连抵消了索引收益 |
+| generated columns | `Covering index lookup on idx_records_bench_status_category_created` | engine 时间约 `0.041..0.125 ms`，仍是 MySQL 最强证据 |
 
 #### 结论更新
 
@@ -852,3 +852,4 @@ go test ./...
 
 - Performance workflow 不使用 `-race`，仍会运行这些 EXPLAIN 诊断并上传 artifact。
 - 普通本地 `go test ./...` 仍会覆盖 EXPLAIN 诊断；本地验证已通过。
+- 修复提交 `cb2b1fc` 已推送到 `origin/master`，CI `27061420249` 已确认通过。
