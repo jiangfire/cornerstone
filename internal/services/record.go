@@ -515,6 +515,80 @@ type recordFilterClause struct {
 	args []interface{}
 }
 
+func buildMySQLRecordListSQL(req QueryRequest, clauses []recordFilterClause) (string, []interface{}) {
+	var b strings.Builder
+	b.WriteString("SELECT id, table_id, data, version, created_at, updated_at FROM records FORCE INDEX (idx_records_table_deleted_created) ")
+	b.WriteString("WHERE table_id = ? AND deleted_at IS NULL")
+
+	args := make([]interface{}, 0, 3+len(clauses)*2)
+	args = append(args, req.TableID)
+	for _, clause := range clauses {
+		b.WriteString(" AND ")
+		b.WriteString(clause.sql)
+		args = append(args, clause.args...)
+	}
+
+	b.WriteString(" ORDER BY created_at DESC LIMIT ? OFFSET ?")
+	args = append(args, req.Limit, req.Offset)
+	return b.String(), args
+}
+
+func buildMySQLRecordCountSQL(tableID string, clauses []recordFilterClause) (string, []interface{}) {
+	var b strings.Builder
+	b.WriteString("SELECT COUNT(*) FROM records FORCE INDEX (idx_records_table_deleted_created) ")
+	b.WriteString("WHERE table_id = ? AND deleted_at IS NULL")
+
+	args := make([]interface{}, 0, 1+len(clauses)*2)
+	args = append(args, tableID)
+	for _, clause := range clauses {
+		b.WriteString(" AND ")
+		b.WriteString(clause.sql)
+		args = append(args, clause.args...)
+	}
+
+	return b.String(), args
+}
+
+func (s *RecordService) findRecordPage(req QueryRequest, clauses []recordFilterClause) ([]models.Record, error) {
+	var records []models.Record
+	if s.db.Name() == "mysql" {
+		sql, args := buildMySQLRecordListSQL(req, clauses)
+		if err := s.db.Raw(sql, args...).Scan(&records).Error; err != nil {
+			return nil, err
+		}
+		return records, nil
+	}
+
+	query := s.db.Where("table_id = ? AND deleted_at IS NULL", req.TableID)
+	for _, clause := range clauses {
+		query = query.Where(clause.sql, clause.args...)
+	}
+	if err := query.Order("created_at DESC").Limit(req.Limit).Offset(req.Offset).Find(&records).Error; err != nil {
+		return nil, err
+	}
+	return records, nil
+}
+
+func (s *RecordService) countRecords(tableID string, clauses []recordFilterClause) (int64, error) {
+	var total int64
+	if s.db.Name() == "mysql" {
+		sql, args := buildMySQLRecordCountSQL(tableID, clauses)
+		if err := s.db.Raw(sql, args...).Scan(&total).Error; err != nil {
+			return 0, err
+		}
+		return total, nil
+	}
+
+	query := s.db.Model(&models.Record{}).Where("table_id = ? AND deleted_at IS NULL", tableID)
+	for _, clause := range clauses {
+		query = query.Where(clause.sql, clause.args...)
+	}
+	if err := query.Count(&total).Error; err != nil {
+		return 0, err
+	}
+	return total, nil
+}
+
 // tryParseStructuredFilter 把 filter 字符串当作 JSON 对象解析。
 // 仅当返回 true 时调用方应走结构化下推路径;否则按关键字处理。
 func tryParseStructuredFilter(filter string) (map[string]interface{}, bool) {
@@ -761,13 +835,12 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 	switch filter {
 	case "":
 		// 3a. 无过滤: SQL 分页 + COUNT
-		listQ := s.db.Where("table_id = ? AND deleted_at IS NULL", req.TableID).
-			Order("created_at DESC").Limit(req.Limit).Offset(req.Offset)
-		if err := listQ.Find(&records).Error; err != nil {
+		records, err = s.findRecordPage(req, nil)
+		if err != nil {
 			return nil, fmt.Errorf("查询记录失败: %w", err)
 		}
-		countQ := s.db.Model(&models.Record{}).Where("table_id = ? AND deleted_at IS NULL", req.TableID)
-		if err := countQ.Count(&total).Error; err != nil {
+		total, err = s.countRecords(req.TableID, nil)
+		if err != nil {
 			return nil, fmt.Errorf("统计记录失败: %w", err)
 		}
 
@@ -785,16 +858,12 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 				return &QueryResponse{Records: []RecordResponse{}, Total: 0, HasMore: false}, nil
 			}
 
-			listQ := s.db.Where("table_id = ? AND deleted_at IS NULL", req.TableID)
-			countQ := s.db.Model(&models.Record{}).Where("table_id = ? AND deleted_at IS NULL", req.TableID)
-			for _, c := range clauses {
-				listQ = listQ.Where(c.sql, c.args...)
-				countQ = countQ.Where(c.sql, c.args...)
-			}
-			if err := listQ.Order("created_at DESC").Limit(req.Limit).Offset(req.Offset).Find(&records).Error; err != nil {
+			records, err = s.findRecordPage(req, clauses)
+			if err != nil {
 				return nil, fmt.Errorf("查询记录失败: %w", err)
 			}
-			if err := countQ.Count(&total).Error; err != nil {
+			total, err = s.countRecords(req.TableID, clauses)
+			if err != nil {
 				return nil, fmt.Errorf("统计记录失败: %w", err)
 			}
 		} else {

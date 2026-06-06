@@ -507,3 +507,37 @@ func TestBuildStructuredFilterClauses_MalformedJSON(t *testing.T) {
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "过滤值序列化失败")
 }
+
+func TestBuildMySQLRecordListSQL_NoFilter(t *testing.T) {
+	sql, args := buildMySQLRecordListSQL(QueryRequest{
+		TableID: "tbl_1",
+		Limit:   50,
+		Offset:  10,
+	}, nil)
+
+	assert.Equal(t, "SELECT id, table_id, data, version, created_at, updated_at FROM records FORCE INDEX (idx_records_table_deleted_created) WHERE table_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT ? OFFSET ?", sql)
+	assert.Equal(t, []interface{}{"tbl_1", 50, 10}, args)
+}
+
+func TestBuildMySQLRecordListSQL_WithStructuredClauses(t *testing.T) {
+	sql, args := buildMySQLRecordListSQL(QueryRequest{
+		TableID: "tbl_1",
+		Limit:   20,
+		Offset:  0,
+	}, []recordFilterClause{
+		{sql: "JSON_EXTRACT(data, ?) = ?", args: []interface{}{"$.status", "paid"}},
+		{sql: "JSON_EXTRACT(data, ?) = ?", args: []interface{}{"$.category", "beta"}},
+	})
+
+	assert.Equal(t, "SELECT id, table_id, data, version, created_at, updated_at FROM records FORCE INDEX (idx_records_table_deleted_created) WHERE table_id = ? AND deleted_at IS NULL AND JSON_EXTRACT(data, ?) = ? AND JSON_EXTRACT(data, ?) = ? ORDER BY created_at DESC LIMIT ? OFFSET ?", sql)
+	assert.Equal(t, []interface{}{"tbl_1", "$.status", "paid", "$.category", "beta", 20, 0}, args)
+}
+
+func TestBuildMySQLRecordCountSQL_WithStructuredClauses(t *testing.T) {
+	sql, args := buildMySQLRecordCountSQL("tbl_1", []recordFilterClause{
+		{sql: "JSON_EXTRACT(data, ?) = ?", args: []interface{}{"$.status", "paid"}},
+	})
+
+	assert.Equal(t, "SELECT COUNT(*) FROM records FORCE INDEX (idx_records_table_deleted_created) WHERE table_id = ? AND deleted_at IS NULL AND JSON_EXTRACT(data, ?) = ?", sql)
+	assert.Equal(t, []interface{}{"tbl_1", "$.status", "paid"}, args)
+}
