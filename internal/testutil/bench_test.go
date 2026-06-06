@@ -57,3 +57,31 @@ func TestSetupBenchmarkFixtureSeedsSQLite(t *testing.T) {
 	require.NoError(t, fixture.DB.Model(&models.Record{}).Count(&recordCount).Error)
 	require.EqualValues(t, 12, recordCount)
 }
+
+func TestSetupBenchmarkFixtureSeedsNoiseTables(t *testing.T) {
+	t.Setenv("DB_TYPE", "")
+	t.Setenv("DATABASE_URL", "")
+
+	fixture := SetupBenchmarkFixture(t, BenchmarkSeedConfig{
+		RecordCount:          12,
+		ExtraFieldCount:      2,
+		NoiseTableCount:      3,
+		NoiseRecordsPerTable: 5,
+	})
+
+	require.Len(t, fixture.NoiseTables, 3)
+
+	var tableCount int64
+	require.NoError(t, fixture.DB.Model(&models.Table{}).Count(&tableCount).Error)
+	require.EqualValues(t, 4, tableCount)
+
+	var recordCount int64
+	require.NoError(t, fixture.DB.Model(&models.Record{}).Count(&recordCount).Error)
+	require.EqualValues(t, 27, recordCount)
+
+	for _, noiseTable := range fixture.NoiseTables {
+		var noiseFieldCount int64
+		require.NoError(t, fixture.DB.Model(&models.Field{}).Where("table_id = ?", noiseTable.ID).Count(&noiseFieldCount).Error)
+		require.EqualValues(t, len(fixture.Fields), noiseFieldCount)
+	}
+}

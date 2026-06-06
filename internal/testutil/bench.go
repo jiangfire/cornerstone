@@ -19,8 +19,10 @@ import (
 )
 
 type BenchmarkSeedConfig struct {
-	RecordCount     int
-	ExtraFieldCount int
+	RecordCount          int
+	ExtraFieldCount      int
+	NoiseTableCount      int
+	NoiseRecordsPerTable int
 }
 
 type BenchmarkFixture struct {
@@ -29,6 +31,7 @@ type BenchmarkFixture struct {
 	DBPath      string
 	Database    *models.Database
 	Table       *models.Table
+	NoiseTables []*models.Table
 	Fields      []models.Field
 	MasterToken *models.Token
 	ScopedToken *models.Token
@@ -64,6 +67,12 @@ func SetupBenchmarkFixture(tb testing.TB, cfg BenchmarkSeedConfig) *BenchmarkFix
 
 	if cfg.RecordCount <= 0 {
 		cfg.RecordCount = 2000
+	}
+	if cfg.NoiseRecordsPerTable < 0 {
+		cfg.NoiseRecordsPerTable = 0
+	}
+	if cfg.NoiseTableCount < 0 {
+		cfg.NoiseTableCount = 0
 	}
 
 	dbCfg, err := resolveBenchmarkDatabaseConfig(tb)
@@ -145,6 +154,20 @@ func (f *BenchmarkFixture) seed(tb testing.TB, cfg BenchmarkSeedConfig) {
 
 	require.NoError(tb, f.DB.Create(&fields).Error)
 
+	noiseTables := make([]*models.Table, 0, cfg.NoiseTableCount)
+	for i := 0; i < cfg.NoiseTableCount; i++ {
+		noiseTable := &models.Table{
+			DatabaseID:  database.ID,
+			Name:        fmt.Sprintf("bench_records_noise_%02d", i),
+			Description: "benchmark noise records",
+		}
+		require.NoError(tb, f.DB.Create(noiseTable).Error)
+
+		noiseFields := cloneBenchmarkFieldsForTable(fields, noiseTable.ID)
+		require.NoError(tb, f.DB.Create(&noiseFields).Error)
+		noiseTables = append(noiseTables, noiseTable)
+	}
+
 	scopeJSON := fmt.Sprintf(
 		`{"databases":{%q:"viewer"},"tables":{%q:{"role":"viewer"}}}`,
 		database.ID,
@@ -188,13 +211,62 @@ func (f *BenchmarkFixture) seed(tb testing.TB, cfg BenchmarkSeedConfig) {
 	}
 
 	require.NoError(tb, f.DB.CreateInBatches(&records, 500).Error)
+
+	if cfg.NoiseTableCount > 0 && cfg.NoiseRecordsPerTable > 0 {
+		noiseRecords := make([]models.Record, 0, cfg.NoiseTableCount*cfg.NoiseRecordsPerTable)
+		for tableIdx, noiseTable := range noiseTables {
+			for i := 0; i < cfg.NoiseRecordsPerTable; i++ {
+				globalIndex := tableIdx*cfg.NoiseRecordsPerTable + i
+				payload := map[string]any{
+					"name":     fmt.Sprintf("noise-user-%02d-%06d", tableIdx, i),
+					"status":   statuses[globalIndex%len(statuses)],
+					"category": categories[globalIndex%len(categories)],
+					"score":    globalIndex % 1000,
+					"payload": map[string]any{
+						"index": globalIndex,
+						"flags": []string{"x", "y", "z"},
+					},
+				}
+				for extra := 0; extra < cfg.ExtraFieldCount; extra++ {
+					payload[fmt.Sprintf("extra_%02d", extra)] = fmt.Sprintf("noise-value-%d-%d", extra, globalIndex%23)
+				}
+
+				dataJSON, err := json.Marshal(payload)
+				require.NoError(tb, err)
+
+				noiseRecords = append(noiseRecords, models.Record{
+					TableID: noiseTable.ID,
+					Data:    models.JSONField(dataJSON),
+					Version: 1,
+				})
+			}
+		}
+
+		require.NoError(tb, f.DB.CreateInBatches(&noiseRecords, 500).Error)
+	}
 	cache.ClearAll()
 
 	f.Database = database
 	f.Table = table
+	f.NoiseTables = noiseTables
 	f.Fields = fields
 	f.MasterToken = master
 	f.ScopedToken = scoped
+}
+
+func cloneBenchmarkFieldsForTable(fields []models.Field, tableID string) []models.Field {
+	cloned := make([]models.Field, 0, len(fields))
+	for _, field := range fields {
+		cloned = append(cloned, models.Field{
+			TableID:     tableID,
+			Name:        field.Name,
+			Type:        field.Type,
+			Description: field.Description,
+			Required:    field.Required,
+			Options:     field.Options,
+		})
+	}
+	return cloned
 }
 
 func sanitizeBenchmarkIdentifier(value string) string {

@@ -9,6 +9,25 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/jiangfire/cornerstone/internal/testutil"
+	"gorm.io/gorm"
+)
+
+const (
+	mysqlForceCompositeIndexQuery = `SELECT id, table_id, created_at
+FROM records FORCE INDEX (idx_records_table_deleted_created)
+WHERE table_id = ? AND deleted_at IS NULL
+ORDER BY created_at DESC
+LIMIT 50`
+	mysqlGeneratedColumnSetup = `ALTER TABLE records
+ADD COLUMN bench_status VARCHAR(32) GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(data, '$.status'))) STORED,
+ADD COLUMN bench_category VARCHAR(32) GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(data, '$.category'))) STORED`
+	mysqlGeneratedColumnIndex = `CREATE INDEX idx_records_bench_status_category_created
+ON records(table_id, deleted_at, bench_status, bench_category, created_at DESC)`
+	mysqlGeneratedColumnQuery = `SELECT id, table_id, created_at
+FROM records FORCE INDEX (idx_records_bench_status_category_created)
+WHERE table_id = ? AND deleted_at IS NULL AND bench_status = ? AND bench_category = ?
+ORDER BY created_at DESC
+LIMIT 50`
 )
 
 type benchmarkNarrowRecordRow struct {
@@ -141,6 +160,26 @@ func BenchmarkRecordServiceListRecords(b *testing.B) {
 			return query.Order("created_at DESC").Limit(50).Scan(dest).Error
 		})
 	})
+
+	if fixture.DB.Name() == "mysql" {
+		b.Run("mysql_no_filter_db_narrow_projection_force_composite_index", func(b *testing.B) {
+			benchmarkRawQueryRows[benchmarkNarrowRecordRow](b, fixture.DB, mysqlForceCompositeIndexQuery, fixture.Table.ID)
+		})
+
+		b.Run("mysql_structured_filter_generated_columns", func(b *testing.B) {
+			if err := prepareMySQLGeneratedColumnExperiment(fixture.DB); err != nil {
+				b.Fatal(err)
+			}
+			benchmarkRawQueryRows[benchmarkNarrowRecordRow](
+				b,
+				fixture.DB,
+				mysqlGeneratedColumnQuery,
+				fixture.Table.ID,
+				"paid",
+				"beta",
+			)
+		})
+	}
 }
 
 func benchmarkQueryRows[T any](b *testing.B, run func(dest *[]T) error) {
@@ -150,6 +189,21 @@ func benchmarkQueryRows[T any](b *testing.B, run func(dest *[]T) error) {
 	for i := 0; i < b.N; i++ {
 		var rows []T
 		if err := run(&rows); err != nil {
+			b.Fatal(err)
+		}
+		if len(rows) == 0 {
+			b.Fatal("expected rows")
+		}
+	}
+}
+
+func benchmarkRawQueryRows[T any](b *testing.B, db *gorm.DB, query string, args ...interface{}) {
+	b.Helper()
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		var rows []T
+		if err := db.Raw(query, args...).Scan(&rows).Error; err != nil {
 			b.Fatal(err)
 		}
 		if len(rows) == 0 {
@@ -235,22 +289,7 @@ func TestExplainPlanListRecords(t *testing.T) {
 		ExtraFieldCount: 12,
 	})
 
-	statement := explainListRecordsStatement(fixture.DB.Name())
-	rows, err := fixture.DB.Raw(statement, fixture.Table.ID).Rows()
-	if err != nil {
-		t.Fatalf("explain failed: %v", err)
-	}
-	defer rows.Close()
-
-	details, err := collectExplainRows(rows)
-	if err != nil {
-		t.Fatalf("collect explain rows failed: %v", err)
-	}
-	if len(details) == 0 {
-		t.Fatal("expected explain plan rows")
-	}
-
-	planText := strings.Join(details, " | ")
+	planText := explainListRecords(t, fixture.DB, fixture.Table.ID)
 	t.Logf("list records plan: %s", planText)
 
 	switch fixture.DB.Name() {
@@ -268,6 +307,94 @@ func TestExplainPlanListRecords(t *testing.T) {
 	}
 }
 
+func TestExplainPlanListRecordsWithNoiseTables(t *testing.T) {
+	fixture := testutil.SetupBenchmarkFixture(t, testutil.BenchmarkSeedConfig{
+		RecordCount:          5000,
+		ExtraFieldCount:      12,
+		NoiseTableCount:      4,
+		NoiseRecordsPerTable: 2500,
+	})
+
+	planText := explainListRecords(t, fixture.DB, fixture.Table.ID)
+	t.Logf("list records plan with noise tables: %s", planText)
+
+	switch fixture.DB.Name() {
+	case "sqlite":
+		if !strings.Contains(planText, "idx_records_table_deleted_created") {
+			t.Fatalf("expected idx_records_table_deleted_created in plan, got: %s", planText)
+		}
+	case "mysql", "postgres":
+		if !strings.Contains(strings.ToLower(planText), "records") {
+			t.Fatalf("expected plan to mention records table, got: %s", planText)
+		}
+	}
+}
+
+func TestExplainPlanListRecordsMySQLExperiments(t *testing.T) {
+	fixture := testutil.SetupBenchmarkFixture(t, testutil.BenchmarkSeedConfig{
+		RecordCount:     5000,
+		ExtraFieldCount: 12,
+	})
+	if fixture.DB.Name() != "mysql" {
+		t.Skip("mysql-only diagnostics")
+	}
+
+	plainPlan := explainListRecords(t, fixture.DB, fixture.Table.ID)
+	t.Logf("mysql plain list records plan: %s", plainPlan)
+
+	forcedPlan := explainStatement(t, fixture.DB, mysqlForceCompositeIndexQuery, fixture.Table.ID)
+	t.Logf("mysql forced composite plan: %s", forcedPlan)
+
+	if err := prepareMySQLGeneratedColumnExperiment(fixture.DB); err != nil {
+		t.Fatalf("prepare generated column experiment failed: %v", err)
+	}
+	generatedPlan := explainStatement(
+		t,
+		fixture.DB,
+		mysqlGeneratedColumnQuery,
+		fixture.Table.ID,
+		"paid",
+		"beta",
+	)
+	t.Logf("mysql generated column plan: %s", generatedPlan)
+}
+
+func prepareMySQLGeneratedColumnExperiment(db *gorm.DB) error {
+	if db.Name() != "mysql" {
+		return nil
+	}
+
+	var count int64
+	if err := db.Raw(`
+SELECT COUNT(*)
+FROM information_schema.COLUMNS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'records' AND COLUMN_NAME = 'bench_status'
+`).Scan(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
+		if err := db.Exec(mysqlGeneratedColumnSetup).Error; err != nil {
+			return err
+		}
+	}
+
+	count = 0
+	if err := db.Raw(`
+SELECT COUNT(*)
+FROM information_schema.STATISTICS
+WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'records' AND INDEX_NAME = 'idx_records_bench_status_category_created'
+`).Scan(&count).Error; err != nil {
+		return err
+	}
+	if count == 0 {
+		if err := db.Exec(mysqlGeneratedColumnIndex).Error; err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func explainListRecordsStatement(dbType string) string {
 	baseQuery := `SELECT id, table_id, data, version, created_at, updated_at
 FROM records
@@ -283,6 +410,31 @@ LIMIT 50 OFFSET 0`
 	default:
 		return "EXPLAIN " + baseQuery
 	}
+}
+
+func explainListRecords(t *testing.T, db *gorm.DB, tableID string) string {
+	t.Helper()
+	return explainStatement(t, db, explainListRecordsStatement(db.Name()), tableID)
+}
+
+func explainStatement(t *testing.T, db *gorm.DB, statement string, args ...interface{}) string {
+	t.Helper()
+
+	rows, err := db.Raw(statement, args...).Rows()
+	if err != nil {
+		t.Fatalf("explain failed: %v", err)
+	}
+	defer rows.Close()
+
+	details, err := collectExplainRows(rows)
+	if err != nil {
+		t.Fatalf("collect explain rows failed: %v", err)
+	}
+	if len(details) == 0 {
+		t.Fatal("expected explain plan rows")
+	}
+
+	return strings.Join(details, " | ")
 }
 
 func collectExplainRows(rows *sql.Rows) ([]string, error) {
