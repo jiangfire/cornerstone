@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
-	stdjson "encoding/json"
 	"fmt"
 	"strings"
 
@@ -236,7 +235,7 @@ func decodeScannedBytes(b []byte) interface{} {
 	}
 
 	var jsonVal interface{}
-	if err := stdjson.Unmarshal(b, &jsonVal); err == nil {
+	if err := json.Unmarshal(b, &jsonVal); err == nil {
 		return jsonVal
 	}
 	return string(b)

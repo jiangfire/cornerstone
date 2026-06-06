@@ -111,14 +111,6 @@ func (v *Validator) validateRequestWithScope(ctx context.Context, req *QueryRequ
 	return nil
 }
 
-func (v *Validator) validateWhereFields(ctx context.Context, userID string, table string, joins []JoinClause, where *WhereClause) error {
-	scope, err := v.newAccessScope(userID)
-	if err != nil {
-		return err
-	}
-	return v.validateWhereFieldsWithScope(ctx, table, joins, where, scope)
-}
-
 func (v *Validator) validateWhereFieldsWithScope(ctx context.Context, table string, joins []JoinClause, where *WhereClause, scope *validatorAccessScope) error {
 	for _, cond := range where.And {
 		if err := v.validateConditionFieldsWithScope(ctx, table, joins, cond, scope); err != nil {
@@ -131,14 +123,6 @@ func (v *Validator) validateWhereFieldsWithScope(ctx context.Context, table stri
 		}
 	}
 	return nil
-}
-
-func (v *Validator) validateConditionFields(ctx context.Context, userID string, table string, joins []JoinClause, cond Condition) error {
-	scope, err := v.newAccessScope(userID)
-	if err != nil {
-		return err
-	}
-	return v.validateConditionFieldsWithScope(ctx, table, joins, cond, scope)
 }
 
 func (v *Validator) validateConditionFieldsWithScope(ctx context.Context, table string, joins []JoinClause, cond Condition, scope *validatorAccessScope) error {
@@ -369,30 +353,6 @@ func (v *Validator) autoFilterByPermissionWithScope(req *QueryRequest, scope *va
 	}
 
 	return nil
-}
-
-func (v *Validator) getAccessibleDatabaseIDs(userID string) ([]string, error) {
-	scope, err := v.newAccessScope(userID)
-	if err != nil {
-		return nil, err
-	}
-	return scope.accessibleDatabaseIDs()
-}
-
-func (v *Validator) getAccessibleTableIDs(userID string) ([]string, error) {
-	scope, err := v.newAccessScope(userID)
-	if err != nil {
-		return nil, err
-	}
-	return scope.accessibleTableIDs()
-}
-
-func (v *Validator) getAccessibleRecordIDs(userID string) ([]string, error) {
-	scope, err := v.newAccessScope(userID)
-	if err != nil {
-		return nil, err
-	}
-	return scope.accessibleRecordIDs()
 }
 
 func (v *Validator) newAccessScope(userID string) (*validatorAccessScope, error) {

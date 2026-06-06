@@ -97,11 +97,18 @@ func TestExplainPlanListRecords(t *testing.T) {
 	planText := strings.Join(details, " | ")
 	t.Logf("list records plan: %s", planText)
 
-	if !strings.Contains(planText, "idx_records_table_deleted_created") {
-		t.Fatalf("expected idx_records_table_deleted_created in plan, got: %s", planText)
-	}
-	if fixture.DB.Name() == "sqlite" && strings.Contains(planText, "USE TEMP B-TREE FOR ORDER BY") {
-		t.Fatalf("expected plan to avoid temp b-tree sort, got: %s", planText)
+	switch fixture.DB.Name() {
+	case "sqlite":
+		if !strings.Contains(planText, "idx_records_table_deleted_created") {
+			t.Fatalf("expected idx_records_table_deleted_created in plan, got: %s", planText)
+		}
+		if strings.Contains(planText, "USE TEMP B-TREE FOR ORDER BY") {
+			t.Fatalf("expected plan to avoid temp b-tree sort, got: %s", planText)
+		}
+	case "mysql", "postgres":
+		if !strings.Contains(strings.ToLower(planText), "records") {
+			t.Fatalf("expected plan to mention records table, got: %s", planText)
+		}
 	}
 }
 

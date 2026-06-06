@@ -1,10 +1,12 @@
 package middleware
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jiangfire/cornerstone/internal/config"
 	internaldb "github.com/jiangfire/cornerstone/internal/db"
@@ -41,9 +43,10 @@ func setupAuthBenchmarkToken(tb testing.TB) *models.Token {
 
 	database := pkgdb.DB()
 	cache.ClearAll()
+	tokenValue := fmt.Sprintf("bench_auth_%s_%d", sanitizeBenchmarkTokenPart(tb.Name()), time.Now().UnixNano())
 	token := &models.Token{
 		Name:     "bench-token",
-		Token:    "cs_auth_bench",
+		Token:    tokenValue,
 		IsMaster: false,
 		Scopes:   "{}",
 	}
@@ -83,4 +86,22 @@ func resolveAuthBenchmarkConfig(tb testing.TB) (config.DatabaseConfig, error) {
 		return config.DatabaseConfig{}, err
 	}
 	return cfg, nil
+}
+
+func sanitizeBenchmarkTokenPart(value string) string {
+	var b strings.Builder
+	b.Grow(len(value))
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r)
+		case r >= 'A' && r <= 'Z':
+			b.WriteRune(r + ('a' - 'A'))
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('_')
+		}
+	}
+	return b.String()
 }

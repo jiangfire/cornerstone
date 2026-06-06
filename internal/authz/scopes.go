@@ -18,6 +18,12 @@ type jsonToken struct {
 	Scopes ScopeConfig  `json:"scopes"`
 }
 
+type Authorizer struct {
+	db     *gorm.DB
+	token  models.Token
+	scopes ScopeConfig
+}
+
 func (a Authorizer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonToken{Token: a.token, Scopes: a.scopes})
 }
@@ -60,12 +66,6 @@ type TableScope struct {
 type ScopeConfig struct {
 	Databases map[string]string     `json:"databases"`
 	Tables    map[string]TableScope `json:"tables"`
-}
-
-type Authorizer struct {
-	db     *gorm.DB
-	token  models.Token
-	scopes ScopeConfig
 }
 
 func NewAuthorizer(db *gorm.DB, tokenID string) (*Authorizer, error) {

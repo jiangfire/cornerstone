@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jiangfire/cornerstone/internal/config"
 	internaldb "github.com/jiangfire/cornerstone/internal/db"
@@ -104,9 +105,10 @@ func SetupSQLiteBenchmarkFixture(tb testing.TB, cfg BenchmarkSeedConfig) *Benchm
 func (f *BenchmarkFixture) seed(tb testing.TB, cfg BenchmarkSeedConfig) {
 	tb.Helper()
 
+	tokenSuffix := fmt.Sprintf("%s_%d", sanitizeBenchmarkIdentifier(tb.Name()), time.Now().UnixNano())
 	master := &models.Token{
 		Name:     "bench-master",
-		Token:    "cs_bench_master",
+		Token:    "bench_master_" + tokenSuffix,
 		IsMaster: true,
 		Scopes:   "{}",
 	}
@@ -144,13 +146,13 @@ func (f *BenchmarkFixture) seed(tb testing.TB, cfg BenchmarkSeedConfig) {
 	require.NoError(tb, f.DB.Create(&fields).Error)
 
 	scopeJSON := fmt.Sprintf(
-		`{"databases":{"%s":"viewer"},"tables":{"%s":{"role":"viewer"}}}`,
+		`{"databases":{%q:"viewer"},"tables":{%q:{"role":"viewer"}}}`,
 		database.ID,
 		table.ID,
 	)
 	scoped := &models.Token{
 		Name:     "bench-scoped",
-		Token:    "cs_bench_scoped",
+		Token:    "bench_scoped_" + tokenSuffix,
 		IsMaster: false,
 		Scopes:   scopeJSON,
 	}
@@ -193,4 +195,22 @@ func (f *BenchmarkFixture) seed(tb testing.TB, cfg BenchmarkSeedConfig) {
 	f.Fields = fields
 	f.MasterToken = master
 	f.ScopedToken = scoped
+}
+
+func sanitizeBenchmarkIdentifier(value string) string {
+	var b strings.Builder
+	b.Grow(len(value))
+	for _, r := range value {
+		switch {
+		case r >= 'a' && r <= 'z':
+			b.WriteRune(r)
+		case r >= 'A' && r <= 'Z':
+			b.WriteRune(r + ('a' - 'A'))
+		case r >= '0' && r <= '9':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('_')
+		}
+	}
+	return b.String()
 }

@@ -801,7 +801,7 @@ func TestScanRows_DecodesJSONAndPlainBytes(t *testing.T) {
 	db := setupQueryTestDB(t)
 	executor := NewExecutor(db)
 
-	rows, err := db.Raw(`SELECT CAST('{"status":"paid"}' AS BLOB) AS payload, CAST('plain-text' AS BLOB) AS label`).Rows()
+	rows, err := db.Raw(scanRowsFixtureQuery(db.Name())).Rows()
 	require.NoError(t, err)
 	defer rows.Close()
 
@@ -813,6 +813,17 @@ func TestScanRows_DecodesJSONAndPlainBytes(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, "paid", payload["status"])
 	assert.Equal(t, "plain-text", result[0]["label"])
+}
+
+func scanRowsFixtureQuery(dbType string) string {
+	switch dbType {
+	case "mysql":
+		return `SELECT CAST('{"status":"paid"}' AS BINARY) AS payload, CAST('plain-text' AS BINARY) AS label`
+	case "postgres":
+		return `SELECT convert_to('{"status":"paid"}', 'UTF8') AS payload, convert_to('plain-text', 'UTF8') AS label`
+	default:
+		return `SELECT CAST('{"status":"paid"}' AS BLOB) AS payload, CAST('plain-text' AS BLOB) AS label`
+	}
 }
 
 func TestDecodeScannedBytes_Heuristics(t *testing.T) {
