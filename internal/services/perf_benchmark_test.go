@@ -13,9 +13,21 @@ import (
 )
 
 const (
+	mysqlPlainNarrowProjectionQuery = `SELECT id, table_id, created_at
+FROM records
+WHERE table_id = ? AND deleted_at IS NULL
+ORDER BY created_at DESC
+LIMIT 50`
 	mysqlForceCompositeIndexQuery = `SELECT id, table_id, created_at
 FROM records FORCE INDEX (idx_records_table_deleted_created)
 WHERE table_id = ? AND deleted_at IS NULL
+ORDER BY created_at DESC
+LIMIT 50`
+	mysqlStructuredFilterRawQuery = `SELECT id, table_id, created_at
+FROM records
+WHERE table_id = ? AND deleted_at IS NULL
+  AND JSON_EXTRACT(data, ?) = ?
+  AND JSON_EXTRACT(data, ?) = ?
 ORDER BY created_at DESC
 LIMIT 50`
 	mysqlGeneratedColumnSetup = `ALTER TABLE records
@@ -162,8 +174,25 @@ func BenchmarkRecordServiceListRecords(b *testing.B) {
 	})
 
 	if fixture.DB.Name() == "mysql" {
+		b.Run("mysql_no_filter_db_narrow_projection_raw_sql", func(b *testing.B) {
+			benchmarkRawQueryRows[benchmarkNarrowRecordRow](b, fixture.DB, mysqlPlainNarrowProjectionQuery, fixture.Table.ID)
+		})
+
 		b.Run("mysql_no_filter_db_narrow_projection_force_composite_index", func(b *testing.B) {
 			benchmarkRawQueryRows[benchmarkNarrowRecordRow](b, fixture.DB, mysqlForceCompositeIndexQuery, fixture.Table.ID)
+		})
+
+		b.Run("mysql_structured_filter_raw_sql", func(b *testing.B) {
+			benchmarkRawQueryRows[benchmarkNarrowRecordRow](
+				b,
+				fixture.DB,
+				mysqlStructuredFilterRawQuery,
+				fixture.Table.ID,
+				"$.status",
+				"paid",
+				"$.category",
+				"beta",
+			)
 		})
 
 		b.Run("mysql_structured_filter_generated_columns", func(b *testing.B) {
@@ -342,8 +371,20 @@ func TestExplainPlanListRecordsMySQLExperiments(t *testing.T) {
 	plainPlan := explainListRecords(t, fixture.DB, fixture.Table.ID)
 	t.Logf("mysql plain list records plan: %s", plainPlan)
 
-	forcedPlan := explainStatement(t, fixture.DB, mysqlForceCompositeIndexQuery, fixture.Table.ID)
+	forcedPlan := explainStatement(t, fixture.DB, "EXPLAIN ANALYZE "+mysqlForceCompositeIndexQuery, fixture.Table.ID)
 	t.Logf("mysql forced composite plan: %s", forcedPlan)
+
+	structuredRawPlan := explainStatement(
+		t,
+		fixture.DB,
+		"EXPLAIN ANALYZE "+mysqlStructuredFilterRawQuery,
+		fixture.Table.ID,
+		"$.status",
+		"paid",
+		"$.category",
+		"beta",
+	)
+	t.Logf("mysql raw structured filter plan: %s", structuredRawPlan)
 
 	if err := prepareMySQLGeneratedColumnExperiment(fixture.DB); err != nil {
 		t.Fatalf("prepare generated column experiment failed: %v", err)
@@ -351,7 +392,7 @@ func TestExplainPlanListRecordsMySQLExperiments(t *testing.T) {
 	generatedPlan := explainStatement(
 		t,
 		fixture.DB,
-		mysqlGeneratedColumnQuery,
+		"EXPLAIN ANALYZE "+mysqlGeneratedColumnQuery,
 		fixture.Table.ID,
 		"paid",
 		"beta",
