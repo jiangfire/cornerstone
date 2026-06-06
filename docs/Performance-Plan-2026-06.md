@@ -576,6 +576,47 @@ go test ./pkg/query -run ^$ -bench BenchmarkExecutorExecute -benchmem -count 1
 
 这两个修复属于 **测试可靠性与缓存正确性修复**，不改变 `ListRecords` 的外部接口和权限语义。
 
+### P1 最新验证 run（GitHub Actions `27058829623` / `27058829624`）
+
+运行地址：
+
+- Performance: `https://github.com/jiangfire/cornerstone/actions/runs/27058829623`
+- CI: `https://github.com/jiangfire/cornerstone/actions/runs/27058829624`
+
+#### 验证状态
+
+| Workflow | 状态 | 说明 |
+|---|---|---|
+| `Performance` | 成功 | SQLite / MySQL 8.0 / PostgreSQL 16 三个 perf job 全部完成，并上传 `auth.txt`、`services.txt`、`query.txt`、`explain.txt` |
+| `CI` | 成功 | SQLite、MySQL、PostgreSQL、Redis、lint、build、vuln、migration integration 全部通过 |
+
+#### 最新 Performance 摘要
+
+| 场景 | SQLite | MySQL 8.0 | PostgreSQL 16 | 观察 |
+|---|---:|---:|---:|---|
+| `ValidateToken` | `0.183 us` | `0.191 us` | `0.187 us` | 认证缓存路径稳定，`1 alloc/op` |
+| `RecordServiceListRecords/no_filter` | `2.412 ms` | `6.560 ms` | `4.572 ms` | MySQL 仍明显好于早期 `~21 ms`，但单次 run 波动高于 `27058102993` 的 `3.428 ms` |
+| `RecordServiceListRecords/structured_filter` | `16.072 ms` | `17.464 ms` | `4.259 ms` | MySQL JSON 过滤仍没有接近 PostgreSQL，结构性瓶颈未消除 |
+| `ExecutorExecute/records_by_table` | `2.742 ms` | `6.314 ms` | `2.998 ms` | Query DSL 普通列表下 MySQL 仍偏慢 |
+| `ExecutorExecute/records_json_filter` | `22.853 ms` | `21.378 ms` | `3.319 ms` | JSON 过滤差距稳定存在，PostgreSQL 明显领先 |
+| `mysql_no_filter_db_narrow_projection_force_composite_index` | 不适用 | `0.501 ms` | 不适用 | 强制复合索引实验仍稳定快 |
+| `mysql_structured_filter_generated_columns` | 不适用 | `0.522 ms` | 不适用 | generated column 实验仍稳定快 |
+
+#### 最新 Explain 摘要
+
+| 数据库 | 计划摘要 | 结论 |
+|---|---|---|
+| SQLite | `SEARCH records USING INDEX idx_records_table_deleted_created` | 主路径索引命中正常 |
+| MySQL | `Index range scan on records using idx_records_table_deleted_created`；forced 实验为 `Covering index lookup` | 生产主路径已命中复合索引，但 forced / covering 形态仍更快 |
+| PostgreSQL | `Index Scan using idx_records_table_deleted_created` + `top-N heapsort` | 计划稳定，JSON 过滤仍受益于 PostgreSQL `jsonb` 路径 |
+
+#### 结论修正
+
+- **MySQL 普通列表已经从早期最差的 `~21 ms` 区间改善到 `~3.4-6.6 ms` 区间**，说明 `FORCE INDEX` 生产改造有效。
+- **MySQL 结构化 JSON 过滤仍不稳定且明显慢于 PostgreSQL**，最新 run 为 `17.464 ms`，不能用上一轮 `9.688 ms` 作为稳定承诺。
+- **MySQL generated column 实验仍是最强证据**：`~0.52 ms` 级别的稳定结果说明如果业务允许拆热点 JSON 键，性能上限可以大幅提高。
+- 后续文档和 PR summary 应记录 **多个 run 的区间**，不要只记录单次最优值。
+
 ### P3：MySQL/SQLite JSON 结构化优化候选
 
 | 场景 | 建议索引方向 | 说明 |
