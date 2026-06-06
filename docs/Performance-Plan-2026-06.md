@@ -291,7 +291,7 @@ SEARCH records USING INDEX idx_records_table_deleted_created (table_id=? AND del
 | 数据库 | 计划摘要 | 当前判断 |
 |---|---|---|
 | SQLite | `SEARCH records USING INDEX idx_records_table_deleted_created (table_id=? AND deleted_at=?)` | 主路径复合索引已命中，但 `JSON_EXTRACT` 仍然是行级解析成本 |
-| MySQL | `Index range scan on records using idx_records_table_deleted_created` + `Limit 50` | **MySQL 也命中了主路径复合索引**，所以慢因不应简单归咎为“没走索引” |
+| MySQL | 早期基线 `27053743084` 中曾出现 `idx_records_table_deleted_created`；但最新拆解基线 `27057165213` 的 `no_filter` explain 为 `idx_records_deleted_at` + `Filter(table_id)` + `Sort(created_at DESC)` | **MySQL 当前慢因不能只归结为 JSON**，最新基线已经显示基础列表路径存在执行计划选择问题 |
 | PostgreSQL | `Index Scan using idx_records_table_deleted_created on records`，JSON 路径可额外受益于 `idx_records_data_gin` | 普通列表和 JSON 过滤都具备更强索引基础 |
 
 ### 为什么 MySQL 记录列表明显慢于 PostgreSQL
@@ -300,9 +300,10 @@ SEARCH records USING INDEX idx_records_table_deleted_created (table_id=? AND del
 
 | 事实 | 证据 |
 |---|---|
-| 两者都命中了 `idx_records_table_deleted_created(table_id, deleted_at, created_at DESC)` | `EXPLAIN ANALYZE` / `EXPLAIN` 输出已验证 |
-| 差距不只出现在 JSON 过滤场景 | `no_filter` 下 MySQL `21.27 ms`，PostgreSQL `4.46 ms` |
-| JSON 过滤场景差距更大 | `records_json_filter` 下 MySQL `21.58 ms`，PostgreSQL `3.10 ms` |
+| 早期基线里 MySQL 曾命中过 `idx_records_table_deleted_created`，但最新拆解基线里 `no_filter` explain 选择了 `idx_records_deleted_at` | `27053743084` 与 `27057165213` 两次 GitHub Actions 结果对比 |
+| 差距不只出现在 JSON 过滤场景 | `no_filter` 下 MySQL `20.89 ms`，PostgreSQL `4.69 ms` |
+| 窄投影下差距仍然明显 | `no_filter_db_narrow_projection` 下 MySQL `8.30 ms`，PostgreSQL `1.45 ms` |
+| JSON 过滤场景差距更大 | `records_json_filter` 下 MySQL `20.48 ms`，PostgreSQL `3.22 ms` |
 | PostgreSQL 具备 `jsonb` + `GIN`（广义倒排索引，用于加速包含匹配和键值检索）基础设施 | `internal/models/models.go`、`internal/db/migrate.go` |
 | MySQL/SQLite 当前路径是 `JSON_EXTRACT(data, ?) = ?` | `internal/services/record.go` |
 
@@ -310,14 +311,16 @@ SEARCH records USING INDEX idx_records_table_deleted_created (table_id=? AND del
 
 | 原因 | 解释 | 置信度 |
 |---|---|---|
+| MySQL 当前基础列表存在计划选择问题 | 最新 `EXPLAIN ANALYZE` 显示 MySQL 走的是 `idx_records_deleted_at`，再过滤 `table_id` 并排序，而不是预期的复合索引 | 高 |
 | JSON 存储与索引模型差异 | PostgreSQL 使用 `jsonb`（二进制 JSON）且已建 `GIN` 索引；MySQL 当前只有 `json` 原列，没有针对高频 JSON 键的专门索引 | 高 |
-| MySQL 行物化成本更高 | 即使列表主路径先靠复合索引筛出候选行，后续取整行、读取 `data`、再在数据库或应用侧做 JSON 处理，MySQL 当前形态成本更高 | 中 |
-| PostgreSQL 对当前查询形状更友好 | 当前 `WHERE table_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT ?` 加上可选 `data @> ?`，PostgreSQL 的执行器和成本模型在这个形状上表现更稳定 | 中 |
-| 当前 SQL 投影仍偏宽 | `ListRecords` / `Query Executor` 会把 `data` 等宽字段一起拉回，MySQL 对宽行扫描更敏感；这一点需要进一步用“窄投影 vs 全投影” benchmark 证实 | 中 |
+| 宽投影会增加 MySQL 成本，但不是主因 | MySQL `no_filter_db_narrow_projection` `8.30 ms`，`no_filter_db_wide_projection` `10.26 ms`；宽行有放大，但基础扫描已偏慢 | 高 |
+| 当前 JSON 谓词开销主要留在数据库层 | `records_json_filter_id_only` `20.25 ms` 与 `records_json_filter_full_data_projection` `20.90 ms` 几乎同级，说明不是应用侧 `data` 投影导致主耗时 | 高 |
+| PostgreSQL 对当前查询形状更友好 | 当前 `WHERE table_id = ? AND deleted_at IS NULL ORDER BY created_at DESC LIMIT ?` 加上 `data @> ?`，PostgreSQL 的执行器和索引模型明显更契合 | 中 |
 
 #### 不应过早下结论的点
 
-- **目前还不能把 MySQL 慢完全归结为驱动问题**。现有证据首先指向数据库执行与 JSON 行处理成本，而不是 Go MySQL driver 本身。
+- **目前还不能把 MySQL 慢完全归结为驱动问题**。现有证据首先指向 MySQL 执行计划选择和 JSON 行处理成本，而不是 Go MySQL driver 本身。
+- **当前也不能把 MySQL 的问题完全归结为 JSON**。最新基线已显示基础列表路径先走错了索引/排序路线。
 - **也不能仅凭一次 CI 结果就决定全面放弃 MySQL**。但至少在“JSON-heavy（以 JSON 条件为主）读路径”上，MySQL 需要额外结构化优化，否则很难接近 PostgreSQL。
 - **当前 benchmark 是合成数据集**。如果真实线上过滤键更集中，MySQL 通过派生列和复合索引仍可能把差距显著缩小。
 
@@ -336,7 +339,7 @@ SEARCH records USING INDEX idx_records_table_deleted_created (table_id=? AND del
 | 数据库 | 当前实现 | 主要问题 | 更合适的策略 |
 |---|---|---|---|
 | PostgreSQL | `data @> ?` + `jsonb` + `idx_records_data_gin` | 仍需确认所有高频谓词都能稳定命中 `GIN`，少数排序/范围条件未必适合仅靠 `GIN` | 保持 JSONB 主体模型，只为热点键补充定向索引 |
-| MySQL | `JSON_EXTRACT(data, ?) = ?` | 对 JSON 路径做函数求值，通常难以像普通列那样高效利用组合索引 | 把 `status`、`category`、`owner_id`、数值型评分等高频键拆成 generated column，再建 `(table_id, deleted_at, derived_col, created_at DESC)` |
+| MySQL | `JSON_EXTRACT(data, ?) = ?` | 对 JSON 路径做函数求值，且 `JSON` 原列不能直接索引；若不转成 generated column / `JSON_VALUE()` 表达式索引，优化空间有限 | 把 `status`、`category`、`owner_id`、数值型评分等高频键拆成 generated column，或改为 `JSON_VALUE()` 函数索引，再建 `(table_id, deleted_at, derived_col, created_at DESC)` |
 | SQLite | `JSON_EXTRACT(data, ?) = ?`，底层 `data` 为 `TEXT` | JSON1（SQLite JSON 扩展）本质上更偏函数式解析，数据量变大时 CPU 成本很难压住 | 继续作为 correctness/perf smoke baseline；若必须承压，再考虑影子列 |
 
 #### 派生列的使用门槛
@@ -423,6 +426,65 @@ SEARCH records USING INDEX idx_records_table_deleted_created (table_id=? AND del
 go test ./internal/services -run ^$ -bench BenchmarkRecordServiceListRecords -benchmem -count 1
 go test ./pkg/query -run ^$ -bench BenchmarkExecutorExecute -benchmem -count 1
 ```
+
+### P1 跨数据库拆解结果（GitHub Actions `27057165213`）
+
+运行地址：
+
+- `https://github.com/jiangfire/cornerstone/actions/runs/27057165213`
+
+#### `RecordService` 拆解结果
+
+| 场景 | SQLite | MySQL 8.0 | PostgreSQL 16 | 观察 |
+|---|---|---|---|---|
+| `no_filter` | `2.39 ms` | `20.89 ms` | `4.69 ms` | MySQL 普通列表仍显著落后 |
+| `no_filter_db_narrow_projection` | `0.27 ms` | `8.30 ms` | `1.45 ms` | **MySQL 即使只取窄字段也很慢**，说明问题不只是宽行 |
+| `no_filter_db_wide_projection` | `0.46 ms` | `10.26 ms` | `1.99 ms` | 宽投影会继续放大 MySQL，但不是唯一问题 |
+| `no_filter_go_response_shaping` | `0.33 ms` | `0.34 ms` | `0.34 ms` | Go 侧整形成本三者接近，不是跨库差异主因 |
+| `structured_filter` | `15.76 ms` | `24.96 ms` | `4.08 ms` | PostgreSQL 对结构化过滤仍明显最优 |
+| `structured_filter_db_narrow_projection` | `3.18 ms` | `10.83 ms` | `0.88 ms` | MySQL/SQLite 的 JSON 过滤 DB 成本明显高于 PostgreSQL |
+| `structured_filter_db_wide_projection` | `3.36 ms` | `11.14 ms` | `1.11 ms` | MySQL 宽投影有增量，但核心仍是 DB 过滤成本 |
+
+#### `Query Executor` 拆解结果
+
+| 场景 | SQLite | MySQL 8.0 | PostgreSQL 16 | 观察 |
+|---|---|---|---|---|
+| `records_by_table` | `2.81 ms` | `6.33 ms` | `2.79 ms` | MySQL 普通 Query DSL 列表也偏慢 |
+| `records_json_filter` | `22.15 ms` | `20.48 ms` | `3.22 ms` | PostgreSQL 对 JSON 条件优势巨大 |
+| `records_json_filter_id_only` | `22.04 ms` | `20.25 ms` | `3.12 ms` | 去掉 `data` 全列投影后，MySQL/SQLite 总耗时几乎不变 |
+| `records_json_filter_full_data_projection` | `22.33 ms` | `20.90 ms` | `3.99 ms` | `full_data_projection` 主要放大分配，不改主耗时级别 |
+
+#### 最新 `EXPLAIN ANALYZE` 观察
+
+| 数据库 | 观察 | 结论 |
+|---|---|---|
+| SQLite | `SEARCH records USING INDEX idx_records_table_deleted_created` | 主路径索引命中正常 |
+| MySQL | `Index lookup on records using idx_records_deleted_at (deleted_at=NULL)`，之后 `Filter(table_id)`，再 `Sort(created_at DESC)` | **当前 MySQL 基础列表路径没有选中预期复合索引**，这是普通列表慢的重要原因 |
+| PostgreSQL | `Index Scan using idx_records_table_deleted_created on records` + `top-N heapsort` | 计划稳定，主路径表现正常 |
+
+#### 当前结论边界
+
+1. **MySQL 当前慢不只是 JSON 问题**：最新基线已经显示 `no_filter` 的窄投影也明显慢，且 explain 选错了索引路径。
+2. **但 MySQL 的 JSON 路径在当前模型下优化空间也确实有限**：`id_only` 与 `full_data_projection` 的耗时接近，说明瓶颈主要在数据库 JSON 谓词，而不是应用侧取回 `data`。
+3. **所以“还能不能优化”的答案是有条件的**：
+   - 若允许调整数据模型，可以继续做：generated column、`JSON_VALUE()` 表达式索引、必要时调整/收敛与 `deleted_at` 竞争的索引。
+   - 若坚持保持“单个原始 `JSON` 列 + 通用 `JSON_EXTRACT(data, path) = value`”这一模型不变，则 **可优化空间有限**，很难把 MySQL 拉近 PostgreSQL。
+
+### MySQL JSON 路径的官方证据
+
+以下结论已由官方文档支持：
+
+| 来源 | 关键点 | 对当前项目的含义 |
+|---|---|---|
+| MySQL Reference Manual, `Secondary Indexes and Generated Columns` | `JSON` 列不能直接索引；推荐通过 generated column 间接索引 | 当前 `JSON_EXTRACT(data, ...)` 若无派生列，很难获得稳定索引收益 |
+| MySQL Reference Manual, `Functions That Search JSON Values` | `JSON_VALUE()` 可以直接用于表达式索引，简化 JSON 索引创建 | 如果继续支持 MySQL，应优先考虑 `JSON_VALUE(data, '$.status' RETURNING ...)` 一类索引方案 |
+| PostgreSQL `JSON Types / jsonb Indexing` | `jsonb` 的 `@>` 可由 `GIN` 支持 | 当前 PostgreSQL 路径与项目实现天然更匹配 |
+
+参考链接：
+
+- MySQL: `https://dev.mysql.com/doc/refman/8.0/en/json-search-functions.html`
+- MySQL: `https://dev.mysql.com/doc/refman/en/create-table-secondary-indexes.html`
+- PostgreSQL: `https://www.postgresql.org/docs/current/datatype-json.html`
 
 ### P3：MySQL/SQLite JSON 结构化优化候选
 
