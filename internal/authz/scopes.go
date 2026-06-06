@@ -24,6 +24,40 @@ type Authorizer struct {
 	scopes ScopeConfig
 }
 
+type cachedToken struct {
+	ID        string     `json:"id"`
+	Token     string     `json:"token"`
+	Name      string     `json:"name"`
+	IsMaster  bool       `json:"is_master"`
+	Scopes    string     `json:"scopes"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+	CreatedAt time.Time  `json:"created_at"`
+}
+
+func tokenToCache(token models.Token) cachedToken {
+	return cachedToken{
+		ID:        token.ID,
+		Token:     token.Token,
+		Name:      token.Name,
+		IsMaster:  token.IsMaster,
+		Scopes:    token.Scopes,
+		ExpiresAt: token.ExpiresAt,
+		CreatedAt: token.CreatedAt,
+	}
+}
+
+func tokenFromCache(token cachedToken) models.Token {
+	return models.Token{
+		ID:        token.ID,
+		Token:     token.Token,
+		Name:      token.Name,
+		IsMaster:  token.IsMaster,
+		Scopes:    token.Scopes,
+		ExpiresAt: token.ExpiresAt,
+		CreatedAt: token.CreatedAt,
+	}
+}
+
 func (a Authorizer) MarshalJSON() ([]byte, error) {
 	return json.Marshal(jsonToken{Token: a.token, Scopes: a.scopes})
 }
@@ -42,8 +76,8 @@ func (a *Authorizer) UnmarshalJSON(data []byte) error {
 var authorizerCache = cache.NewString[*Authorizer]("authorizer", 5*time.Minute)
 
 // tokenByIDCache / tokenByValueCache 缓存 Token 记录，分别服务于权限构建和认证入口。
-var tokenByIDCache = cache.NewString[models.Token]("token-by-id", 5*time.Minute)
-var tokenByValueCache = cache.NewString[models.Token]("token-by-value", 5*time.Minute)
+var tokenByIDCache = cache.NewString[cachedToken]("token-by-id", 5*time.Minute)
+var tokenByValueCache = cache.NewString[cachedToken]("token-by-value", 5*time.Minute)
 
 func init() {
 	cache.Register(authorizerCache)
@@ -95,15 +129,16 @@ func NewAuthorizer(db *gorm.DB, tokenID string) (*Authorizer, error) {
 }
 
 func cacheTokenRecord(token models.Token) {
-	tokenByIDCache.Set(token.ID, token)
+	cached := tokenToCache(token)
+	tokenByIDCache.Set(token.ID, cached)
 	if token.Token != "" {
-		tokenByValueCache.Set(token.Token, token)
+		tokenByValueCache.Set(token.Token, cached)
 	}
 }
 
 func findTokenByID(db *gorm.DB, tokenID string) (*models.Token, error) {
 	if token, ok := tokenByIDCache.Get(tokenID); ok {
-		cached := token
+		cached := tokenFromCache(token)
 		return &cached, nil
 	}
 
@@ -124,7 +159,7 @@ func FindTokenByValue(db *gorm.DB, tokenValue string) (*models.Token, error) {
 		return nil, errors.New("数据库未初始化")
 	}
 	if token, ok := tokenByValueCache.Get(tokenValue); ok {
-		cached := token
+		cached := tokenFromCache(token)
 		return &cached, nil
 	}
 

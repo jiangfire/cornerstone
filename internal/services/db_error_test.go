@@ -40,6 +40,16 @@ func injectDBQueryError(t *testing.T, db *gorm.DB) {
 	})
 }
 
+func injectDBRowError(t *testing.T, db *gorm.DB) {
+	err := db.Callback().Row().Before("gorm:row").Register("test_inject_row_error", func(d *gorm.DB) {
+		d.Error = fmt.Errorf("injected row error")
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = db.Callback().Row().Remove("test_inject_row_error")
+	})
+}
+
 func injectQueryErrorOnNthCall(t *testing.T, db *gorm.DB, n int) {
 	var counter int32
 	err := db.Callback().Query().Before("gorm:query").Register("test_query_nth_error", func(d *gorm.DB) {
@@ -65,6 +75,14 @@ func setupRecordDB(t *testing.T) (*RecordService, *gorm.DB, string) {
 		}{"title", "string", false},
 	)
 	return svc, db, tbl.ID
+}
+
+func injectListRecordsPageError(t *testing.T, db *gorm.DB) {
+	if db.Name() == "mysql" {
+		injectDBRowError(t, db)
+		return
+	}
+	injectQueryErrorOnNthCall(t, db, 5)
 }
 
 func TestCreateRecord_DBCreateError(t *testing.T) {
@@ -132,7 +150,7 @@ func TestListRecords_DBQueryError(t *testing.T) {
 	svc, db, tableID := setupRecordDB(t)
 
 	SharedFieldCache.Clear()
-	injectQueryErrorOnNthCall(t, db, 5)
+	injectListRecordsPageError(t, db)
 
 	_, err := svc.ListRecords(QueryRequest{
 		TableID: tableID,

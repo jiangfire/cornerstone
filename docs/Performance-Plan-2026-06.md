@@ -534,6 +534,48 @@ go test ./pkg/query -run ^$ -bench BenchmarkExecutorExecute -benchmem -count 1
    - JSON 条件：把高频键拆成 generated column，或用 `JSON_VALUE()` 表达式索引替代当前通用 `JSON_EXTRACT`。
 3. **如果不允许改数据模型与热点查询路径，只保留现状做微调，则 MySQL 的优化空间有限。**
 
+### P1 MySQL 主路径生产改造结果（GitHub Actions `27058102993`）
+
+运行地址：
+
+- `https://github.com/jiangfire/cornerstone/actions/runs/27058102993`
+
+#### 本次生产改造
+
+| 项目 | 内容 |
+|---|---|
+| 改造范围 | `RecordService.ListRecords` 的 MySQL 无过滤和结构化过滤分页 / COUNT 主路径 |
+| 具体做法 | MySQL 分支改为参数化 raw SQL，并对 `records` 使用 `FORCE INDEX (idx_records_table_deleted_created)` |
+| 保持不变 | PostgreSQL / SQLite 仍走原 GORM 查询路径；权限过滤、字段可见性、分页语义不变 |
+| 测试配套 | 测试夹具改为走生产迁移，确保测试库同样具备 `idx_records_table_deleted_created` |
+
+#### 跨数据库 benchmark 对照
+
+| 场景 | SQLite | MySQL 8.0 | PostgreSQL 16 | 结论 |
+|---|---:|---:|---:|---|
+| `RecordServiceListRecords/no_filter` | `2.346 ms` | `3.428 ms` | `4.525 ms` | **MySQL 普通列表从约 `21 ms` 降到 `3.43 ms`，主路径已接近/优于 PostgreSQL 单次结果** |
+| `RecordServiceListRecords/structured_filter` | `16.302 ms` | `9.688 ms` | `4.176 ms` | **MySQL 结构化过滤从约 `25.96 ms` 降到 `9.69 ms`，但仍明显慢于 PostgreSQL** |
+| `mysql_no_filter_db_narrow_projection_force_composite_index` | 不适用 | `0.253 ms` | 不适用 | 强制复合索引后的数据库窄投影上限非常好 |
+| `mysql_structured_filter_generated_columns` | 不适用 | `0.265 ms` | 不适用 | generated column 实验继续证明 MySQL JSON 热字段拆列收益明确 |
+
+#### 结论更新
+
+| 问题 | 当前结论 |
+|---|---|
+| MySQL 记录列表为什么明显慢于 PostgreSQL | 普通列表慢的主要原因已被证明是 MySQL 访问路径 / 索引选择不稳定；生产 `FORCE INDEX` 后普通列表已明显改善 |
+| MySQL JSON 过滤还能否靠现状继续优化 | 只能小幅优化。当前 `JSON_EXTRACT(data, ?) = ?` 仍需逐行函数求值，无法接近 generated column 实验结果 |
+| PostgreSQL 为什么结构化过滤仍领先 | 当前模型下 PostgreSQL 的 `jsonb` + `GIN` 更适合 `data @> ?` 这类结构化条件 |
+| SQLite JSON 过滤怎么定位 | SQLite 仍适合作为本地和 CI 快速基线；JSON-heavy 生产性能不能按 SQLite 结果外推 |
+
+#### CI 失败修复记录
+
+| Job | 失败点 | 根因 | 修复 |
+|---|---|---|---|
+| `Tests (MySQL 8.0)` | `TestListRecords_DBQueryError` | 生产 MySQL 列表路径改为 `Raw().Scan()` 后，原测试只注入 GORM `Query` callback，无法覆盖 raw row 查询错误 | 测试按数据库类型注入错误：MySQL 使用 `Callback().Row()`，其他数据库保留 `Callback().Query()` |
+| `Tests (Redis Cache)` | `TestFindTokenByValue_UsesInvalidateTokenCache` | Redis 后端用 JSON 序列化缓存 `models.Token`，但 `Token.Token` 字段标记为 `json:"-"`，反序列化后无法按 token value 删除缓存 | `authz` Token 缓存改用内部 `cachedToken` payload，保留失效所需的 token value |
+
+这两个修复属于 **测试可靠性与缓存正确性修复**，不改变 `ListRecords` 的外部接口和权限语义。
+
 ### P3：MySQL/SQLite JSON 结构化优化候选
 
 | 场景 | 建议索引方向 | 说明 |
@@ -565,7 +607,7 @@ go test ./pkg/query -run ^$ -bench BenchmarkExecutorExecute -benchmem -count 1
 | Explain plan | 关键 SQL 是否命中目标索引 |
 | DB 维度差异 | SQLite/MySQL/PostgreSQL 是否都验证过 |
 | 风险 | 是否引入新索引、写放大、兼容性变化 |
-| 未解决问题 | 如 Redis CI 失败这类与本次性能无关但仍待处理的问题 |
+| 未解决问题 | 如 MySQL JSON 过滤仍需 generated column / 表达式索引这类后续结构性问题 |
 
 ### 当前建议的决策
 

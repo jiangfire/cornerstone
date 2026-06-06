@@ -1,6 +1,7 @@
 package authz
 
 import (
+	"encoding/json"
 	"path/filepath"
 	"testing"
 
@@ -617,6 +618,27 @@ func TestFindTokenByValue_UsesInvalidateTokenCache(t *testing.T) {
 	fresh, err := FindTokenByValue(d, tok.Token)
 	require.NoError(t, err)
 	assert.Equal(t, tok.Scopes, fresh.Scopes)
+}
+
+func TestCachedTokenPreservesTokenValueThroughJSON(t *testing.T) {
+	token := models.Token{
+		ID:       "tok_cached",
+		Token:    "cs_cached_secret",
+		Name:     "cached",
+		IsMaster: false,
+		Scopes:   `{"databases":{"db_x":"viewer"},"tables":{}}`,
+	}
+
+	data, err := json.Marshal(tokenToCache(token))
+	require.NoError(t, err)
+
+	var decoded cachedToken
+	require.NoError(t, json.Unmarshal(data, &decoded))
+
+	restored := tokenFromCache(decoded)
+	assert.Equal(t, token.ID, restored.ID)
+	assert.Equal(t, token.Token, restored.Token)
+	assert.Equal(t, token.Scopes, restored.Scopes)
 }
 
 func TestClearTokenCache(t *testing.T) {
