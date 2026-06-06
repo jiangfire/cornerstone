@@ -511,8 +511,15 @@ func marshalRecordPayload(payload map[string]interface{}) (models.JSONField, err
 
 // recordFilterClause 是一个可复用的 WHERE 片段,既用于分页查询,也用于 COUNT。
 type recordFilterClause struct {
-	sql  string
-	args []interface{}
+	sql         string
+	args        []interface{}
+	indexFilter *recordFieldIndexFilter
+}
+
+type recordFieldIndexFilter struct {
+	fieldID   string
+	valueType string
+	value     interface{}
 }
 
 const maxRecordFieldIndexTextLength = 512
@@ -636,6 +643,11 @@ func mysqlRecordFieldIndexClause(field models.Field, value interface{}) (recordF
 				field.ID,
 				row.ValueText,
 			},
+			indexFilter: &recordFieldIndexFilter{
+				fieldID:   field.ID,
+				valueType: row.ValueType,
+				value:     row.ValueText,
+			},
 		}, true, nil
 	case "number":
 		return recordFilterClause{
@@ -644,6 +656,11 @@ func mysqlRecordFieldIndexClause(field models.Field, value interface{}) (recordF
 				field.ID,
 				*row.ValueNumber,
 			},
+			indexFilter: &recordFieldIndexFilter{
+				fieldID:   field.ID,
+				valueType: row.ValueType,
+				value:     *row.ValueNumber,
+			},
 		}, true, nil
 	case "bool":
 		return recordFilterClause{
@@ -651,6 +668,11 @@ func mysqlRecordFieldIndexClause(field models.Field, value interface{}) (recordF
 			args: []interface{}{
 				field.ID,
 				*row.ValueBool,
+			},
+			indexFilter: &recordFieldIndexFilter{
+				fieldID:   field.ID,
+				valueType: row.ValueType,
+				value:     *row.ValueBool,
 			},
 		}, true, nil
 	default:
@@ -679,6 +701,10 @@ func (s *RecordService) syncRecordFieldIndexes(tx *gorm.DB, recordID, tableID st
 }
 
 func buildMySQLRecordListSQL(req QueryRequest, clauses []recordFilterClause) (string, []interface{}) {
+	if filters, ok := collectMySQLRecordFieldIndexFilters(clauses); ok {
+		return buildMySQLRecordFieldIndexListSQL(req, filters)
+	}
+
 	var b strings.Builder
 	b.WriteString("SELECT id, table_id, data, version, created_at, updated_at FROM records FORCE INDEX (idx_records_table_deleted_created) ")
 	b.WriteString("WHERE table_id = ? AND deleted_at IS NULL")
@@ -697,6 +723,10 @@ func buildMySQLRecordListSQL(req QueryRequest, clauses []recordFilterClause) (st
 }
 
 func buildMySQLRecordCountSQL(tableID string, clauses []recordFilterClause) (string, []interface{}) {
+	if filters, ok := collectMySQLRecordFieldIndexFilters(clauses); ok {
+		return buildMySQLRecordFieldIndexCountSQL(tableID, filters)
+	}
+
 	var b strings.Builder
 	b.WriteString("SELECT COUNT(*) FROM records FORCE INDEX (idx_records_table_deleted_created) ")
 	b.WriteString("WHERE table_id = ? AND deleted_at IS NULL")
@@ -708,6 +738,77 @@ func buildMySQLRecordCountSQL(tableID string, clauses []recordFilterClause) (str
 		b.WriteString(clause.sql)
 		args = append(args, clause.args...)
 	}
+
+	return b.String(), args
+}
+
+func collectMySQLRecordFieldIndexFilters(clauses []recordFilterClause) ([]recordFieldIndexFilter, bool) {
+	if len(clauses) == 0 {
+		return nil, false
+	}
+	filters := make([]recordFieldIndexFilter, 0, len(clauses))
+	for _, clause := range clauses {
+		if clause.indexFilter == nil {
+			return nil, false
+		}
+		filters = append(filters, *clause.indexFilter)
+	}
+	return filters, true
+}
+
+func buildMySQLRecordFieldIndexListSQL(req QueryRequest, filters []recordFieldIndexFilter) (string, []interface{}) {
+	subquery, args := buildMySQLRecordFieldIndexMatchedSubquery(req.TableID, filters)
+
+	var b strings.Builder
+	b.WriteString("SELECT records.id, records.table_id, records.data, records.version, records.created_at, records.updated_at ")
+	b.WriteString("FROM (")
+	b.WriteString(subquery)
+	b.WriteString(") matched JOIN records FORCE INDEX (PRIMARY) ON records.id = matched.record_id ")
+	b.WriteString("WHERE records.table_id = ? AND records.deleted_at IS NULL ")
+	b.WriteString("ORDER BY records.created_at DESC LIMIT ? OFFSET ?")
+
+	args = append(args, req.TableID, req.Limit, req.Offset)
+	return b.String(), args
+}
+
+func buildMySQLRecordFieldIndexCountSQL(tableID string, filters []recordFieldIndexFilter) (string, []interface{}) {
+	subquery, args := buildMySQLRecordFieldIndexMatchedSubquery(tableID, filters)
+
+	var b strings.Builder
+	b.WriteString("SELECT COUNT(*) FROM (")
+	b.WriteString(subquery)
+	b.WriteString(") matched JOIN records FORCE INDEX (PRIMARY) ON records.id = matched.record_id ")
+	b.WriteString("WHERE records.table_id = ? AND records.deleted_at IS NULL")
+
+	args = append(args, tableID)
+	return b.String(), args
+}
+
+func buildMySQLRecordFieldIndexMatchedSubquery(tableID string, filters []recordFieldIndexFilter) (string, []interface{}) {
+	var b strings.Builder
+	b.WriteString("SELECT record_id FROM (")
+
+	args := make([]interface{}, 0, 1+len(filters)*3)
+	for i, filter := range filters {
+		if i > 0 {
+			b.WriteString(" UNION ALL ")
+		}
+		b.WriteString("SELECT record_id, field_id FROM record_field_indexes ")
+		b.WriteString("WHERE table_id = ? AND deleted_at IS NULL AND field_id = ? AND ")
+		switch filter.valueType {
+		case "text":
+			b.WriteString("value_text = ?")
+		case "number":
+			b.WriteString("value_number = ?")
+		case "bool":
+			b.WriteString("value_bool = ?")
+		default:
+			b.WriteString("1 = 0")
+		}
+		args = append(args, tableID, filter.fieldID, filter.value)
+	}
+	b.WriteString(") rfi_matches GROUP BY record_id HAVING COUNT(DISTINCT field_id) = ?")
+	args = append(args, len(filters))
 
 	return b.String(), args
 }

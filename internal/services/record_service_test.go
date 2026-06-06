@@ -663,6 +663,7 @@ func TestBuildStructuredFilterClauses_MySQLUsesRecordFieldIndexForSupportedScala
 		assert.Contains(t, clause.sql, "record_field_indexes")
 		assert.Contains(t, clause.sql, "record_id = records.id")
 		assert.NotContains(t, clause.sql, "JSON_EXTRACT")
+		require.NotNil(t, clause.indexFilter)
 	}
 	argsByField := make(map[string][]interface{}, len(clauses))
 	for _, clause := range clauses {
@@ -671,6 +672,60 @@ func TestBuildStructuredFilterClauses_MySQLUsesRecordFieldIndexForSupportedScala
 	assert.Equal(t, []interface{}{"fld_status", "paid"}, argsByField["fld_status"])
 	assert.Equal(t, []interface{}{"fld_score", float64(42)}, argsByField["fld_score"])
 	assert.Equal(t, []interface{}{"fld_active", true}, argsByField["fld_active"])
+}
+
+func TestBuildMySQLRecordListSQL_WithRecordFieldIndexFilters(t *testing.T) {
+	sql, args := buildMySQLRecordListSQL(QueryRequest{
+		TableID: "tbl_1",
+		Limit:   20,
+		Offset:  0,
+	}, []recordFilterClause{
+		{
+			sql:  "EXISTS (...)",
+			args: []interface{}{"fld_status", "paid"},
+			indexFilter: &recordFieldIndexFilter{
+				fieldID:   "fld_status",
+				valueType: "text",
+				value:     "paid",
+			},
+		},
+		{
+			sql:  "EXISTS (...)",
+			args: []interface{}{"fld_category", "beta"},
+			indexFilter: &recordFieldIndexFilter{
+				fieldID:   "fld_category",
+				valueType: "text",
+				value:     "beta",
+			},
+		},
+	})
+
+	assert.Contains(t, sql, "FROM (SELECT record_id FROM (SELECT record_id, field_id FROM record_field_indexes")
+	assert.Contains(t, sql, "UNION ALL")
+	assert.Contains(t, sql, "GROUP BY record_id HAVING COUNT(DISTINCT field_id) = ?")
+	assert.Contains(t, sql, ") matched JOIN records FORCE INDEX (PRIMARY) ON records.id = matched.record_id")
+	assert.NotContains(t, sql, "EXISTS")
+	assert.Equal(t, []interface{}{"tbl_1", "fld_status", "paid", "tbl_1", "fld_category", "beta", 2, "tbl_1", 20, 0}, args)
+}
+
+func TestBuildMySQLRecordCountSQL_WithRecordFieldIndexFilters(t *testing.T) {
+	sql, args := buildMySQLRecordCountSQL("tbl_1", []recordFilterClause{
+		{
+			sql:  "EXISTS (...)",
+			args: []interface{}{"fld_status", "paid"},
+			indexFilter: &recordFieldIndexFilter{
+				fieldID:   "fld_status",
+				valueType: "text",
+				value:     "paid",
+			},
+		},
+	})
+
+	assert.Contains(t, sql, "SELECT COUNT(*) FROM (SELECT record_id FROM (SELECT record_id, field_id FROM record_field_indexes")
+	assert.Contains(t, sql, "GROUP BY record_id HAVING COUNT(DISTINCT field_id) = ?")
+	assert.Contains(t, sql, ") matched JOIN records FORCE INDEX (PRIMARY) ON records.id = matched.record_id")
+	assert.NotContains(t, sql, "EXISTS")
+	assert.Equal(t, []interface{}{"tbl_1", "fld_status", "paid", 1, "tbl_1"}, args)
 }
 
 func TestBuildStructuredFilterClauses_MySQLFallsBackForUnsupportedValues(t *testing.T) {

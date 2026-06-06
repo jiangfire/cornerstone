@@ -31,25 +31,23 @@ WHERE table_id = ? AND deleted_at IS NULL
 ORDER BY created_at DESC
 LIMIT 50`
 	mysqlRecordFieldIndexQuery = `SELECT id, table_id, created_at
-FROM records FORCE INDEX (idx_records_table_deleted_created)
-WHERE table_id = ? AND deleted_at IS NULL
-  AND EXISTS (
-    SELECT 1 FROM record_field_indexes rfi
-    WHERE rfi.record_id = records.id
-      AND rfi.table_id = records.table_id
-      AND rfi.deleted_at IS NULL
-      AND rfi.field_id = ?
-      AND rfi.value_text = ?
-  )
-  AND EXISTS (
-    SELECT 1 FROM record_field_indexes rfi
-    WHERE rfi.record_id = records.id
-      AND rfi.table_id = records.table_id
-      AND rfi.deleted_at IS NULL
-      AND rfi.field_id = ?
-      AND rfi.value_text = ?
-  )
-ORDER BY created_at DESC
+FROM (
+  SELECT record_id
+  FROM (
+    SELECT record_id, field_id
+    FROM record_field_indexes
+    WHERE table_id = ? AND deleted_at IS NULL AND field_id = ? AND value_text = ?
+    UNION ALL
+    SELECT record_id, field_id
+    FROM record_field_indexes
+    WHERE table_id = ? AND deleted_at IS NULL AND field_id = ? AND value_text = ?
+  ) rfi_matches
+  GROUP BY record_id
+  HAVING COUNT(DISTINCT field_id) = 2
+) matched
+JOIN records FORCE INDEX (PRIMARY) ON records.id = matched.record_id
+WHERE records.table_id = ? AND records.deleted_at IS NULL
+ORDER BY records.created_at DESC
 LIMIT 50`
 	mysqlGeneratedColumnSetup = `ALTER TABLE records
 ADD COLUMN bench_status VARCHAR(32) GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(data, '$.status'))) STORED,
@@ -228,6 +226,7 @@ func BenchmarkRecordServiceListRecords(b *testing.B) {
 				"paid",
 				categoryID,
 				"beta",
+				fixture.Table.ID,
 			)
 		})
 
@@ -442,6 +441,7 @@ func TestExplainPlanListRecordsMySQLExperiments(t *testing.T) {
 		"paid",
 		mustBenchmarkFieldID(t, fixture.Fields, "category"),
 		"beta",
+		fixture.Table.ID,
 	)
 	t.Logf("mysql record field index structured filter plan: %s", recordFieldIndexPlan)
 
