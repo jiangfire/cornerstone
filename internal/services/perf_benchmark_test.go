@@ -221,12 +221,7 @@ func BenchmarkRecordServiceListRecords(b *testing.B) {
 				b,
 				fixture.DB,
 				mysqlRecordFieldIndexQuery,
-				fixture.Table.ID,
-				statusID,
-				"paid",
-				categoryID,
-				"beta",
-				fixture.Table.ID,
+				mysqlRecordFieldIndexArgs(fixture.Table.ID, statusID, categoryID)...,
 			)
 		})
 
@@ -436,12 +431,11 @@ func TestExplainPlanListRecordsMySQLExperiments(t *testing.T) {
 		t,
 		fixture.DB,
 		"EXPLAIN ANALYZE "+mysqlRecordFieldIndexQuery,
-		fixture.Table.ID,
-		mustBenchmarkFieldID(t, fixture.Fields, "status"),
-		"paid",
-		mustBenchmarkFieldID(t, fixture.Fields, "category"),
-		"beta",
-		fixture.Table.ID,
+		mysqlRecordFieldIndexArgs(
+			fixture.Table.ID,
+			mustBenchmarkFieldID(t, fixture.Fields, "status"),
+			mustBenchmarkFieldID(t, fixture.Fields, "category"),
+		)...,
 	)
 	t.Logf("mysql record field index structured filter plan: %s", recordFieldIndexPlan)
 
@@ -457,6 +451,40 @@ func TestExplainPlanListRecordsMySQLExperiments(t *testing.T) {
 		"beta",
 	)
 	t.Logf("mysql generated column plan: %s", generatedPlan)
+}
+
+func TestMySQLRecordFieldIndexBenchmarkQueryArgs(t *testing.T) {
+	args := mysqlRecordFieldIndexArgs("tbl_1", "fld_status", "fld_category")
+
+	if placeholders := strings.Count(mysqlRecordFieldIndexQuery, "?"); placeholders != len(args) {
+		t.Fatalf("expected %d query args, got %d", placeholders, len(args))
+	}
+	expected := []interface{}{
+		"tbl_1",
+		"fld_status",
+		"paid",
+		"tbl_1",
+		"fld_category",
+		"beta",
+		"tbl_1",
+	}
+	for i := range expected {
+		if expected[i] != args[i] {
+			t.Fatalf("arg %d: expected %v, got %v", i, expected[i], args[i])
+		}
+	}
+}
+
+func mysqlRecordFieldIndexArgs(tableID, statusID, categoryID string) []interface{} {
+	return []interface{}{
+		tableID,
+		statusID,
+		"paid",
+		tableID,
+		categoryID,
+		"beta",
+		tableID,
+	}
 }
 
 func prepareMySQLGeneratedColumnExperiment(db *gorm.DB) error {
