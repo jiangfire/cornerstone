@@ -2,8 +2,10 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -79,6 +81,7 @@ func Migrate() error {
 		&models.Table{},
 		&models.Field{},
 		&models.Record{},
+		&models.RecordFieldIndex{},
 		&models.File{},
 	); err != nil {
 		return fmt.Errorf("自动迁移失败: %w", err)
@@ -91,6 +94,10 @@ func Migrate() error {
 	}
 
 	logger.Info("索引创建完成")
+
+	if err := backfillRecordFieldIndexes(database); err != nil {
+		return fmt.Errorf("回填记录字段索引失败: %w", err)
+	}
 
 	masterToken := os.Getenv("MASTER_TOKEN")
 	if masterToken == "" {
@@ -108,6 +115,15 @@ func createIndexes(db *gorm.DB) error {
 	if err := createIndexIfNotExists(db, "records", "idx_records_table_deleted_created", "table_id, deleted_at, created_at DESC"); err != nil {
 		return err
 	}
+	if err := createIndexIfNotExists(db, "record_field_indexes", "idx_rfi_text_lookup", "table_id, field_id, value_text, deleted_at, created_at DESC, record_id"); err != nil {
+		return err
+	}
+	if err := createIndexIfNotExists(db, "record_field_indexes", "idx_rfi_number_lookup", "table_id, field_id, value_number, deleted_at, created_at DESC, record_id"); err != nil {
+		return err
+	}
+	if err := createIndexIfNotExists(db, "record_field_indexes", "idx_rfi_bool_lookup", "table_id, field_id, value_bool, deleted_at, created_at DESC, record_id"); err != nil {
+		return err
+	}
 
 	// PostgreSQL: GIN 索引加速 JSONB 查询（data @>, JSON 路径等）
 	if isPostgres(db) {
@@ -117,6 +133,158 @@ func createIndexes(db *gorm.DB) error {
 	}
 
 	return nil
+}
+
+const recordFieldIndexBackfillBatchSize = 500
+const recordFieldIndexTextMaxLength = 512
+
+func backfillRecordFieldIndexes(db *gorm.DB) error {
+	var fields []models.Field
+	if err := db.Where("deleted_at IS NULL").Find(&fields).Error; err != nil {
+		return err
+	}
+	if len(fields) == 0 {
+		return nil
+	}
+
+	fieldsByTable := make(map[string][]models.Field, len(fields))
+	for _, field := range fields {
+		fieldsByTable[field.TableID] = append(fieldsByTable[field.TableID], field)
+	}
+
+	return db.Model(&models.Record{}).
+		Where("deleted_at IS NULL").
+		FindInBatches(&[]models.Record{}, recordFieldIndexBackfillBatchSize, func(tx *gorm.DB, _ int) error {
+			records, ok := tx.Statement.Dest.(*[]models.Record)
+			if !ok || len(*records) == 0 {
+				return nil
+			}
+
+			recordIDs := make([]string, 0, len(*records))
+			for _, record := range *records {
+				recordIDs = append(recordIDs, record.ID)
+			}
+
+			var existing []string
+			if err := tx.Model(&models.RecordFieldIndex{}).
+				Where("record_id IN ? AND deleted_at IS NULL", recordIDs).
+				Distinct("record_id").
+				Pluck("record_id", &existing).Error; err != nil {
+				return err
+			}
+			hasIndex := make(map[string]struct{}, len(existing))
+			for _, recordID := range existing {
+				hasIndex[recordID] = struct{}{}
+			}
+
+			rows := make([]models.RecordFieldIndex, 0, len(*records)*4)
+			for _, record := range *records {
+				if _, ok := hasIndex[record.ID]; ok {
+					continue
+				}
+				payload := make(map[string]interface{})
+				if err := json.Unmarshal([]byte(record.Data), &payload); err != nil {
+					continue
+				}
+				rows = append(rows, buildBackfillRecordFieldIndexRows(record, fieldsByTable[record.TableID], payload)...)
+			}
+			if len(rows) == 0 {
+				return nil
+			}
+			return tx.CreateInBatches(&rows, 1000).Error
+		}).Error
+}
+
+func buildBackfillRecordFieldIndexRows(record models.Record, fields []models.Field, payload map[string]interface{}) []models.RecordFieldIndex {
+	rows := make([]models.RecordFieldIndex, 0, len(fields))
+	for _, field := range fields {
+		value, ok := payload[field.Name]
+		if !ok || value == nil {
+			continue
+		}
+		row, ok := buildBackfillRecordFieldIndexRow(record, field, value)
+		if ok {
+			rows = append(rows, row)
+		}
+	}
+	return rows
+}
+
+func buildBackfillRecordFieldIndexRow(record models.Record, field models.Field, value interface{}) (models.RecordFieldIndex, bool) {
+	row := models.RecordFieldIndex{
+		TableID:   record.TableID,
+		RecordID:  record.ID,
+		FieldID:   field.ID,
+		FieldName: field.Name,
+	}
+
+	switch strings.ToLower(strings.TrimSpace(field.Type)) {
+	case "string", "text", "date", "datetime":
+		text, ok := value.(string)
+		if !ok || len(text) > recordFieldIndexTextMaxLength {
+			return models.RecordFieldIndex{}, false
+		}
+		row.ValueType = "text"
+		row.ValueText = text
+		return row, true
+	case "number":
+		number, ok := backfillRecordFieldIndexNumber(value)
+		if !ok {
+			return models.RecordFieldIndex{}, false
+		}
+		row.ValueType = "number"
+		row.ValueNumber = &number
+		return row, true
+	case "boolean":
+		boolean, ok := value.(bool)
+		if !ok {
+			return models.RecordFieldIndex{}, false
+		}
+		row.ValueType = "bool"
+		row.ValueBool = &boolean
+		return row, true
+	case "json":
+		text, ok := backfillRecordFieldIndexJSONText(value)
+		if !ok {
+			return models.RecordFieldIndex{}, false
+		}
+		row.ValueType = "text"
+		row.ValueText = text
+		return row, true
+	default:
+		return models.RecordFieldIndex{}, false
+	}
+}
+
+func backfillRecordFieldIndexNumber(value interface{}) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	default:
+		return 0, false
+	}
+}
+
+func backfillRecordFieldIndexJSONText(value interface{}) (string, bool) {
+	if text, ok := value.(string); ok {
+		if len(text) > recordFieldIndexTextMaxLength {
+			return "", false
+		}
+		return text, true
+	}
+	encoded, err := json.Marshal(value)
+	if err != nil || len(encoded) > recordFieldIndexTextMaxLength {
+		return "", false
+	}
+	return string(encoded), true
 }
 
 // createIndexIfNotExists 跨数据库兼容的索引创建

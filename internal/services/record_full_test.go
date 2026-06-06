@@ -847,13 +847,13 @@ func TestResolveReadableFilterField(t *testing.T) {
 	}
 	readable := map[string]models.Field{"name": {Name: "name"}, "status": {Name: "status"}}
 
-	name, ok := resolveReadableFilterField(fields, readable, "name")
+	field, ok := resolveReadableFilterField(fields, readable, "name")
 	assert.True(t, ok)
-	assert.Equal(t, "name", name)
+	assert.Equal(t, "name", field.Name)
 
-	name, ok = resolveReadableFilterField(fields, readable, "fld_1")
+	field, ok = resolveReadableFilterField(fields, readable, "fld_1")
 	assert.True(t, ok)
-	assert.Equal(t, "name", name)
+	assert.Equal(t, "name", field.Name)
 
 	_, ok = resolveReadableFilterField(fields, readable, "hidden")
 	assert.False(t, ok)

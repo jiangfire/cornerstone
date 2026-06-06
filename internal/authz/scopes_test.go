@@ -28,6 +28,7 @@ func setupDB(t *testing.T) *gorm.DB {
 		&models.Table{},
 		&models.Field{},
 		&models.Record{},
+		&models.RecordFieldIndex{},
 		&models.File{},
 	))
 

@@ -28,11 +28,12 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	require.NoError(t, err)
 
 	db := pkgdb.DB()
-	require.NoError(t, db.AutoMigrate(&models.Token{}, &models.Database{}, &models.Table{}, &models.Field{}, &models.Record{}, &models.File{}))
+	require.NoError(t, db.AutoMigrate(&models.Token{}, &models.Database{}, &models.Table{}, &models.Field{}, &models.Record{}, &models.RecordFieldIndex{}, &models.File{}))
 
 	// 清理函数：硬删除所有测试数据
 	t.Cleanup(func() {
 		db.Unscoped().Where("1 = 1").Delete(&models.File{})
+		db.Unscoped().Where("1 = 1").Delete(&models.RecordFieldIndex{})
 		db.Unscoped().Where("1 = 1").Delete(&models.Record{})
 		db.Unscoped().Where("1 = 1").Delete(&models.Field{})
 		db.Unscoped().Where("1 = 1").Delete(&models.Table{})
@@ -133,6 +134,7 @@ func TestMigrate(t *testing.T) {
 	assert.True(t, pkgdb.DB().Migrator().HasTable("tables"))
 	assert.True(t, pkgdb.DB().Migrator().HasTable("fields"))
 	assert.True(t, pkgdb.DB().Migrator().HasTable("records"))
+	assert.True(t, pkgdb.DB().Migrator().HasTable("record_field_indexes"))
 	assert.True(t, pkgdb.DB().Migrator().HasTable("files"))
 }
 
@@ -154,4 +156,45 @@ func TestCreateIndexes(t *testing.T) {
 
 	err := createIndexes(db)
 	require.NoError(t, err)
+}
+
+func TestBackfillRecordFieldIndexes(t *testing.T) {
+	db := setupTestDB(t)
+
+	database := &models.Database{Name: "backfill_db"}
+	require.NoError(t, db.Create(database).Error)
+	table := &models.Table{DatabaseID: database.ID, Name: "backfill_table"}
+	require.NoError(t, db.Create(table).Error)
+	statusField := &models.Field{TableID: table.ID, Name: "status", Type: "string"}
+	scoreField := &models.Field{TableID: table.ID, Name: "score", Type: "number"}
+	activeField := &models.Field{TableID: table.ID, Name: "active", Type: "boolean"}
+	require.NoError(t, db.Create([]*models.Field{statusField, scoreField, activeField}).Error)
+
+	record := &models.Record{
+		TableID: table.ID,
+		Data:    models.JSONField(`{"status":"paid","score":42,"active":true}`),
+		Version: 1,
+	}
+	require.NoError(t, db.Create(record).Error)
+
+	require.NoError(t, backfillRecordFieldIndexes(db))
+
+	var indexes []models.RecordFieldIndex
+	require.NoError(t, db.Where("record_id = ? AND deleted_at IS NULL", record.ID).Find(&indexes).Error)
+	require.Len(t, indexes, 3)
+
+	byField := make(map[string]models.RecordFieldIndex, len(indexes))
+	for _, index := range indexes {
+		byField[index.FieldName] = index
+	}
+	assert.Equal(t, "paid", byField["status"].ValueText)
+	require.NotNil(t, byField["score"].ValueNumber)
+	assert.Equal(t, 42.0, *byField["score"].ValueNumber)
+	require.NotNil(t, byField["active"].ValueBool)
+	assert.True(t, *byField["active"].ValueBool)
+
+	require.NoError(t, backfillRecordFieldIndexes(db))
+	var count int64
+	require.NoError(t, db.Model(&models.RecordFieldIndex{}).Where("record_id = ? AND deleted_at IS NULL", record.ID).Count(&count).Error)
+	assert.Equal(t, int64(3), count)
 }

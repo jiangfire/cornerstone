@@ -150,6 +150,35 @@ func (r *Record) BeforeCreate(tx *gorm.DB) (err error) {
 	return nil
 }
 
+// RecordFieldIndex 记录字段派生索引表，用于 MySQL 动态字段等值过滤优化。
+type RecordFieldIndex struct {
+	ID          string         `gorm:"type:varchar(50);primaryKey" json:"id"`
+	TableID     string         `gorm:"type:varchar(50);not null" json:"table_id"`
+	RecordID    string         `gorm:"type:varchar(50);not null" json:"record_id"`
+	FieldID     string         `gorm:"type:varchar(50);not null" json:"field_id"`
+	FieldName   string         `gorm:"type:varchar(255);not null" json:"field_name"`
+	ValueType   string         `gorm:"type:varchar(20);not null" json:"value_type"`
+	ValueText   string         `gorm:"type:varchar(512)" json:"value_text"`
+	ValueNumber *float64       `gorm:"type:double precision" json:"value_number"`
+	ValueBool   *bool          `gorm:"type:boolean" json:"value_bool"`
+	CreatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"created_at"`
+	UpdatedAt   time.Time      `gorm:"type:timestamp;default:CURRENT_TIMESTAMP" json:"updated_at"`
+	DeletedAt   gorm.DeletedAt `gorm:"type:timestamp;index" json:"deleted_at"`
+	Record      Record         `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;foreignKey:RecordID" json:"-"`
+	Field       Field          `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;foreignKey:FieldID" json:"-"`
+}
+
+func (RecordFieldIndex) TableName() string {
+	return "record_field_indexes"
+}
+
+func (r *RecordFieldIndex) BeforeCreate(tx *gorm.DB) (err error) {
+	if r.ID == "" {
+		r.ID = GenerateID("rfi")
+	}
+	return nil
+}
+
 // File 文件附件表
 type File struct {
 	ID         string         `gorm:"type:varchar(50);primaryKey" json:"id"`

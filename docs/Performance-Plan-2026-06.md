@@ -656,3 +656,143 @@ go test ./pkg/query -run ^$ -bench BenchmarkExecutorExecute -benchmem -count 1
 2. **MySQL 优化方向**：不要继续只靠 `JSON_EXTRACT` 硬扛；进入下一轮时，应优先做 generated column 候选设计和对照 benchmark。
 3. **SQLite 定位**：继续保留为本地与 CI 快速回归基线，不把它当作 JSON-heavy 生产能力的真实性能代表。
 4. **交付规范**：后续每次性能改造都要同步更新本文档和 PR summary，避免 benchmark 结果只留在 Actions 页面里。
+
+## MySQL JSON 结构化索引改造计划（record_field_index）
+
+### 目标边界
+
+| 项目 | 决策 |
+|---|---|
+| 本轮目标 | 优先优化 MySQL 结构化等值过滤，例如 `{"status":"paid"}`、`{"score":90}`、`{"active":true}` |
+| 非目标 | 暂不覆盖模糊搜索、数组包含、范围过滤、全文检索、多值 list 字段 |
+| 保留路径 | PostgreSQL 继续走 `jsonb @> ?` + `GIN`；SQLite 继续走 `JSON_EXTRACT` 基线 |
+| 正确性要求 | 派生索引缺失或值不适合索引时，MySQL 必须回退到现有 `JSON_EXTRACT`，不能返回错误结果 |
+
+术语说明：
+
+| 术语 | 说明 |
+|---|---|
+| 派生索引表 | 从 `records.data` 里拆出可查询字段值，单独存入一张可建普通 BTree 索引的表 |
+| 写放大 | 每次写一条业务记录时，还要额外写多条索引行，换取读查询性能 |
+| 回退路径 | 当派生索引不适用时，继续使用原来的 JSON 函数过滤，保证行为不变 |
+
+### 表结构草案
+
+`record_field_indexes`：
+
+| 字段 | 说明 |
+|---|---|
+| `id` | 主键，`rfi_` 前缀 |
+| `table_id` | 所属表 ID |
+| `record_id` | 所属记录 ID |
+| `field_id` | 字段 ID，避免字段改名影响索引定位 |
+| `field_name` | 字段名，便于排查与回填 |
+| `value_type` | `text` / `number` / `bool` |
+| `value_text` | `string`、`text`、`date`、`datetime`、短 JSON 标量或短 JSON 文本 |
+| `value_number` | `number` 字段 |
+| `value_bool` | `boolean` 字段 |
+| `created_at` / `updated_at` / `deleted_at` | 生命周期字段 |
+
+核心索引：
+
+```text
+(table_id, field_id, value_text, deleted_at, created_at DESC, record_id)
+(table_id, field_id, value_number, deleted_at, created_at DESC, record_id)
+(table_id, field_id, value_bool, deleted_at, created_at DESC, record_id)
+```
+
+### 同步生命周期
+
+| 操作 | 同步策略 | 事务要求 |
+|---|---|---|
+| CreateRecord | 创建记录后写入当前 payload 的派生索引行 | 与记录创建同事务 |
+| UpdateRecord | 乐观锁更新成功后软删除旧索引行，再写入新索引行 | 与记录更新同事务 |
+| DeleteRecord | 软删除记录时同步软删除索引行 | 与记录删除同事务 |
+| BatchCreateRecords | 每批记录创建后批量写入索引行 | 与批量记录创建同事务 |
+
+### 查询策略
+
+MySQL 对可索引结构化等值条件改为 `EXISTS` 派生索引过滤：
+
+```sql
+EXISTS (
+  SELECT 1
+  FROM record_field_indexes rfi
+  WHERE rfi.table_id = ?
+    AND rfi.field_id = ?
+    AND rfi.value_text = ?
+    AND rfi.record_id = records.id
+    AND rfi.deleted_at IS NULL
+)
+```
+
+如果字段类型、过滤值或文本长度不适合派生索引，则保留原路径：
+
+```sql
+JSON_EXTRACT(data, ?) = ?
+```
+
+补充边界：
+
+- 新写入数据由 `RecordService` 在同一事务内同步派生索引。
+- 历史数据由 `Migrate()` 执行批量回填；已存在活跃派生索引的记录会跳过，避免重复写入。
+- 因此 MySQL 生产查询可以对受支持标量条件使用纯 `EXISTS` 索引路径；如果生产库绕过服务层直接写 `records`，必须同步执行回填或调用一致性校验。
+
+### TDD 验收用例
+
+| 用例 | 期望 |
+|---|---|
+| 构建派生索引行 | `string/text/date/datetime/json` 进入 `value_text`，`number` 进入 `value_number`，`boolean` 进入 `value_bool` |
+| 不支持值 | `list/file`、`nil`、过长文本跳过派生索引 |
+| 创建记录 | 同事务写入派生索引行 |
+| 更新记录 | 旧索引行软删除，新索引行生效 |
+| 删除记录 | 记录和派生索引行一起软删除 |
+| 批量创建 | 每条记录都有对应派生索引行 |
+| MySQL SQL | 可索引结构化等值过滤使用 `record_field_indexes`，不可索引条件回退 `JSON_EXTRACT` |
+
+### 风险记录
+
+| 风险 | 处理 |
+|---|---|
+| 写放大 | 仅索引当前支持的标量字段，避免为 list/file 等复杂字段产生大量行 |
+| 长文本索引 | 为避免 MySQL 大宽度索引问题，长文本不写派生索引，查询回退 JSON 路径 |
+| 历史数据 | 本轮先保证新写入数据一致；生产启用前需要补回填任务和校验脚本 |
+| 多数据库差异 | 生产查询改造仅作用于 MySQL；PostgreSQL/SQLite 行为保持原状 |
+
+### 本轮实现记录（2026-06-06）
+
+| 项目 | 状态 | 说明 |
+|---|---|---|
+| `RecordFieldIndex` 模型 | 已完成 | 新增 `record_field_indexes` 表，保存 `table_id/record_id/field_id/value_*` |
+| 迁移与索引 | 已完成 | 新增 `idx_rfi_text_lookup`、`idx_rfi_number_lookup`、`idx_rfi_bool_lookup` |
+| 历史回填 | 已完成 | `Migrate()` 批量回填已有记录，跳过已有索引的记录 |
+| 写入同步 | 已完成 | `CreateRecord`、`UpdateRecord`、`DeleteRecord`、`BatchCreateRecords` 均在事务内同步派生索引 |
+| MySQL 查询改写 | 已完成 | 受支持标量结构化等值过滤走 `EXISTS record_field_indexes`；不支持值回退 `JSON_EXTRACT` |
+| Benchmark fixture | 已完成 | 直接批量 seed 的 benchmark 记录同步生成派生索引行，CI 能验证新路径 |
+| MySQL perf 对照项 | 已完成 | 新增 `mysql_structured_filter_record_field_index`，用于对比 raw JSON 与 generated column |
+
+本地 SQLite 验证结果（Windows / PowerShell / 2026-06-06）：
+
+| 场景 | 结果 | 观察 |
+|---|---:|---|
+| `RecordServiceListRecords/no_filter` | `1.240823 ms/op` | 普通列表仍在此前 `~1.2-1.4 ms` 区间 |
+| `RecordServiceListRecords/structured_filter` | `8.546129 ms/op` | SQLite 仍受 `JSON_EXTRACT` 路径影响，符合预期 |
+| `structured_filter_db_narrow_projection` | `1.125383 ms/op` | 数据库 JSON 过滤成本仍是 SQLite 结构化过滤主因 |
+| `structured_filter_db_wide_projection` | `1.221458 ms/op` | 宽投影不是主要瓶颈 |
+
+已执行验证命令：
+
+```powershell
+go test ./internal/services
+go test ./internal/db ./internal/testutil
+go test ./internal/services -run ^$ -bench BenchmarkRecordServiceListRecords -benchmem -count 1
+go test ./...
+```
+
+CI 待验证重点：
+
+| 场景 | 预期 |
+|---|---|
+| `mysql_structured_filter_record_field_index` | 应明显快于 `mysql_structured_filter_raw_sql`，但可能仍慢于或接近 generated column |
+| MySQL `RecordServiceListRecords/structured_filter` | 应优先受益于派生索引表，减少 `JSON_EXTRACT` 逐行函数过滤 |
+| PostgreSQL / SQLite | 行为保持原状，性能不应出现明显退化 |

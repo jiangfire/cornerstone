@@ -515,6 +515,169 @@ type recordFilterClause struct {
 	args []interface{}
 }
 
+const maxRecordFieldIndexTextLength = 512
+
+func buildRecordFieldIndexRows(tableID, recordID string, fields []models.Field, data map[string]interface{}) ([]models.RecordFieldIndex, error) {
+	rows := make([]models.RecordFieldIndex, 0, len(fields))
+	for _, field := range fields {
+		value, exists := data[field.Name]
+		if !exists || value == nil {
+			continue
+		}
+		row, ok, err := buildRecordFieldIndexRow(tableID, recordID, field, value)
+		if err != nil {
+			return nil, err
+		}
+		if ok {
+			rows = append(rows, row)
+		}
+	}
+	return rows, nil
+}
+
+func buildRecordFieldIndexRow(tableID, recordID string, field models.Field, value interface{}) (models.RecordFieldIndex, bool, error) {
+	row := models.RecordFieldIndex{
+		TableID:   tableID,
+		RecordID:  recordID,
+		FieldID:   field.ID,
+		FieldName: field.Name,
+	}
+
+	switch normalizeFieldType(field.Type) {
+	case "string", "text", "date", "datetime":
+		text, ok := value.(string)
+		if !ok || len(text) > maxRecordFieldIndexTextLength {
+			return models.RecordFieldIndex{}, false, nil
+		}
+		row.ValueType = "text"
+		row.ValueText = text
+		return row, true, nil
+	case "number":
+		number, ok := recordFieldIndexNumber(value)
+		if !ok {
+			return models.RecordFieldIndex{}, false, nil
+		}
+		row.ValueType = "number"
+		row.ValueNumber = &number
+		return row, true, nil
+	case "boolean":
+		boolean, ok := value.(bool)
+		if !ok {
+			return models.RecordFieldIndex{}, false, nil
+		}
+		row.ValueType = "bool"
+		row.ValueBool = &boolean
+		return row, true, nil
+	case "json":
+		text, ok, err := recordFieldIndexJSONText(value)
+		if err != nil || !ok {
+			return models.RecordFieldIndex{}, ok, err
+		}
+		row.ValueType = "text"
+		row.ValueText = text
+		return row, true, nil
+	default:
+		return models.RecordFieldIndex{}, false, nil
+	}
+}
+
+func recordFieldIndexNumber(value interface{}) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	case json.Number:
+		n, err := v.Float64()
+		return n, err == nil
+	default:
+		return 0, false
+	}
+}
+
+func recordFieldIndexJSONText(value interface{}) (string, bool, error) {
+	if str, ok := value.(string); ok {
+		if len(str) > maxRecordFieldIndexTextLength {
+			return "", false, nil
+		}
+		return str, true, nil
+	}
+	encoded, err := json.MarshalString(value)
+	if err != nil {
+		return "", false, fmt.Errorf("字段索引序列化失败: %w", err)
+	}
+	if len(encoded) > maxRecordFieldIndexTextLength {
+		return "", false, nil
+	}
+	return encoded, true, nil
+}
+
+func mysqlRecordFieldIndexClause(field models.Field, value interface{}) (recordFilterClause, bool, error) {
+	if normalizeFieldType(field.Type) == "json" {
+		return recordFilterClause{}, false, nil
+	}
+
+	row, ok, err := buildRecordFieldIndexRow("", "", field, value)
+	if err != nil || !ok {
+		return recordFilterClause{}, ok, err
+	}
+
+	switch row.ValueType {
+	case "text":
+		return recordFilterClause{
+			sql: "EXISTS (SELECT 1 FROM record_field_indexes rfi WHERE rfi.record_id = records.id AND rfi.table_id = records.table_id AND rfi.deleted_at IS NULL AND rfi.field_id = ? AND rfi.value_text = ?)",
+			args: []interface{}{
+				field.ID,
+				row.ValueText,
+			},
+		}, true, nil
+	case "number":
+		return recordFilterClause{
+			sql: "EXISTS (SELECT 1 FROM record_field_indexes rfi WHERE rfi.record_id = records.id AND rfi.table_id = records.table_id AND rfi.deleted_at IS NULL AND rfi.field_id = ? AND rfi.value_number = ?)",
+			args: []interface{}{
+				field.ID,
+				*row.ValueNumber,
+			},
+		}, true, nil
+	case "bool":
+		return recordFilterClause{
+			sql: "EXISTS (SELECT 1 FROM record_field_indexes rfi WHERE rfi.record_id = records.id AND rfi.table_id = records.table_id AND rfi.deleted_at IS NULL AND rfi.field_id = ? AND rfi.value_bool = ?)",
+			args: []interface{}{
+				field.ID,
+				*row.ValueBool,
+			},
+		}, true, nil
+	default:
+		return recordFilterClause{}, false, nil
+	}
+}
+
+func (s *RecordService) syncRecordFieldIndexes(tx *gorm.DB, recordID, tableID string, fields []models.Field, data map[string]interface{}) error {
+	if err := tx.Model(&models.RecordFieldIndex{}).
+		Where("record_id = ? AND deleted_at IS NULL", recordID).
+		Update("deleted_at", time.Now()).Error; err != nil {
+		return fmt.Errorf("清理记录字段索引失败: %w", err)
+	}
+
+	rows, err := buildRecordFieldIndexRows(tableID, recordID, fields, data)
+	if err != nil {
+		return err
+	}
+	if len(rows) == 0 {
+		return nil
+	}
+	if err := tx.Create(&rows).Error; err != nil {
+		return fmt.Errorf("写入记录字段索引失败: %w", err)
+	}
+	return nil
+}
+
 func buildMySQLRecordListSQL(req QueryRequest, clauses []recordFilterClause) (string, []interface{}) {
 	var b strings.Builder
 	b.WriteString("SELECT id, table_id, data, version, created_at, updated_at FROM records FORCE INDEX (idx_records_table_deleted_created) ")
@@ -619,14 +782,23 @@ func (s *RecordService) buildStructuredFilterClauses(
 	readableFields map[string]models.Field,
 	structured map[string]interface{},
 ) ([]recordFilterClause, bool, error) {
-	dbType := s.db.Name()
+	return s.buildStructuredFilterClausesForDB(s.db.Name(), fields, readableFields, structured)
+}
+
+func (s *RecordService) buildStructuredFilterClausesForDB(
+	dbType string,
+	fields []models.Field,
+	readableFields map[string]models.Field,
+	structured map[string]interface{},
+) ([]recordFilterClause, bool, error) {
 	clauses := make([]recordFilterClause, 0, len(structured))
 
 	for key, value := range structured {
-		fieldName, ok := resolveReadableFilterField(fields, readableFields, key)
+		field, ok := resolveReadableFilterField(fields, readableFields, key)
 		if !ok {
 			return nil, true, nil
 		}
+		fieldName := field.Name
 
 		jsonValue, err := json.Marshal(value)
 		if err != nil {
@@ -650,6 +822,16 @@ func (s *RecordService) buildStructuredFilterClauses(
 			if err := json.Unmarshal(jsonValue, &scalar); err != nil {
 				return nil, false, fmt.Errorf("过滤值格式错误: %w", err)
 			}
+			if dbType == "mysql" {
+				indexClause, ok, err := mysqlRecordFieldIndexClause(field, scalar)
+				if err != nil {
+					return nil, false, err
+				}
+				if ok {
+					clauses = append(clauses, indexClause)
+					continue
+				}
+			}
 			clauses = append(clauses, recordFilterClause{
 				sql:  "JSON_EXTRACT(data, ?) = ?",
 				args: []interface{}{"$." + fieldName, scalar},
@@ -671,9 +853,9 @@ func jsonValuesEqual(actual, expected interface{}) bool {
 	return bytes.Equal(actualJSON, expectedJSON)
 }
 
-func resolveReadableFilterField(fields []models.Field, readableFields map[string]models.Field, filterKey string) (string, bool) {
-	if _, ok := readableFields[filterKey]; ok {
-		return filterKey, true
+func resolveReadableFilterField(fields []models.Field, readableFields map[string]models.Field, filterKey string) (models.Field, bool) {
+	if field, ok := readableFields[filterKey]; ok {
+		return field, true
 	}
 
 	for _, field := range fields {
@@ -681,12 +863,12 @@ func resolveReadableFilterField(fields []models.Field, readableFields map[string
 			continue
 		}
 		if _, ok := readableFields[field.Name]; !ok {
-			return "", false
+			return models.Field{}, false
 		}
-		return field.Name, true
+		return field, true
 	}
 
-	return "", false
+	return models.Field{}, false
 }
 
 func (s *RecordService) matchesRecordFilter(fields []models.Field, readableFields map[string]models.Field, payload map[string]interface{}, filter string) (bool, error) {
@@ -698,12 +880,12 @@ func (s *RecordService) matchesRecordFilter(fields []models.Field, readableField
 	var structuredFilter map[string]interface{}
 	if err := json.Unmarshal([]byte(filter), &structuredFilter); err == nil && len(structuredFilter) > 0 {
 		for filterKey, expected := range structuredFilter {
-			fieldName, ok := resolveReadableFilterField(fields, readableFields, filterKey)
+			field, ok := resolveReadableFilterField(fields, readableFields, filterKey)
 			if !ok {
 				return false, nil
 			}
 
-			actual, exists := payload[fieldName]
+			actual, exists := payload[field.Name]
 			if !exists || !jsonValuesEqual(actual, expected) {
 				return false, nil
 			}
@@ -786,6 +968,9 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 			return fmt.Errorf("创建记录失败: %w", err)
 		}
 		if err := s.syncAttachmentBindings(tx, record.ID, fields, normalizedData); err != nil {
+			return err
+		}
+		if err := s.syncRecordFieldIndexes(tx, record.ID, record.TableID, fields, normalizedData); err != nil {
 			return err
 		}
 		return nil
@@ -1156,6 +1341,9 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 		if err := s.syncAttachmentBindings(tx, recordID, fields, currentData); err != nil {
 			return err
 		}
+		if err := s.syncRecordFieldIndexes(tx, recordID, record.TableID, fields, currentData); err != nil {
+			return err
+		}
 
 		if err := tx.Where("id = ?", recordID).First(&record).Error; err != nil {
 			return fmt.Errorf("读取更新后记录失败: %w", err)
@@ -1191,18 +1379,28 @@ func (s *RecordService) DeleteRecord(recordID, userID string) error {
 
 	// 3. 软删除记录
 	now := time.Now()
-	result := s.db.Model(&models.Record{}).
-		Where("id = ? AND deleted_at IS NULL", recordID).
-		Updates(map[string]interface{}{
-			"deleted_at": now,
-			"updated_at": now,
-			"version":    gorm.Expr("version + 1"),
-		})
-	if result.Error != nil {
-		return fmt.Errorf("删除记录失败: %w", result.Error)
-	}
-	if result.RowsAffected == 0 {
-		return fmt.Errorf("记录不存在: %w", gorm.ErrRecordNotFound)
+	if err := s.db.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&models.Record{}).
+			Where("id = ? AND deleted_at IS NULL", recordID).
+			Updates(map[string]interface{}{
+				"deleted_at": now,
+				"updated_at": now,
+				"version":    gorm.Expr("version + 1"),
+			})
+		if result.Error != nil {
+			return fmt.Errorf("删除记录失败: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return fmt.Errorf("记录不存在: %w", gorm.ErrRecordNotFound)
+		}
+		if err := tx.Model(&models.RecordFieldIndex{}).
+			Where("record_id = ? AND deleted_at IS NULL", recordID).
+			Update("deleted_at", now).Error; err != nil {
+			return fmt.Errorf("删除记录字段索引失败: %w", err)
+		}
+		return nil
+	}); err != nil {
+		return err
 	}
 
 	payload := map[string]interface{}{
@@ -1288,8 +1486,19 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 			if err := tx.Create(&batch).Error; err != nil {
 				return fmt.Errorf("批量创建失败: %w", err)
 			}
+			indexRows := make([]models.RecordFieldIndex, 0, len(batch)*len(fields))
 			for j := range batch {
+				rows, err := buildRecordFieldIndexRows(req.TableID, batch[j].ID, fields, normalizedData)
+				if err != nil {
+					return err
+				}
+				indexRows = append(indexRows, rows...)
 				records = append(records, &batch[j])
+			}
+			if len(indexRows) > 0 {
+				if err := tx.Create(&indexRows).Error; err != nil {
+					return fmt.Errorf("写入记录字段索引失败: %w", err)
+				}
 			}
 		}
 		return nil

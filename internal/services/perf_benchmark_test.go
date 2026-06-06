@@ -30,6 +30,27 @@ WHERE table_id = ? AND deleted_at IS NULL
   AND JSON_EXTRACT(data, ?) = ?
 ORDER BY created_at DESC
 LIMIT 50`
+	mysqlRecordFieldIndexQuery = `SELECT id, table_id, created_at
+FROM records FORCE INDEX (idx_records_table_deleted_created)
+WHERE table_id = ? AND deleted_at IS NULL
+  AND EXISTS (
+    SELECT 1 FROM record_field_indexes rfi
+    WHERE rfi.record_id = records.id
+      AND rfi.table_id = records.table_id
+      AND rfi.deleted_at IS NULL
+      AND rfi.field_id = ?
+      AND rfi.value_text = ?
+  )
+  AND EXISTS (
+    SELECT 1 FROM record_field_indexes rfi
+    WHERE rfi.record_id = records.id
+      AND rfi.table_id = records.table_id
+      AND rfi.deleted_at IS NULL
+      AND rfi.field_id = ?
+      AND rfi.value_text = ?
+  )
+ORDER BY created_at DESC
+LIMIT 50`
 	mysqlGeneratedColumnSetup = `ALTER TABLE records
 ADD COLUMN bench_status VARCHAR(32) GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(data, '$.status'))) STORED,
 ADD COLUMN bench_category VARCHAR(32) GENERATED ALWAYS AS (JSON_UNQUOTE(JSON_EXTRACT(data, '$.category'))) STORED`
@@ -195,6 +216,21 @@ func BenchmarkRecordServiceListRecords(b *testing.B) {
 			)
 		})
 
+		b.Run("mysql_structured_filter_record_field_index", func(b *testing.B) {
+			statusID := mustBenchmarkFieldID(b, fields, "status")
+			categoryID := mustBenchmarkFieldID(b, fields, "category")
+			benchmarkRawQueryRows[benchmarkNarrowRecordRow](
+				b,
+				fixture.DB,
+				mysqlRecordFieldIndexQuery,
+				fixture.Table.ID,
+				statusID,
+				"paid",
+				categoryID,
+				"beta",
+			)
+		})
+
 		b.Run("mysql_structured_filter_generated_columns", func(b *testing.B) {
 			if err := prepareMySQLGeneratedColumnExperiment(fixture.DB); err != nil {
 				b.Fatal(err)
@@ -292,6 +328,17 @@ func mustBuildStructuredBenchmarkClauses(
 	return clauses
 }
 
+func mustBenchmarkFieldID(tb testing.TB, fields []models.Field, name string) string {
+	tb.Helper()
+	for _, field := range fields {
+		if field.Name == name {
+			return field.ID
+		}
+	}
+	tb.Fatalf("expected benchmark field %q", name)
+	return ""
+}
+
 func BenchmarkFieldServiceListFields(b *testing.B) {
 	fixture := testutil.SetupBenchmarkFixture(b, testutil.BenchmarkSeedConfig{
 		RecordCount:     1000,
@@ -385,6 +432,18 @@ func TestExplainPlanListRecordsMySQLExperiments(t *testing.T) {
 		"beta",
 	)
 	t.Logf("mysql raw structured filter plan: %s", structuredRawPlan)
+
+	recordFieldIndexPlan := explainStatement(
+		t,
+		fixture.DB,
+		"EXPLAIN ANALYZE "+mysqlRecordFieldIndexQuery,
+		fixture.Table.ID,
+		mustBenchmarkFieldID(t, fixture.Fields, "status"),
+		"paid",
+		mustBenchmarkFieldID(t, fixture.Fields, "category"),
+		"beta",
+	)
+	t.Logf("mysql record field index structured filter plan: %s", recordFieldIndexPlan)
 
 	if err := prepareMySQLGeneratedColumnExperiment(fixture.DB); err != nil {
 		t.Fatalf("prepare generated column experiment failed: %v", err)

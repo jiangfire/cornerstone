@@ -109,7 +109,7 @@ func cleanupTables(db *gorm.DB, tb testing.TB) {
 		}()
 	}
 
-	tables := []string{"files", "records", "fields", "tables", "databases", "tokens"}
+	tables := []string{"files", "record_field_indexes", "records", "fields", "tables", "databases", "tokens"}
 	for _, table := range tables {
 		query := quoteIdentifier(db, table)
 		if err := db.Exec("DELETE FROM " + query).Error; err != nil {
@@ -122,7 +122,7 @@ func cleanupTables(db *gorm.DB, tb testing.TB) {
 
 	// 强制检查：确认所有表已清空
 	var count int64
-	for _, m := range []any{&models.File{}, &models.Record{}, &models.Field{}, &models.Table{}, &models.Database{}, &models.Token{}} {
+	for _, m := range []any{&models.File{}, &models.RecordFieldIndex{}, &models.Record{}, &models.Field{}, &models.Table{}, &models.Database{}, &models.Token{}} {
 		if err := db.Model(m).Unscoped().Count(&count).Error; err != nil {
 			tb.Logf("failed to count %T: %v", m, err)
 		} else {

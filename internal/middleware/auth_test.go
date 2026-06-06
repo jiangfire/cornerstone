@@ -34,7 +34,7 @@ func setupAuthDB(t *testing.T) (*gin.Engine, *models.Token, *models.Token) {
 	require.NoError(t, err)
 
 	d := pkgdb.DB()
-	err = d.AutoMigrate(&models.Token{}, &models.Database{}, &models.Table{}, &models.Field{}, &models.Record{}, &models.File{})
+	err = d.AutoMigrate(&models.Token{}, &models.Database{}, &models.Table{}, &models.Field{}, &models.Record{}, &models.RecordFieldIndex{}, &models.File{})
 	require.NoError(t, err)
 
 	master := &models.Token{Name: "master", IsMaster: true, Scopes: "{}", CreatedAt: time.Now()}
@@ -48,6 +48,7 @@ func setupAuthDB(t *testing.T) (*gin.Engine, *models.Token, *models.Token) {
 	// 清理函数：硬删除所有测试数据
 	t.Cleanup(func() {
 		d.Unscoped().Where("1 = 1").Delete(&models.File{})
+		d.Unscoped().Where("1 = 1").Delete(&models.RecordFieldIndex{})
 		d.Unscoped().Where("1 = 1").Delete(&models.Record{})
 		d.Unscoped().Where("1 = 1").Delete(&models.Field{})
 		d.Unscoped().Where("1 = 1").Delete(&models.Table{})

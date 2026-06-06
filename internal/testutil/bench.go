@@ -37,6 +37,8 @@ type BenchmarkFixture struct {
 	ScopedToken *models.Token
 }
 
+const benchmarkRecordFieldIndexTextLength = 512
+
 func resolveBenchmarkDatabaseConfig(tb testing.TB) (config.DatabaseConfig, error) {
 	tb.Helper()
 
@@ -211,6 +213,7 @@ func (f *BenchmarkFixture) seed(tb testing.TB, cfg BenchmarkSeedConfig) {
 	}
 
 	require.NoError(tb, f.DB.CreateInBatches(&records, 500).Error)
+	seedBenchmarkRecordFieldIndexes(tb, f.DB, table.ID, fields, records)
 
 	if cfg.NoiseTableCount > 0 && cfg.NoiseRecordsPerTable > 0 {
 		noiseRecords := make([]models.Record, 0, cfg.NoiseTableCount*cfg.NoiseRecordsPerTable)
@@ -243,6 +246,21 @@ func (f *BenchmarkFixture) seed(tb testing.TB, cfg BenchmarkSeedConfig) {
 		}
 
 		require.NoError(tb, f.DB.CreateInBatches(&noiseRecords, 500).Error)
+		fieldsByTable := make(map[string][]models.Field, len(noiseTables))
+		for _, noiseTable := range noiseTables {
+			var noiseFields []models.Field
+			require.NoError(tb, f.DB.Where("table_id = ? AND deleted_at IS NULL", noiseTable.ID).
+				Order("created_at ASC").
+				Find(&noiseFields).Error)
+			fieldsByTable[noiseTable.ID] = noiseFields
+		}
+		recordsByTable := make(map[string][]models.Record, len(noiseTables))
+		for _, record := range noiseRecords {
+			recordsByTable[record.TableID] = append(recordsByTable[record.TableID], record)
+		}
+		for tableID, tableRecords := range recordsByTable {
+			seedBenchmarkRecordFieldIndexes(tb, f.DB, tableID, fieldsByTable[tableID], tableRecords)
+		}
 	}
 	cache.ClearAll()
 
@@ -252,6 +270,108 @@ func (f *BenchmarkFixture) seed(tb testing.TB, cfg BenchmarkSeedConfig) {
 	f.Fields = fields
 	f.MasterToken = master
 	f.ScopedToken = scoped
+}
+
+func seedBenchmarkRecordFieldIndexes(tb testing.TB, database *gorm.DB, tableID string, fields []models.Field, records []models.Record) {
+	tb.Helper()
+	if len(records) == 0 || len(fields) == 0 {
+		return
+	}
+
+	fieldByName := make(map[string]models.Field, len(fields))
+	for _, field := range fields {
+		fieldByName[field.Name] = field
+	}
+
+	indexRows := make([]models.RecordFieldIndex, 0, len(records)*len(fields))
+	for _, record := range records {
+		payload := make(map[string]interface{})
+		require.NoError(tb, json.Unmarshal([]byte(record.Data), &payload))
+		for fieldName, value := range payload {
+			field, ok := fieldByName[fieldName]
+			if !ok || value == nil {
+				continue
+			}
+			row, ok := benchmarkRecordFieldIndexRow(tableID, record.ID, field, value)
+			if ok {
+				indexRows = append(indexRows, row)
+			}
+		}
+	}
+	if len(indexRows) > 0 {
+		require.NoError(tb, database.CreateInBatches(&indexRows, 1000).Error)
+	}
+}
+
+func benchmarkRecordFieldIndexRow(tableID, recordID string, field models.Field, value interface{}) (models.RecordFieldIndex, bool) {
+	row := models.RecordFieldIndex{
+		TableID:   tableID,
+		RecordID:  recordID,
+		FieldID:   field.ID,
+		FieldName: field.Name,
+	}
+
+	switch field.Type {
+	case "string", "text", "date", "datetime":
+		text, ok := value.(string)
+		if !ok || len(text) > benchmarkRecordFieldIndexTextLength {
+			return models.RecordFieldIndex{}, false
+		}
+		row.ValueType = "text"
+		row.ValueText = text
+		return row, true
+	case "number":
+		number, ok := benchmarkRecordFieldIndexNumber(value)
+		if !ok {
+			return models.RecordFieldIndex{}, false
+		}
+		row.ValueType = "number"
+		row.ValueNumber = &number
+		return row, true
+	case "boolean":
+		boolean, ok := value.(bool)
+		if !ok {
+			return models.RecordFieldIndex{}, false
+		}
+		row.ValueType = "bool"
+		row.ValueBool = &boolean
+		return row, true
+	case "json":
+		if text, ok := value.(string); ok {
+			if len(text) > benchmarkRecordFieldIndexTextLength {
+				return models.RecordFieldIndex{}, false
+			}
+			row.ValueType = "text"
+			row.ValueText = text
+			return row, true
+		}
+		encoded, err := json.Marshal(value)
+		if err != nil || len(encoded) > benchmarkRecordFieldIndexTextLength {
+			return models.RecordFieldIndex{}, false
+		}
+		row.ValueType = "text"
+		row.ValueText = string(encoded)
+		return row, true
+	default:
+		return models.RecordFieldIndex{}, false
+	}
+}
+
+func benchmarkRecordFieldIndexNumber(value interface{}) (float64, bool) {
+	switch v := value.(type) {
+	case float64:
+		return v, true
+	case float32:
+		return float64(v), true
+	case int:
+		return float64(v), true
+	case int32:
+		return float64(v), true
+	case int64:
+		return float64(v), true
+	default:
+		return 0, false
+	}
 }
 
 func cloneBenchmarkFieldsForTable(fields []models.Field, tableID string) []models.Field {

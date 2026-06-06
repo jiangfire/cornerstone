@@ -3,6 +3,7 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -506,6 +507,204 @@ func TestBuildStructuredFilterClauses_MalformedJSON(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "过滤值序列化失败")
+}
+
+func TestBuildRecordFieldIndexRows_SupportedScalarValues(t *testing.T) {
+	fields := []models.Field{
+		{ID: "fld_status", TableID: "tbl_1", Name: "status", Type: "string"},
+		{ID: "fld_title", TableID: "tbl_1", Name: "title", Type: "text"},
+		{ID: "fld_due", TableID: "tbl_1", Name: "due_on", Type: "date"},
+		{ID: "fld_score", TableID: "tbl_1", Name: "score", Type: "number"},
+		{ID: "fld_active", TableID: "tbl_1", Name: "active", Type: "boolean"},
+		{ID: "fld_meta", TableID: "tbl_1", Name: "meta", Type: "json"},
+	}
+
+	rows, err := buildRecordFieldIndexRows("tbl_1", "rec_1", fields, map[string]interface{}{
+		"status": "paid",
+		"title":  "Invoice",
+		"due_on": "2026-06-06",
+		"score":  float64(42.5),
+		"active": true,
+		"meta":   map[string]interface{}{"tier": "gold"},
+	})
+
+	require.NoError(t, err)
+	require.Len(t, rows, 6)
+
+	byField := make(map[string]models.RecordFieldIndex, len(rows))
+	for _, row := range rows {
+		byField[row.FieldName] = row
+	}
+
+	assert.Equal(t, "text", byField["status"].ValueType)
+	assert.Equal(t, "paid", byField["status"].ValueText)
+	assert.Equal(t, "Invoice", byField["title"].ValueText)
+	assert.Equal(t, "2026-06-06", byField["due_on"].ValueText)
+	assert.Equal(t, "number", byField["score"].ValueType)
+	require.NotNil(t, byField["score"].ValueNumber)
+	assert.Equal(t, 42.5, *byField["score"].ValueNumber)
+	assert.Equal(t, "bool", byField["active"].ValueType)
+	require.NotNil(t, byField["active"].ValueBool)
+	assert.True(t, *byField["active"].ValueBool)
+	assert.Equal(t, "text", byField["meta"].ValueType)
+	assert.Contains(t, byField["meta"].ValueText, `"tier"`)
+}
+
+func TestBuildRecordFieldIndexRows_SkipsUnsupportedValues(t *testing.T) {
+	fields := []models.Field{
+		{ID: "fld_tags", TableID: "tbl_1", Name: "tags", Type: "list"},
+		{ID: "fld_doc", TableID: "tbl_1", Name: "doc", Type: "file"},
+		{ID: "fld_empty", TableID: "tbl_1", Name: "empty", Type: "string"},
+		{ID: "fld_long", TableID: "tbl_1", Name: "long_text", Type: "text"},
+	}
+
+	rows, err := buildRecordFieldIndexRows("tbl_1", "rec_1", fields, map[string]interface{}{
+		"tags":      []interface{}{"a", "b"},
+		"doc":       "fil_1",
+		"empty":     nil,
+		"long_text": strings.Repeat("x", maxRecordFieldIndexTextLength+1),
+	})
+
+	require.NoError(t, err)
+	assert.Empty(t, rows)
+}
+
+func TestRecordFieldIndexSync_CreateUpdateDeleteBatch(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	_, tbl, _ := createTestTableWithFields(t, db, "user1", "IndexSyncDB", "records",
+		struct {
+			Name     string
+			Type     string
+			Required bool
+		}{"status", "string", false},
+		struct {
+			Name     string
+			Type     string
+			Required bool
+		}{"score", "number", false},
+	)
+
+	record, err := s.CreateRecord(CreateRecordRequest{
+		TableID: tbl.ID,
+		Data:    map[string]interface{}{"status": "paid", "score": float64(10)},
+	}, "user1")
+	require.NoError(t, err)
+
+	var indexes []models.RecordFieldIndex
+	require.NoError(t, db.Where("record_id = ? AND deleted_at IS NULL", record.ID).Find(&indexes).Error)
+	require.Len(t, indexes, 2)
+
+	_, err = s.UpdateRecord(record.ID, UpdateRecordRequest{
+		Data:    map[string]interface{}{"status": "refunded", "score": float64(20)},
+		Version: 1,
+	}, "user1")
+	require.NoError(t, err)
+
+	indexes = nil
+	require.NoError(t, db.Where("record_id = ? AND deleted_at IS NULL", record.ID).Find(&indexes).Error)
+	require.Len(t, indexes, 2)
+	for _, idx := range indexes {
+		if idx.FieldName == "status" {
+			assert.Equal(t, "refunded", idx.ValueText)
+		}
+		if idx.FieldName == "score" {
+			require.NotNil(t, idx.ValueNumber)
+			assert.Equal(t, 20.0, *idx.ValueNumber)
+		}
+	}
+
+	require.NoError(t, s.DeleteRecord(record.ID, "user1"))
+	var liveCount int64
+	require.NoError(t, db.Model(&models.RecordFieldIndex{}).Where("record_id = ? AND deleted_at IS NULL", record.ID).Count(&liveCount).Error)
+	assert.Equal(t, int64(0), liveCount)
+
+	batchRecords, err := s.BatchCreateRecords(CreateRecordRequest{
+		TableID: tbl.ID,
+		Data:    map[string]interface{}{"status": "batch", "score": float64(30)},
+	}, "user1", 3)
+	require.NoError(t, err)
+	require.Len(t, batchRecords, 3)
+
+	var batchIndexCount int64
+	require.NoError(t, db.Model(&models.RecordFieldIndex{}).
+		Where("table_id = ? AND deleted_at IS NULL", tbl.ID).
+		Where("value_text = ? OR value_number = ?", "batch", 30.0).
+		Count(&batchIndexCount).Error)
+	assert.Equal(t, int64(6), batchIndexCount)
+}
+
+func TestBuildStructuredFilterClauses_MySQLUsesRecordFieldIndexForSupportedScalar(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	fields := []models.Field{
+		{ID: "fld_status", Name: "status", Type: "string"},
+		{ID: "fld_score", Name: "score", Type: "number"},
+		{ID: "fld_active", Name: "active", Type: "boolean"},
+	}
+	readable := map[string]models.Field{
+		"status": fields[0],
+		"score":  fields[1],
+		"active": fields[2],
+	}
+
+	clauses, refsHidden, err := s.buildStructuredFilterClausesForDB("mysql", fields, readable, map[string]interface{}{
+		"status": "paid",
+		"score":  float64(42),
+		"active": true,
+	})
+
+	require.NoError(t, err)
+	assert.False(t, refsHidden)
+	require.Len(t, clauses, 3)
+	for _, clause := range clauses {
+		assert.Contains(t, clause.sql, "record_field_indexes")
+		assert.Contains(t, clause.sql, "record_id = records.id")
+		assert.NotContains(t, clause.sql, "JSON_EXTRACT")
+	}
+	argsByField := make(map[string][]interface{}, len(clauses))
+	for _, clause := range clauses {
+		argsByField[clause.args[0].(string)] = clause.args
+	}
+	assert.Equal(t, []interface{}{"fld_status", "paid"}, argsByField["fld_status"])
+	assert.Equal(t, []interface{}{"fld_score", float64(42)}, argsByField["fld_score"])
+	assert.Equal(t, []interface{}{"fld_active", true}, argsByField["fld_active"])
+}
+
+func TestBuildStructuredFilterClauses_MySQLFallsBackForUnsupportedValues(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	fields := []models.Field{{ID: "fld_tags", Name: "tags", Type: "list"}}
+	readable := map[string]models.Field{"tags": fields[0]}
+
+	clauses, refsHidden, err := s.buildStructuredFilterClausesForDB("mysql", fields, readable, map[string]interface{}{
+		"tags": []interface{}{"a", "b"},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, refsHidden)
+	require.Len(t, clauses, 1)
+	assert.Equal(t, "JSON_EXTRACT(data, ?) = ?", clauses[0].sql)
+}
+
+func TestBuildStructuredFilterClauses_MySQLFallsBackForJSONField(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	fields := []models.Field{{ID: "fld_meta", Name: "meta", Type: "json"}}
+	readable := map[string]models.Field{"meta": fields[0]}
+
+	clauses, refsHidden, err := s.buildStructuredFilterClausesForDB("mysql", fields, readable, map[string]interface{}{
+		"meta": map[string]interface{}{"tier": "gold"},
+	})
+
+	require.NoError(t, err)
+	assert.False(t, refsHidden)
+	require.Len(t, clauses, 1)
+	assert.Equal(t, "JSON_EXTRACT(data, ?) = ?", clauses[0].sql)
 }
 
 func TestBuildMySQLRecordListSQL_NoFilter(t *testing.T) {
