@@ -3,6 +3,7 @@ package services
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -354,6 +355,8 @@ func BenchmarkFieldServiceListFields(b *testing.B) {
 }
 
 func TestExplainPlanListRecords(t *testing.T) {
+	skipExplainDiagnosticsUnderRace(t)
+
 	fixture := testutil.SetupBenchmarkFixture(t, testutil.BenchmarkSeedConfig{
 		RecordCount:     5000,
 		ExtraFieldCount: 12,
@@ -378,6 +381,8 @@ func TestExplainPlanListRecords(t *testing.T) {
 }
 
 func TestExplainPlanListRecordsWithNoiseTables(t *testing.T) {
+	skipExplainDiagnosticsUnderRace(t)
+
 	fixture := testutil.SetupBenchmarkFixture(t, testutil.BenchmarkSeedConfig{
 		RecordCount:          5000,
 		ExtraFieldCount:      12,
@@ -401,6 +406,8 @@ func TestExplainPlanListRecordsWithNoiseTables(t *testing.T) {
 }
 
 func TestExplainPlanListRecordsMySQLExperiments(t *testing.T) {
+	skipExplainDiagnosticsUnderRace(t)
+
 	fixture := testutil.SetupBenchmarkFixture(t, testutil.BenchmarkSeedConfig{
 		RecordCount:     5000,
 		ExtraFieldCount: 12,
@@ -451,6 +458,14 @@ func TestExplainPlanListRecordsMySQLExperiments(t *testing.T) {
 		"beta",
 	)
 	t.Logf("mysql generated column plan: %s", generatedPlan)
+}
+
+func skipExplainDiagnosticsUnderRace(t *testing.T) {
+	t.Helper()
+	if !raceEnabled() || os.Getenv("CORNERSTONE_PERF_EXPLAIN_FULL") == "1" {
+		return
+	}
+	t.Skip("heavy EXPLAIN diagnostics are covered by the Performance workflow; set CORNERSTONE_PERF_EXPLAIN_FULL=1 to run them under -race")
 }
 
 func TestMySQLRecordFieldIndexBenchmarkQueryArgs(t *testing.T) {

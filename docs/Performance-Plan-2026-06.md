@@ -712,18 +712,28 @@ go test ./pkg/query -run ^$ -bench BenchmarkExecutorExecute -benchmem -count 1
 
 ### 查询策略
 
-MySQL 对可索引结构化等值条件改为 `EXISTS` 派生索引过滤：
+MySQL 对可索引结构化等值条件先收集 `record_field_indexes` 命中记录，再回连 `records`：
 
 ```sql
-EXISTS (
-  SELECT 1
-  FROM record_field_indexes rfi
-  WHERE rfi.table_id = ?
-    AND rfi.field_id = ?
-    AND rfi.value_text = ?
-    AND rfi.record_id = records.id
-    AND rfi.deleted_at IS NULL
-)
+SELECT records.id, records.table_id, records.data, records.version, records.created_at, records.updated_at
+FROM (
+  SELECT record_id
+  FROM (
+    SELECT record_id, field_id
+    FROM record_field_indexes
+    WHERE table_id = ? AND deleted_at IS NULL AND field_id = ? AND value_text = ?
+    UNION ALL
+    SELECT record_id, field_id
+    FROM record_field_indexes
+    WHERE table_id = ? AND deleted_at IS NULL AND field_id = ? AND value_text = ?
+  ) rfi_matches
+  GROUP BY record_id
+  HAVING COUNT(DISTINCT field_id) = ?
+) matched
+JOIN records FORCE INDEX (PRIMARY) ON records.id = matched.record_id
+WHERE records.table_id = ? AND records.deleted_at IS NULL
+ORDER BY records.created_at DESC
+LIMIT ? OFFSET ?
 ```
 
 如果字段类型、过滤值或文本长度不适合派生索引，则保留原路径：
@@ -736,7 +746,7 @@ JSON_EXTRACT(data, ?) = ?
 
 - 新写入数据由 `RecordService` 在同一事务内同步派生索引。
 - 历史数据由 `Migrate()` 执行批量回填；已存在活跃派生索引的记录会跳过，避免重复写入。
-- 因此 MySQL 生产查询可以对受支持标量条件使用纯 `EXISTS` 索引路径；如果生产库绕过服务层直接写 `records`，必须同步执行回填或调用一致性校验。
+- 因此 MySQL 生产查询可以对受支持标量条件使用派生索引匹配路径；如果生产库绕过服务层直接写 `records`，必须同步执行回填或调用一致性校验。
 
 ### TDD 验收用例
 
@@ -748,7 +758,7 @@ JSON_EXTRACT(data, ?) = ?
 | 更新记录 | 旧索引行软删除，新索引行生效 |
 | 删除记录 | 记录和派生索引行一起软删除 |
 | 批量创建 | 每条记录都有对应派生索引行 |
-| MySQL SQL | 可索引结构化等值过滤使用 `record_field_indexes`，不可索引条件回退 `JSON_EXTRACT` |
+| MySQL SQL | 可索引结构化等值过滤使用 `record_field_indexes` 派生匹配子查询，不可索引条件回退 `JSON_EXTRACT` |
 
 ### 风险记录
 
@@ -767,7 +777,7 @@ JSON_EXTRACT(data, ?) = ?
 | 迁移与索引 | 已完成 | 新增 `idx_rfi_text_lookup`、`idx_rfi_number_lookup`、`idx_rfi_bool_lookup` |
 | 历史回填 | 已完成 | `Migrate()` 批量回填已有记录，跳过已有索引的记录 |
 | 写入同步 | 已完成 | `CreateRecord`、`UpdateRecord`、`DeleteRecord`、`BatchCreateRecords` 均在事务内同步派生索引 |
-| MySQL 查询改写 | 已完成 | 受支持标量结构化等值过滤走 `EXISTS record_field_indexes`；不支持值回退 `JSON_EXTRACT` |
+| MySQL 查询改写 | 已完成 | 受支持标量结构化等值过滤走 `record_field_indexes` 派生匹配子查询；不支持值回退 `JSON_EXTRACT` |
 | Benchmark fixture | 已完成 | 直接批量 seed 的 benchmark 记录同步生成派生索引行，CI 能验证新路径 |
 | MySQL perf 对照项 | 已完成 | 新增 `mysql_structured_filter_record_field_index`，用于对比 raw JSON 与 generated column |
 
@@ -789,10 +799,56 @@ go test ./internal/services -run ^$ -bench BenchmarkRecordServiceListRecords -be
 go test ./...
 ```
 
-CI 待验证重点：
+### CI/Performance 验证结果（GitHub Actions `27060717416` / `27060717431`）
 
-| 场景 | 预期 |
-|---|---|
-| `mysql_structured_filter_record_field_index` | 应明显快于 `mysql_structured_filter_raw_sql`，但可能仍慢于或接近 generated column |
-| MySQL `RecordServiceListRecords/structured_filter` | 应优先受益于派生索引表，减少 `JSON_EXTRACT` 逐行函数过滤 |
-| PostgreSQL / SQLite | 行为保持原状，性能不应出现明显退化 |
+运行地址：
+
+- Performance: `https://github.com/jiangfire/cornerstone/actions/runs/27060717416`
+- CI: `https://github.com/jiangfire/cornerstone/actions/runs/27060717431`
+
+#### 验证状态
+
+| Workflow | 状态 | 说明 |
+|---|---|---|
+| `Performance` | 成功 | SQLite / MySQL 8.0 / PostgreSQL 16 三个 perf job 全部完成，并上传 artifact |
+| `CI` | 失败，已定位并修复 | MySQL / PostgreSQL / migration / lint / build / vuln 成功；SQLite 与 Redis 在 `go test -race` 下被重型 `TestExplainPlanListRecordsWithNoiseTables` 拖到超时，已改为 race CI 默认跳过这些 EXPLAIN 诊断测试 |
+
+#### 跨数据库 benchmark 摘要
+
+| 场景 | SQLite | MySQL 8.0 | PostgreSQL 16 | 观察 |
+|---|---:|---:|---:|---|
+| `RecordServiceListRecords/no_filter` | `2.048 ms` | `6.702 ms` | `4.646 ms` | MySQL 普通列表仍在 `~6-7 ms` 波动区间，主路径已能产出但不稳定 |
+| `RecordServiceListRecords/structured_filter` | `13.157 ms` | `30.684 ms` | `6.198 ms` | MySQL 结构化过滤本轮明显退化，派生索引表没有带来预期收益 |
+| `structured_filter_db_narrow_projection` | `2.606 ms` | `6.280 ms` | `1.883 ms` | PostgreSQL 仍领先；MySQL JSON/派生路径仍偏慢 |
+| `mysql_structured_filter_raw_sql` | 不适用 | `2.887 ms` | 不适用 | 当前数据集上 raw `JSON_EXTRACT` 反而快于派生索引表实验 |
+| `mysql_structured_filter_record_field_index` | 不适用 | `9.791 ms` | 不适用 | 派生索引表查询可运行，但当前 SQL 形态不是有效优化 |
+| `mysql_structured_filter_generated_columns` | 不适用 | `0.562 ms` | 不适用 | generated column 仍是已验证最快 MySQL JSON 热字段方案 |
+
+#### MySQL `EXPLAIN ANALYZE` 结论
+
+| 场景 | 计划摘要 | 结论 |
+|---|---|---|
+| plain list | `Index range scan on records using idx_records_table_deleted_created` | 普通列表主路径仍能命中复合索引 |
+| forced composite | `Covering index lookup on records using idx_records_table_deleted_created` | 强制覆盖索引形态仍更快，engine 时间约 `0.047..0.108 ms` |
+| raw structured filter | 先走 `idx_records_table_deleted_created`，再执行 `json_extract(...)` 过滤 | engine 时间约 `0.074..120 ms`，仍是逐行 JSON 函数路径 |
+| record field index | `idx_rfi_text_lookup` 命中后被 `UNION ALL materialize`、`Sort`、`Group aggregate`，再与 `records` 回连 | engine 时间约 `235..236 ms`，物化/排序/聚合抵消了索引收益 |
+| generated columns | `Covering index lookup on idx_records_bench_status_category_created` | engine 时间约 `0.556..0.630 ms`，仍是 MySQL 最强证据 |
+
+#### 结论更新
+
+1. **普通列表路径**：继续保留 MySQL `FORCE INDEX (idx_records_table_deleted_created)` 主路径，并用 CI benchmark 监控波动。
+2. **派生索引表路径**：正确性、迁移、事务同步和 benchmark 产出均已验证，但当前 `UNION ALL + GROUP BY + 回连 records` 查询形态在 MySQL 8.0 上慢于 raw JSON，不应作为 MySQL 性能优化结论对外承诺。
+3. **MySQL JSON 热字段**：如果确实要优化少量稳定字段，优先采用 generated column 或 `JSON_VALUE()` 表达式索引；这类方案在当前 benchmark 中稳定优于 raw JSON 和派生索引表。
+4. **长期动态字段方案**：`record_field_indexes` 仍可作为动态字段索引的数据模型基础，但下一轮必须重新设计查询形态，例如从最高选择性的字段先筛 `record_id`、避免大范围物化聚合，或按真实查询模式维护更窄的组合索引。
+5. **PostgreSQL / SQLite 定位**：PostgreSQL 继续作为 JSON-heavy 生产推荐；SQLite 继续作为本地和 CI 快速基线，不外推为生产 JSON 查询能力。
+
+#### CI 超时修复
+
+| 问题 | 根因 | 修复 |
+|---|---|---|
+| SQLite / Redis CI 失败 | 功能 CI 使用 `go test -race` 跑全量测试；`TestExplainPlanListRecordsWithNoiseTables` 会构造多表噪声数据并跑重型 EXPLAIN，在 race runtime 下分别触发 `10m/15m` 超时 | EXPLAIN 诊断测试在 race 模式下默认跳过；如需强制在 race 下运行，可设置 `CORNERSTONE_PERF_EXPLAIN_FULL=1` |
+
+补充边界：
+
+- Performance workflow 不使用 `-race`，仍会运行这些 EXPLAIN 诊断并上传 artifact。
+- 普通本地 `go test ./...` 仍会覆盖 EXPLAIN 诊断；本地验证已通过。
