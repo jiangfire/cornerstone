@@ -65,7 +65,7 @@ func TestFieldService_CreateField_RejectsInvalidType(t *testing.T) {
 			Type:    fieldType,
 		}, master.ID)
 		assert.Errorf(t, err, "type %q should be rejected", fieldType)
-		assert.Contains(t, err.Error(), "字段类型验证失败")
+		assert.Contains(t, err.Error(), "field type validation failed")
 	}
 }
 
@@ -79,7 +79,7 @@ func TestFieldService_CreateField_RejectsInvalidName(t *testing.T) {
 			Type:    "string",
 		}, master.ID)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "字段名称验证失败")
+		assert.Contains(t, err.Error(), "field name validation failed")
 	})
 
 	t.Run("name with spaces", func(t *testing.T) {
@@ -98,7 +98,7 @@ func TestFieldService_CreateField_RejectsInvalidName(t *testing.T) {
 			Type:    "string",
 		}, master.ID)
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "不能以数字开头")
+		assert.Contains(t, err.Error(), "field name must not start with a digit")
 	})
 
 	t.Run("name with special characters", func(t *testing.T) {
@@ -127,7 +127,7 @@ func TestFieldService_CreateField_RejectsDuplicateName(t *testing.T) {
 		Type:    "text",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "已存在同名字段")
+	assert.Contains(t, err.Error(), "a field with this name already exists in this table")
 }
 
 func TestFieldService_CreateField_StoresConfig(t *testing.T) {

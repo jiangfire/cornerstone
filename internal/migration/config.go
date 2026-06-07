@@ -107,15 +107,15 @@ func DefaultConfig() Config {
 func LoadConfig(path string) (Config, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return Config{}, fmt.Errorf("读取配置文件失败: %w", err)
+		return Config{}, fmt.Errorf("failed to read config file: %w", err)
 	}
 
 	cfg := DefaultConfig()
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return Config{}, newMigrationError(ErrCodeConfigInvalid, "解析配置文件失败", err)
+		return Config{}, newMigrationError(ErrCodeConfigInvalid, "failed to parse config file", err)
 	}
 	if err := cfg.Validate(); err != nil {
-		return Config{}, newMigrationError(ErrCodeConfigInvalid, "配置文件验证失败", err)
+		return Config{}, newMigrationError(ErrCodeConfigInvalid, "config file validation failed", err)
 	}
 	return cfg, nil
 }
@@ -127,12 +127,12 @@ func (c *Config) ApplyTypeMapOverrideFile(path string) error {
 
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return fmt.Errorf("读取类型映射文件失败: %w", err)
+		return fmt.Errorf("failed to read type mapping file: %w", err)
 	}
 
 	overrides := map[string]string{}
 	if err := json.Unmarshal(data, &overrides); err != nil {
-		return fmt.Errorf("解析类型映射文件失败: %w", err)
+		return fmt.Errorf("failed to parse type mapping file: %w", err)
 	}
 	if c.Mapping.Overrides == nil {
 		c.Mapping.Overrides = map[string]string{}
@@ -148,44 +148,44 @@ func (c Config) Validate() error {
 	switch sourceType {
 	case "mysql", "postgres", "sqlite":
 	default:
-		return fmt.Errorf("source.type %s 不支持: %s", ErrCodeUnsupportedSource, c.Source.Type)
+		return fmt.Errorf("source.type %s is not supported: %s", ErrCodeUnsupportedSource, c.Source.Type)
 	}
 
 	if c.hasSourceDSN() && c.hasSourceFields() {
-		return errors.New("source.dsn 与分字段连接配置互斥")
+		return errors.New("source.dsn and split field connection config are mutually exclusive")
 	}
 	if !c.hasSourceDSN() && !c.hasSourceFields() {
-		return errors.New("必须提供 source.dsn 或分字段连接配置")
+		return errors.New("either source.dsn or split field connection config must be provided")
 	}
 
 	if sourceType == "sqlite" {
 		if c.Source.DSN == "" && strings.TrimSpace(c.Source.Database) == "" {
-			return errors.New("sqlite 源必须提供 source.dsn 或 source.database")
+			return errors.New("sqlite source requires either source.dsn or source.database")
 		}
 	} else if c.Source.DSN == "" {
 		if strings.TrimSpace(c.Source.Host) == "" || strings.TrimSpace(c.Source.User) == "" || strings.TrimSpace(c.Source.Database) == "" {
-			return errors.New("非 sqlite 源需要完整的 host/user/database 配置")
+			return errors.New("non-sqlite source requires full host/user/database config")
 		}
 	}
 
 	if c.Data.BatchSize <= 0 {
-		return errors.New("data.batch_size 必须大于 0")
+		return errors.New("data.batch_size must be greater than 0")
 	}
 	switch c.Data.PaginationStrategy {
 	case "", PaginationCursor, PaginationOffset:
 	default:
-		return fmt.Errorf("data.pagination_strategy 不支持: %s", c.Data.PaginationStrategy)
+		return fmt.Errorf("data.pagination_strategy is not supported: %s", c.Data.PaginationStrategy)
 	}
 	if c.Data.MaxConcurrentTables <= 0 {
-		return errors.New("data.max_concurrent_tables 必须大于 0")
+		return errors.New("data.max_concurrent_tables must be greater than 0")
 	}
 	if c.Options.CheckpointInterval <= 0 {
-		return errors.New("options.checkpoint_interval 必须大于 0")
+		return errors.New("options.checkpoint_interval must be greater than 0")
 	}
 	switch c.Options.RollbackOnFailure {
 	case "", RollbackTable, RollbackNone:
 	default:
-		return fmt.Errorf("options.rollback_on_failure 不支持: %s", c.Options.RollbackOnFailure)
+		return fmt.Errorf("options.rollback_on_failure is not supported: %s", c.Options.RollbackOnFailure)
 	}
 
 	return nil
@@ -197,13 +197,13 @@ func CheckConfigFileWarnings(path string) []string {
 	}
 	info, err := os.Stat(path)
 	if err != nil {
-		return []string{fmt.Sprintf("无法读取配置文件权限: %v", err)}
+		return []string{fmt.Sprintf("unable to read config file permissions: %v", err)}
 	}
 	if os.PathSeparator == '\\' {
 		return nil
 	}
 	if info.Mode().Perm()&0o077 != 0 {
-		return []string{"配置文件包含敏感信息时建议权限为 0600"}
+		return []string{"config file containing sensitive information should have permissions 0600"}
 	}
 	return nil
 }

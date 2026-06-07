@@ -9,8 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// MCPOriginGuard 校验 HTTP MCP 的 Origin，降低 DNS rebinding 风险。
-// 若请求未携带 Origin，则默认放行，兼容非浏览器 MCP 客户端。
+// MCPOriginGuard validates the HTTP MCP Origin to mitigate DNS rebinding risk.
+// If the request does not carry an Origin, allow by default to support non-browser MCP clients.
 func MCPOriginGuard() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		origin := strings.TrimSpace(c.GetHeader("Origin"))

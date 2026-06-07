@@ -8,38 +8,38 @@ import (
 	"strings"
 )
 
-// Parser 查询解析器
+// Parser parses query requests.
 type Parser struct {
 	limits QueryLimits
 }
 
-// NewParser 创建解析器
+// NewParser creates a parser.
 func NewParser() *Parser {
 	return &Parser{
 		limits: DefaultLimits,
 	}
 }
 
-// NewParserWithLimits 创建带自定义限制的解析器
+// NewParserWithLimits creates a parser with custom limits.
 func NewParserWithLimits(limits QueryLimits) *Parser {
 	return &Parser{
 		limits: limits,
 	}
 }
 
-// Parse 解析查询请求
+// Parse parses a query request.
 func (p *Parser) Parse(data []byte) (*QueryRequest, error) {
 	var req QueryRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		return nil, fmt.Errorf("JSON解析失败: %w", err)
+		return nil, fmt.Errorf("JSON parse failed: %w", err)
 	}
 
-	// 规范化请求
+	// Normalize request
 	if err := p.normalize(&req); err != nil {
 		return nil, err
 	}
 
-	// 验证请求
+	// Validate request
 	if err := p.validate(&req); err != nil {
 		return nil, err
 	}
@@ -47,25 +47,25 @@ func (p *Parser) Parse(data []byte) (*QueryRequest, error) {
 	return &req, nil
 }
 
-// ParseFromMap 从 map 解析查询请求
+// ParseFromMap parses a query request from a map.
 func (p *Parser) ParseFromMap(data map[string]interface{}) (*QueryRequest, error) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return nil, fmt.Errorf("序列化失败: %w", err)
+		return nil, fmt.Errorf("serialization failed: %w", err)
 	}
 	return p.Parse(jsonData)
 }
 
-// normalize 规范化请求 - 将简化语法转换为完整语法
+// normalize converts simplified syntax to full syntax.
 func (p *Parser) normalize(req *QueryRequest) error {
-	// 处理简化语法
+	// Handle simplified syntax
 	if req.Table != "" {
 		req.From = req.Table
 	}
 
-	// 设置默认值
+	// Set defaults
 	if req.From == "" {
-		return errors.New("必须指定表名 (from 或 table)")
+		return errors.New("table name is required (from or table)")
 	}
 
 	if req.Page <= 0 {
@@ -76,7 +76,7 @@ func (p *Parser) normalize(req *QueryRequest) error {
 		req.Size = 20
 	}
 
-	// 转换简化语法的 filter 到 Where
+	// Convert simplified filter to Where
 	if len(req.Filter) > 0 && req.Where == nil {
 		where, err := p.parseSimplifiedFilter(req.Filter)
 		if err != nil {
@@ -85,7 +85,7 @@ func (p *Parser) normalize(req *QueryRequest) error {
 		req.Where = where
 	}
 
-	// 转换简化语法的 sort 到 OrderBy
+	// Convert simplified sort to OrderBy
 	if req.Sort != "" && len(req.OrderBy) == 0 {
 		orderBy, err := p.parseSimplifiedSort(req.Sort)
 		if err != nil {
@@ -94,12 +94,12 @@ func (p *Parser) normalize(req *QueryRequest) error {
 		req.OrderBy = orderBy
 	}
 
-	// 如果没有指定 select，默认查询所有字段
+	// Default to all fields if select is not specified
 	if len(req.Select) == 0 {
 		req.Select = []string{"*"}
 	}
 
-	// 规范化排序方向
+	// Normalize sort direction
 	for i := range req.OrderBy {
 		req.OrderBy[i].Dir = strings.ToLower(req.OrderBy[i].Dir)
 		if req.OrderBy[i].Dir == "" {
@@ -110,7 +110,7 @@ func (p *Parser) normalize(req *QueryRequest) error {
 	return nil
 }
 
-// parseSimplifiedFilter 解析简化语法的 filter
+// parseSimplifiedFilter parses simplified filter syntax.
 func (p *Parser) parseSimplifiedFilter(filter map[string]interface{}) (*WhereClause, error) {
 	where := &WhereClause{
 		And: make([]Condition, 0, len(filter)),
@@ -127,11 +127,11 @@ func (p *Parser) parseSimplifiedFilter(filter map[string]interface{}) (*WhereCla
 	return where, nil
 }
 
-// parseFilterField 解析单个过滤字段
+// parseFilterField parses a single filter field.
 func (p *Parser) parseFilterField(field string, value interface{}) (Condition, error) {
-	// 检查是否是操作符对象
+	// Check if value is an operator object
 	if obj, ok := value.(map[string]interface{}); ok {
-		// 支持 {"field": {"op": "value"}} 或 {"field": {"in": ["a", "b"]}}
+		// Support {"field": {"op": "value"}} or {"field": {"in": ["a", "b"]}}
 		for op, val := range obj {
 			switch op {
 			case "eq", "ne", "gt", "gte", "lt", "lte", "like", "in", "between", "is_null":
@@ -141,7 +141,7 @@ func (p *Parser) parseFilterField(field string, value interface{}) (Condition, e
 					Value: val,
 				}, nil
 			default:
-				// 可能是简写 {"status": {"in": ["a", "b"]}}
+				// Possibly shorthand {"status": {"in": ["a", "b"]}}
 				if isOperator(op) {
 					return Condition{
 						Field: field,
@@ -152,10 +152,10 @@ func (p *Parser) parseFilterField(field string, value interface{}) (Condition, e
 			}
 		}
 
-		return Condition{}, fmt.Errorf("字段 '%s' 包含无效操作符", field)
+		return Condition{}, fmt.Errorf("field '%s' contains invalid operator", field)
 	}
 
-	// 默认值使用 eq 操作符
+	// Default to eq operator
 	return Condition{
 		Field: field,
 		Op:    "eq",
@@ -163,7 +163,7 @@ func (p *Parser) parseFilterField(field string, value interface{}) (Condition, e
 	}, nil
 }
 
-// parseSimplifiedSort 解析简化语法的 sort
+// parseSimplifiedSort parses simplified sort syntax.
 func (p *Parser) parseSimplifiedSort(sort string) ([]OrderByClause, error) {
 	parts := strings.Split(sort, ",")
 	orderBy := make([]OrderByClause, 0, len(parts))
@@ -174,7 +174,7 @@ func (p *Parser) parseSimplifiedSort(sort string) ([]OrderByClause, error) {
 			continue
 		}
 
-		// 检查前缀 - 表示降序
+		// Check for - prefix indicating descending order
 		if strings.HasPrefix(part, "-") {
 			orderBy = append(orderBy, OrderByClause{
 				Field: strings.TrimPrefix(part, "-"),
@@ -196,43 +196,43 @@ func (p *Parser) parseSimplifiedSort(sort string) ([]OrderByClause, error) {
 	return orderBy, nil
 }
 
-// validate 验证查询请求
+// validate validates a query request.
 func (p *Parser) validate(req *QueryRequest) error {
-	// 验证表名
+	// Validate table name
 	if req.From == "" {
-		return errors.New("表名不能为空")
+		return errors.New("table name cannot be empty")
 	}
 
-	// 验证分页参数
+	// Validate pagination params
 	if req.Size > p.limits.MaxPageSize {
-		return fmt.Errorf("每页大小不能超过 %d", p.limits.MaxPageSize)
+		return fmt.Errorf("page size cannot exceed %d", p.limits.MaxPageSize)
 	}
 
-	// 验证 JOIN 数量
+	// Validate JOIN count
 	if len(req.Join) > p.limits.MaxJoins {
-		return fmt.Errorf("JOIN 表数不能超过 %d", p.limits.MaxJoins)
+		return fmt.Errorf("JOIN count cannot exceed %d", p.limits.MaxJoins)
 	}
 
-	// 验证查询字段数
+	// Validate field count
 	if len(req.Select) > p.limits.MaxFields {
-		return fmt.Errorf("查询字段数不能超过 %d", p.limits.MaxFields)
+		return fmt.Errorf("field count cannot exceed %d", p.limits.MaxFields)
 	}
 
-	// 验证 WHERE 条件深度
+	// Validate WHERE nesting depth
 	if req.Where != nil {
 		if err := p.validateWhereDepth(req.Where, 0); err != nil {
 			return err
 		}
 	}
 
-	// 验证 HAVING 条件深度
+	// Validate HAVING nesting depth
 	if req.Having != nil {
 		if err := p.validateWhereDepth(req.Having, 0); err != nil {
 			return err
 		}
 	}
 
-	// 验证 UNION 查询
+	// Validate UNION queries
 	for i, unionReq := range req.Union {
 		if err := p.validate(&unionReq); err != nil {
 			return fmt.Errorf("union[%d]: %w", i, err)
@@ -244,23 +244,23 @@ func (p *Parser) validate(req *QueryRequest) error {
 		}
 	}
 
-	// 验证聚合函数
+	// Validate aggregate functions
 	for _, agg := range req.Aggregate {
 		if !isValidAggregateFunc(agg.Func) {
-			return fmt.Errorf("无效的聚合函数: %s", agg.Func)
+			return fmt.Errorf("invalid aggregate function: %s", agg.Func)
 		}
 		if agg.As == "" {
-			return fmt.Errorf("聚合函数 %s 必须指定别名 (as)", agg.Func)
+			return fmt.Errorf("aggregate function %s must specify an alias (as)", agg.Func)
 		}
 	}
 
-	// 验证 JOIN 类型与 ON 条件结构
+	// Validate JOIN type and ON condition structure
 	for i, join := range req.Join {
 		if !isValidJoinType(join.Type) {
-			return fmt.Errorf("无效的 JOIN 类型: %s", join.Type)
+			return fmt.Errorf("invalid JOIN type: %s", join.Type)
 		}
 		if join.Table == "" {
-			return errors.New("JOIN 必须指定 table")
+			return errors.New("JOIN must specify table")
 		}
 		if err := ValidateIdentifier(join.Table); err != nil {
 			return fmt.Errorf("JOIN[%d].table %w", i, err)
@@ -271,7 +271,7 @@ func (p *Parser) validate(req *QueryRequest) error {
 			}
 		}
 		if join.On.IsZero() {
-			return errors.New("invalid_join_condition: JOIN 必须指定 on{left, op, right}")
+			return errors.New("invalid_join_condition: JOIN must specify on{left, op, right}")
 		}
 		if err := ValidateJoinOp(join.On.Op); err != nil {
 			return fmt.Errorf("JOIN[%d].on.op %w", i, err)
@@ -284,8 +284,8 @@ func (p *Parser) validate(req *QueryRequest) error {
 		}
 	}
 
-	// 校验所有用户提供的字段名（Select / OrderBy / GroupBy / Aggregate / Where）。
-	// 此处只做"语法合法性"层面的校验；权限/白名单交给 Validator。
+	// Validate all user-provided field names (Select / OrderBy / GroupBy / Aggregate / Where).
+	// Only syntactic validation is done here; permissions / whitelist are handled by Validator.
 	for i, field := range req.Select {
 		if field == "*" {
 			continue
@@ -344,24 +344,24 @@ func (p *Parser) validate(req *QueryRequest) error {
 	return nil
 }
 
-// validateFieldExpression 校验字段名形如 `id`、`tables.id`、`data.status` 或 `data->>name`。
-// 同时拒绝多 `->` 嵌套、含 `[`/`*`/`'`/`"`/空格的字段名。
+// validateFieldExpression validates field names like `id`, `tables.id`, `data.status`, or `data->>name`.
+// Rejects nested `->`, and names containing `[`, `*`, `'`, `"`, or spaces.
 func validateFieldExpression(field string) error {
 	field = strings.TrimSpace(field)
 	if field == "" {
-		return errors.New("字段名不能为空")
+		return errors.New("field name cannot be empty")
 	}
-	// Postgres JSON 直引语法 `data->>key` 或 `data->key`：分裂校验
+	// Postgres JSON arrow syntax `data->>key` or `data->key`: split and validate
 	if strings.Contains(field, "->") {
-		// 不允许多重 `->`，例如 `data->>a->>b`，下沉为 sql_generator 的 JSON path 表达式更安全
+		// Disallow nested `->`, e.g. `data->>a->>b`; delegate to sql_generator JSON path expression instead
 		parts := strings.SplitN(field, "->", 2)
 		if len(parts) != 2 {
-			return fmt.Errorf("非法字段名 %q：JSON 引用格式错误", field)
+			return fmt.Errorf("invalid field name %q: JSON reference format error", field)
 		}
 		base := strings.TrimSpace(parts[0])
 		path := strings.TrimSpace(parts[1])
-		path = strings.TrimPrefix(path, ">") // 允许 `->>` 与 `->`
-		// 剥单引号：`data->>'key'` 也是合法 SQL，需要先去引号再校验段
+		path = strings.TrimPrefix(path, ">") // Allow both `->>` and `->`
+		// Strip quotes: `data->>'key'` is valid SQL, remove quotes before validating segments
 		path = strings.Trim(path, "'\"")
 		if err := ValidateIdentifier(base); err != nil {
 			return err
@@ -374,7 +374,7 @@ func validateFieldExpression(field string) error {
 	return ValidateIdentifier(field)
 }
 
-// validateWhereFieldNames 深度遍历 WhereClause，校验每个条件的字段名。
+// validateWhereFieldNames recursively validates field names in WhereClause.
 func validateWhereFieldNames(where *WhereClause) error {
 	for _, cond := range where.And {
 		if err := validateConditionFieldName(cond); err != nil {
@@ -390,9 +390,10 @@ func validateWhereFieldNames(where *WhereClause) error {
 }
 
 func validateConditionFieldName(cond Condition) error {
-	// 区分"叶节点条件"与"分组条件"：分组条件（仅含 And/Or）的 Field 允许为空，
-	// 因为它只是用来嵌套；叶节点必须有合法 field，否则后续 SQL 生成会拿到空字段而失败，
-	// 也容易成为绕过校验的载体。
+	// Distinguish leaf conditions from group conditions: group conditions (only And/Or)
+	// may have an empty Field because they are purely for nesting; leaf nodes must have
+	// a valid field, otherwise SQL generation will fail with an empty field and could
+	// become a validation bypass vector.
 	isGroup := len(cond.And) > 0 || len(cond.Or) > 0
 	if !isGroup {
 		if err := validateFieldExpression(cond.Field); err != nil {
@@ -416,10 +417,10 @@ func validateConditionFieldName(cond Condition) error {
 	return nil
 }
 
-// validateWhereDepth 验证 WHERE 条件嵌套深度
+// validateWhereDepth validates WHERE condition nesting depth.
 func (p *Parser) validateWhereDepth(where *WhereClause, depth int) error {
 	if depth > p.limits.MaxDepth {
-		return fmt.Errorf("WHERE 条件嵌套深度不能超过 %d", p.limits.MaxDepth)
+		return fmt.Errorf("WHERE nesting depth cannot exceed %d", p.limits.MaxDepth)
 	}
 
 	for _, cond := range where.And {
@@ -437,18 +438,18 @@ func (p *Parser) validateWhereDepth(where *WhereClause, depth int) error {
 	return nil
 }
 
-// validateConditionDepth 验证条件嵌套深度
+// validateConditionDepth validates condition nesting depth.
 func (p *Parser) validateConditionDepth(cond Condition, depth int) error {
 	if depth > p.limits.MaxDepth {
-		return fmt.Errorf("WHERE 条件嵌套深度不能超过 %d", p.limits.MaxDepth)
+		return fmt.Errorf("WHERE nesting depth cannot exceed %d", p.limits.MaxDepth)
 	}
 
-	// 验证操作符
+	// Validate operator
 	if cond.Op != "" && !isValidOperator(cond.Op) {
-		return fmt.Errorf("无效的操作符: %s", cond.Op)
+		return fmt.Errorf("invalid operator: %s", cond.Op)
 	}
 
-	// 递归验证嵌套条件
+	// Recursively validate nested conditions
 	for _, nested := range cond.And {
 		if err := p.validateConditionDepth(nested, depth+1); err != nil {
 			return err
@@ -464,12 +465,12 @@ func (p *Parser) validateConditionDepth(cond Condition, depth int) error {
 	return nil
 }
 
-// isOperator 检查字符串是否是操作符
+// isOperator checks whether a string is an operator.
 func isOperator(s string) bool {
 	return isValidOperator(s)
 }
 
-// isValidOperator 验证操作符是否有效
+// isValidOperator checks whether an operator is valid.
 func isValidOperator(op string) bool {
 	validOps := []string{"eq", "ne", "gt", "gte", "lt", "lte", "like", "in", "between", "is_null"}
 	for _, valid := range validOps {
@@ -480,7 +481,7 @@ func isValidOperator(op string) bool {
 	return false
 }
 
-// isValidAggregateFunc 验证聚合函数是否有效
+// isValidAggregateFunc checks whether an aggregate function is valid.
 func isValidAggregateFunc(fn string) bool {
 	validFuncs := []string{"count", "sum", "avg", "min", "max", "count_distinct", "stddev", "stddev_pop", "stddev_samp", "variance", "var_pop", "var_samp"}
 	for _, valid := range validFuncs {
@@ -491,7 +492,7 @@ func isValidAggregateFunc(fn string) bool {
 	return false
 }
 
-// isValidJoinType 验证 JOIN 类型是否有效
+// isValidJoinType checks whether a JOIN type is valid.
 func isValidJoinType(joinType string) bool {
 	validTypes := []string{"left", "right", "inner", "outer"}
 	for _, valid := range validTypes {
@@ -502,20 +503,20 @@ func isValidJoinType(joinType string) bool {
 	return false
 }
 
-// ParseBatch 解析批量查询请求
+// ParseBatch parses a batch query request.
 func (p *Parser) ParseBatch(data []byte) (*BatchQueryRequest, error) {
 	var req BatchQueryRequest
 	if err := json.Unmarshal(data, &req); err != nil {
-		return nil, fmt.Errorf("JSON解析失败: %w", err)
+		return nil, fmt.Errorf("JSON parse failed: %w", err)
 	}
 
-	// 验证每个查询
+	// Validate each query
 	for name, query := range req.Queries {
 		if err := p.normalize(&query); err != nil {
-			return nil, fmt.Errorf("查询 '%s' 格式错误: %w", name, err)
+			return nil, fmt.Errorf("query '%s' format error: %w", name, err)
 		}
 		if err := p.validate(&query); err != nil {
-			return nil, fmt.Errorf("查询 '%s' 验证失败: %w", name, err)
+			return nil, fmt.Errorf("query '%s' validation failed: %w", name, err)
 		}
 		req.Queries[name] = query
 	}
@@ -523,11 +524,11 @@ func (p *Parser) ParseBatch(data []byte) (*BatchQueryRequest, error) {
 	return &req, nil
 }
 
-// ConvertValue 转换值为适当类型
+// ConvertValue converts a value to an appropriate type.
 func ConvertValue(value interface{}) interface{} {
 	switch v := value.(type) {
 	case float64:
-		// 检查是否为整数
+		// Check if integer
 		if v == float64(int64(v)) {
 			return int64(v)
 		}
@@ -538,7 +539,7 @@ func ConvertValue(value interface{}) interface{} {
 		}
 		return v
 	case string:
-		// 尝试解析为数字
+		// Try to parse as number
 		if i, err := strconv.ParseInt(v, 10, 64); err == nil {
 			return i
 		}

@@ -7,82 +7,83 @@ import (
 	"fmt"
 )
 
-// QueryRequest 查询请求 - 支持完整语法和简化语法
+// QueryRequest is a query request supporting both full and simplified syntax.
 type QueryRequest struct {
-	// 完整语法
-	From      string          `json:"from"`      // 主表
-	Select    []string        `json:"select"`    // 查询字段
-	Where     *WhereClause    `json:"where"`     // 条件
-	Having    *WhereClause    `json:"having"`    // HAVING 条件（聚合后过滤）
-	Join      []JoinClause    `json:"join"`      // JOIN
-	GroupBy   []string        `json:"groupBy"`   // 分组
-	Aggregate []AggregateFunc `json:"aggregate"` // 聚合
-	OrderBy   []OrderByClause `json:"orderBy"`   // 排序
-	Page      int             `json:"page"`      // 页码
-	Size      int             `json:"size"`      // 每页大小
+	// Full syntax
+	From      string          `json:"from"`      // Primary table
+	Select    []string        `json:"select"`    // Selected fields
+	Where     *WhereClause    `json:"where"`     // Conditions
+	Having    *WhereClause    `json:"having"`    // HAVING conditions (post-aggregate filter)
+	Join      []JoinClause    `json:"join"`      // JOINs
+	GroupBy   []string        `json:"groupBy"`   // Grouping
+	Aggregate []AggregateFunc `json:"aggregate"` // Aggregates
+	OrderBy   []OrderByClause `json:"orderBy"`   // Ordering
+	Page      int             `json:"page"`      // Page number
+	Size      int             `json:"size"`      // Page size
 
-	// 集合操作
-	Union     []QueryRequest `json:"union,omitempty"`     // UNION 查询
-	Intersect []QueryRequest `json:"intersect,omitempty"` // INTERSECT 查询
+	// Set operations
+	Union     []QueryRequest `json:"union,omitempty"`     // UNION queries
+	Intersect []QueryRequest `json:"intersect,omitempty"` // INTERSECT queries
 
-	// 简化语法
-	Table  string                 `json:"table"`  // 主表（简写）
-	Filter map[string]interface{} `json:"filter"` // 过滤条件（简写）
-	Sort   string                 `json:"sort"`   // 排序（简写，如 "-created_at"）
+	// Simplified syntax
+	Table  string                 `json:"table"`  // Primary table (shorthand)
+	Filter map[string]interface{} `json:"filter"` // Filter conditions (shorthand)
+	Sort   string                 `json:"sort"`   // Sort (shorthand, e.g. "-created_at")
 }
 
-// WhereClause WHERE 条件
+// WhereClause is a WHERE condition.
 type WhereClause struct {
 	And []Condition            `json:"and,omitempty"`
 	Or  []Condition            `json:"or,omitempty"`
-	Raw map[string]interface{} `json:"-"` // 简化语法的原始过滤条件
+	Raw map[string]interface{} `json:"-"` // Raw filter from simplified syntax
 }
 
-// Condition 单个条件
+// Condition is a single condition.
 type Condition struct {
-	Field string      `json:"field"`         // 字段名
-	Op    string      `json:"op,omitempty"`  // 操作符，省略时为 eq
-	Value interface{} `json:"value"`         // 值
-	Not   bool        `json:"not,omitempty"` // 是否取反
-	And   []Condition `json:"and,omitempty"` // 嵌套 AND
-	Or    []Condition `json:"or,omitempty"`  // 嵌套 OR
+	Field string      `json:"field"`         // Field name
+	Op    string      `json:"op,omitempty"`  // Operator; defaults to eq when omitted
+	Value interface{} `json:"value"`         // Value
+	Not   bool        `json:"not,omitempty"` // Negation
+	And   []Condition `json:"and,omitempty"` // Nested AND
+	Or    []Condition `json:"or,omitempty"`  // Nested OR
 }
 
-// JoinClause JOIN 子句
+// JoinClause is a JOIN clause.
 type JoinClause struct {
-	Type   string        `json:"type"`             // join 类型: left, right, inner
-	Table  string        `json:"table"`            // 关联表
-	As     string        `json:"as,omitempty"`     // 别名
-	On     JoinCondition `json:"on"`               // 关联条件（必须为结构体，旧字符串形式已废弃）
-	Select []string      `json:"select,omitempty"` // 关联表查询字段
+	Type   string        `json:"type"`             // Join type: left, right, inner
+	Table  string        `json:"table"`            // Joined table
+	As     string        `json:"as,omitempty"`     // Alias
+	On     JoinCondition `json:"on"`               // Join condition (must be struct; string form deprecated)
+	Select []string      `json:"select,omitempty"` // Fields to select from joined table
 }
 
-// JoinCondition 描述 JOIN ... ON 的等值/不等值比较条件。
-// 历史版本里 On 是裸字符串，直接拼进 SQL 导致注入面；现在固定为结构体并要求两侧
-// 是合法限定字段。任何外部调用方都必须迁移到这个形态——旧字符串通过 UnmarshalJSON
-// 直接报错为 `invalid_join_condition`，详见 docs/REVIEW-FIX-PLAN-2026-05.md P1-3。
+// JoinCondition describes an equi- or non-equi comparison for JOIN ... ON.
+// In earlier versions On was a raw string concatenated directly into SQL, creating an injection
+// surface. Now it is fixed as a struct requiring both sides to be valid qualified fields.
+// All callers must migrate to this shape — old strings are rejected by UnmarshalJSON with
+// `invalid_join_condition`. See docs/REVIEW-FIX-PLAN-2026-05.md P1-3.
 type JoinCondition struct {
-	Left  string `json:"left"`  // 例：`tables.database_id`
-	Op    string `json:"op"`    // 仅允许 "=" / "<>"，详见 ValidateJoinOp
-	Right string `json:"right"` // 例：`db.id`
+	Left  string `json:"left"`  // E.g. `tables.database_id`
+	Op    string `json:"op"`    // Only "=" / "<>" allowed; see ValidateJoinOp
+	Right string `json:"right"` // E.g. `db.id`
 }
 
-// IsZero 判断 JoinCondition 是否为零值（用于 parser 的非空校验）。
+// IsZero reports whether JoinCondition is the zero value (used by parser for non-empty check).
 func (jc JoinCondition) IsZero() bool {
 	return jc.Left == "" && jc.Op == "" && jc.Right == ""
 }
 
-// UnmarshalJSON 显式区分"老的字符串形式"（拒绝）与"新的对象形式"（解析）。
-// 这样调用方拿到的是带语义的 400 错误，而不是 GORM/Gin 默认那种生疏的 JSON 类型错。
+// UnmarshalJSON explicitly rejects the old string form and accepts the new object form.
+// This gives callers a meaningful 400 error instead of the generic JSON type error from GORM/Gin.
 func (jc *JoinCondition) UnmarshalJSON(data []byte) error {
 	trimmed := bytes.TrimSpace(data)
 	if len(trimmed) == 0 || bytes.Equal(trimmed, []byte("null")) {
 		return nil
 	}
 	if trimmed[0] == '"' {
-		return errors.New("invalid_join_condition: 'on' 字段必须是 {left, op, right} 对象，旧字符串形式已不支持")
+		return errors.New("invalid_join_condition: 'on' must be a {left, op, right} object; string form is no longer supported")
 	}
-	// 借助一次性 alias 类型避免无限递归。
+	// Use a one-time alias type to avoid infinite recursion.
 	type rawJoinCondition JoinCondition
 	var raw rawJoinCondition
 	if err := json.Unmarshal(trimmed, &raw); err != nil {
@@ -92,48 +93,48 @@ func (jc *JoinCondition) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// AggregateFunc 聚合函数
+// AggregateFunc is an aggregate function.
 type AggregateFunc struct {
-	Func  string `json:"func"`            // 函数名: count, sum, avg, min, max
-	Field string `json:"field,omitempty"` // 字段名
-	As    string `json:"as"`              // 别名
+	Func  string `json:"func"`            // Function name: count, sum, avg, min, max
+	Field string `json:"field,omitempty"` // Field name
+	As    string `json:"as"`              // Alias
 }
 
-// OrderByClause 排序子句
+// OrderByClause is an ORDER BY clause.
 type OrderByClause struct {
-	Field string `json:"field"`         // 字段名
-	Dir   string `json:"dir,omitempty"` // 方向: asc, desc (默认 asc)
+	Field string `json:"field"`         // Field name
+	Dir   string `json:"dir,omitempty"` // Direction: asc, desc (default asc)
 }
 
-// QueryResult 查询结果
+// QueryResult is a query result.
 type QueryResult struct {
-	Data    []map[string]interface{} `json:"data"`     // 数据
-	Total   int64                    `json:"total"`    // 总数
-	Page    int                      `json:"page"`     // 当前页
-	Size    int                      `json:"size"`     // 每页大小
-	HasMore bool                     `json:"has_more"` // 是否还有更多
+	Data    []map[string]interface{} `json:"data"`     // Result rows
+	Total   int64                    `json:"total"`    // Total count
+	Page    int                      `json:"page"`     // Current page
+	Size    int                      `json:"size"`     // Page size
+	HasMore bool                     `json:"has_more"` // Whether more pages exist
 }
 
-// BatchQueryRequest 批量查询请求
+// BatchQueryRequest is a batch query request.
 type BatchQueryRequest struct {
-	Queries map[string]QueryRequest `json:"queries"` // key: 查询名称
+	Queries map[string]QueryRequest `json:"queries"` // key: query name
 }
 
-// BatchQueryResult 批量查询结果
+// BatchQueryResult is a batch query result.
 type BatchQueryResult struct {
-	Results map[string]*QueryResult `json:"results"` // key: 查询名称
+	Results map[string]*QueryResult `json:"results"` // key: query name
 }
 
-// QueryLimits 查询限制配置
+// QueryLimits defines query limit settings.
 type QueryLimits struct {
-	MaxJoins    int   // 最多 JOIN 表数
-	MaxPageSize int   // 最大分页大小
-	MaxDepth    int   // 嵌套查询最大深度
-	MaxRows     int64 // 最大返回行数（不带分页时）
-	MaxFields   int   // 最大查询字段数
+	MaxJoins    int   // Max number of JOIN tables
+	MaxPageSize int   // Max page size
+	MaxDepth    int   // Max nesting depth for conditions
+	MaxRows     int64 // Max rows returned (without pagination)
+	MaxFields   int   // Max number of selected fields
 }
 
-// DefaultLimits 默认查询限制
+// DefaultLimits are the default query limits.
 var DefaultLimits = QueryLimits{
 	MaxJoins:    3,
 	MaxPageSize: 1000,
@@ -142,10 +143,10 @@ var DefaultLimits = QueryLimits{
 	MaxFields:   100,
 }
 
-// AllowedTables 允许的表和字段白名单
+// AllowedTables is a whitelist of allowed tables and fields.
 type AllowedTables map[string][]string
 
-// DefaultAllowedTables 默认允许的表
+// DefaultAllowedTables are the default allowed tables.
 var DefaultAllowedTables = AllowedTables{
 	"records":   {"id", "table_id", "data", "version", "created_at", "updated_at"},
 	"tables":    {"id", "database_id", "name", "description", "created_at", "updated_at"},
@@ -155,13 +156,13 @@ var DefaultAllowedTables = AllowedTables{
 	"tokens":    {"id", "name", "is_master", "scopes", "expires_at", "created_at"},
 }
 
-// IsTableAllowed 检查表是否允许访问
+// IsTableAllowed checks whether a table is allowed.
 func (at AllowedTables) IsTableAllowed(table string) bool {
 	_, ok := at[table]
 	return ok
 }
 
-// IsFieldAllowed 检查字段是否允许访问
+// IsFieldAllowed checks whether a field is allowed.
 func (at AllowedTables) IsFieldAllowed(table, field string) bool {
 	fields, ok := at[table]
 	if !ok {
@@ -175,7 +176,7 @@ func (at AllowedTables) IsFieldAllowed(table, field string) bool {
 	return false
 }
 
-// GetAllowedFields 获取表允许的字段列表
+// GetAllowedFields returns the allowed field list for a table.
 func (at AllowedTables) GetAllowedFields(table string) []string {
 	return at[table]
 }

@@ -13,35 +13,35 @@ import (
 	"gorm.io/gorm"
 )
 
-// FieldService 字段管理服务
+// FieldService manages field operations
 type FieldService struct {
 	db *gorm.DB
 }
 
-// NewFieldService 创建字段服务实例
+// NewFieldService creates a new FieldService instance
 func NewFieldService(db *gorm.DB) *FieldService {
 	return &FieldService{db: db}
 }
 
-// validateFieldName 验证字段名称
+// validateFieldName validates field name format
 func validateFieldName(name string) error {
 	name = strings.TrimSpace(name)
 
 	if len(name) < 1 || len(name) > 255 {
-		return errors.New("字段名称长度必须在1-255个字符之间")
+		return errors.New("field name must be between 1 and 255 characters")
 	}
 
-	// 支持字母（包括中文）、数字、下划线
-	// \p{L} 匹配所有语言的字母（包括中文）
-	// \p{N} 匹配所有语言的数字
+	// Allow letters (including CJK), numbers, underscores
+	// \p{L} matches letters from all languages (including CJK)
+	// \p{N} matches numbers from all languages
 	matched, _ := regexp.MatchString(`^[\p{L}\p{N}_]+$`, name)
 	if !matched {
-		return errors.New("字段名称只能包含字母、数字和下划线")
+		return errors.New("field name can only contain letters, numbers and underscores")
 	}
 
-	// 不能以ASCII数字开头
+	// Must not start with ASCII digit
 	if matched, _ := regexp.MatchString(`^[0-9]`, name); matched {
-		return errors.New("字段名称不能以数字开头")
+		return errors.New("field name must not start with a digit")
 	}
 
 	return nil
@@ -63,7 +63,7 @@ func supportsFieldOptions(fieldType string) bool {
 	return fieldType == "list"
 }
 
-// validateFieldType 验证字段类型
+// validateFieldType validates field type
 func validateFieldType(fieldType string) error {
 	validTypes := []string{"string", "text", "number", "boolean", "date", "datetime", "file", "json", "list"}
 	for _, validType := range validTypes {
@@ -71,64 +71,64 @@ func validateFieldType(fieldType string) error {
 			return nil
 		}
 	}
-	return fmt.Errorf("无效的字段类型: %s", fieldType)
+	return fmt.Errorf("invalid field type: %s", fieldType)
 }
 
 func validateMutableFieldType(fieldType string) error { return nil }
 
-// validateFieldConfig 验证字段配置
+// validateFieldConfig validates field configuration
 func validateFieldConfig(config FieldConfig) error {
-	// 验证选项数量限制
+	// Validate options count
 	if len(config.Options) > 100 {
-		return errors.New("选项数量不能超过100个")
+		return errors.New("number of options must not exceed 100")
 	}
 
-	// 验证选项值长度
+	// Validate option value length
 	for _, option := range config.Options {
 		if len(option) > 255 {
-			return errors.New("选项值长度不能超过255个字符")
+			return errors.New("option value must not exceed 255 characters")
 		}
 	}
 
-	// 验证数值范围
+	// Validate numeric range
 	if config.Min != nil && config.Max != nil && *config.Min > *config.Max {
-		return errors.New("最小值不能大于最大值")
+		return errors.New("min value must not be greater than max value")
 	}
 
-	// 验证最大长度
+	// Validate max length
 	if config.MaxLength != nil && *config.MaxLength < 1 {
-		return errors.New("最大长度必须大于0")
+		return errors.New("max length must be greater than 0")
 	}
 
-	// 验证正则表达式
+	// Validate regex pattern
 	if config.Validation != "" {
 		_, err := regexp.Compile(config.Validation)
 		if err != nil {
-			return fmt.Errorf("无效的正则表达式: %w", err)
+			return fmt.Errorf("invalid regex pattern: %w", err)
 		}
 	}
 
 	if len(config.AllowedTypes) > 50 {
-		return errors.New("允许的文件类型数量不能超过50个")
+		return errors.New("number of allowed file types must not exceed 50")
 	}
 
 	for _, allowedType := range config.AllowedTypes {
 		if len(allowedType) > 100 {
-			return errors.New("文件类型规则长度不能超过100个字符")
+			return errors.New("file type rule must not exceed 100 characters")
 		}
 	}
 
 	if config.MaxFileSizeMB < 0 {
-		return errors.New("附件大小限制不能小于0")
+		return errors.New("max file size must not be negative")
 	}
 
 	return nil
 }
 
-// sanitizeFieldName 清理字段名称
+// sanitizeFieldName sanitizes field name
 func sanitizeFieldName(name string) string {
 	name = strings.TrimSpace(name)
-	// 移除危险字符
+	// Remove dangerous characters
 	name = strings.ReplaceAll(name, "<", "")
 	name = strings.ReplaceAll(name, ">", "")
 	name = strings.ReplaceAll(name, "\"", "")
@@ -136,14 +136,14 @@ func sanitizeFieldName(name string) string {
 	return name
 }
 
-// sanitizeFieldConfig 清理字段配置
+// sanitizeFieldConfig sanitizes field config
 func sanitizeFieldConfig(config FieldConfig) FieldConfig {
-	// 清理选项
+	// Sanitize options
 	cleanedOptions := make([]string, 0, len(config.Options))
 	for _, option := range config.Options {
 		cleanedOption := strings.TrimSpace(option)
 		if cleanedOption != "" {
-			// 移除危险字符
+			// Remove dangerous characters
 			cleanedOption = strings.ReplaceAll(cleanedOption, "<", "")
 			cleanedOption = strings.ReplaceAll(cleanedOption, ">", "")
 			cleanedOption = strings.ReplaceAll(cleanedOption, "\"", "")
@@ -153,7 +153,7 @@ func sanitizeFieldConfig(config FieldConfig) FieldConfig {
 	}
 	config.Options = cleanedOptions
 
-	// 清理正则表达式
+	// Sanitize regex
 	config.Validation = strings.TrimSpace(config.Validation)
 
 	cleanedAllowedTypes := make([]string, 0, len(config.AllowedTypes))
@@ -174,37 +174,37 @@ func sanitizeFieldDescription(description string) string {
 
 func validateFieldDescription(description string) error {
 	if len(description) > 1000 {
-		return errors.New("字段备注长度不能超过1000个字符")
+		return errors.New("field description must not exceed 1000 characters")
 	}
 	return nil
 }
 
-// FieldConfig 字段配置
+// FieldConfig holds field configuration
 type FieldConfig struct {
-	Options       []string `json:"options,omitempty"`          // 列表建议项
-	Required      bool     `json:"required,omitempty"`         // 是否必填
-	Min           *float64 `json:"min,omitempty"`              // 最小值
-	Max           *float64 `json:"max,omitempty"`              // 最大值
-	Format        string   `json:"format,omitempty"`           // 日期格式等
-	MaxLength     *int     `json:"max_length,omitempty"`       // 最大长度
-	Validation    string   `json:"validation,omitempty"`       // 正则验证
-	AllowedTypes  []string `json:"allowed_types,omitempty"`    // 允许的附件类型，如 image/*、.pdf
-	MaxFileSizeMB int      `json:"max_file_size_mb,omitempty"` // 附件大小上限（MB）
-	Multiple      bool     `json:"multiple,omitempty"`         // 是否允许多个附件
+	Options       []string `json:"options,omitempty"`          // list suggestions
+	Required      bool     `json:"required,omitempty"`         // required flag
+	Min           *float64 `json:"min,omitempty"`              // minimum value
+	Max           *float64 `json:"max,omitempty"`              // maximum value
+	Format        string   `json:"format,omitempty"`           // date format, etc.
+	MaxLength     *int     `json:"max_length,omitempty"`       // maximum length
+	Validation    string   `json:"validation,omitempty"`       // regex validation
+	AllowedTypes  []string `json:"allowed_types,omitempty"`    // allowed attachment types, e.g. image/*, .pdf
+	MaxFileSizeMB int      `json:"max_file_size_mb,omitempty"` // max attachment size in MB
+	Multiple      bool     `json:"multiple,omitempty"`         // allow multiple attachments
 }
 
-// CreateFieldRequest 创建字段请求
+// CreateFieldRequest is the request to create a field
 type CreateFieldRequest struct {
 	TableID     string      `json:"table_id" binding:"required"`
 	Name        string      `json:"name" binding:"required,min=1,max=255"`
 	Type        string      `json:"type" binding:"required"`
 	Description string      `json:"description" binding:"max=1000"`
 	Required    bool        `json:"required"`
-	Options     string      `json:"options"` // 列表选项，逗号分隔
+	Options     string      `json:"options"` // list options, comma-separated
 	Config      FieldConfig `json:"config"`
 }
 
-// UpdateFieldRequest 更新字段请求
+// UpdateFieldRequest is the request to update a field
 type UpdateFieldRequest struct {
 	Name        string      `json:"name" binding:"required,min=1,max=255"`
 	Type        string      `json:"type" binding:"required"`
@@ -214,7 +214,7 @@ type UpdateFieldRequest struct {
 	Config      FieldConfig `json:"config"`
 }
 
-// FieldResponse 字段响应
+// FieldResponse is the field API response
 type FieldResponse struct {
 	ID          string      `json:"id"`
 	TableID     string      `json:"table_id"`
@@ -259,17 +259,17 @@ func (s *FieldService) getActiveField(fieldID string) (*models.Field, error) {
 	return &field, nil
 }
 
-// checkTableAccess 检查表是否存在
+// checkTableAccess verifies table exists and user has access
 func (s *FieldService) checkTableAccess(tableID, userID string, requiredRoles []string) error {
 	table, err := s.getActiveTable(tableID)
 	if err != nil {
-		return errors.New("表不存在")
+		return errors.New("table not found")
 	}
 
 	var db models.Database
 	err = s.db.Where("id = ? AND deleted_at IS NULL", table.DatabaseID).First(&db).Error
 	if err != nil {
-		return errors.New("数据库不存在")
+		return errors.New("database not found")
 	}
 
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
@@ -278,7 +278,7 @@ func (s *FieldService) checkTableAccess(tableID, userID string, requiredRoles []
 	}
 	action := requiredActionForRoles(requiredRoles)
 	if !authorizer.CanAccessTable(tableID, action) {
-		return errors.New("无权访问该表")
+		return errors.New("permission denied: cannot access this table")
 	}
 
 	return nil
@@ -306,16 +306,16 @@ func containsRole(roles []string, role string) bool {
 	return false
 }
 
-// CreateField 创建字段
+// CreateField creates a new field
 func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*models.Field, error) {
-	// 1. 检查表访问权限（owner, admin, editor可以创建字段）
+	// 1. Check table access (owner, admin, editor can create fields)
 	if err := s.checkTableAccess(req.TableID, userID, []string{"owner", "admin", "editor"}); err != nil {
 		return nil, err
 	}
 
-	// 2. 如果前端提供了options字符串，转换为Config
+	// 2. Convert options string to Config if provided
 	if req.Options != "" && supportsFieldOptions(req.Type) {
-		// 将逗号分隔的字符串转换为字符串数组
+		// Convert comma-separated string to string array
 		optionsList := strings.Split(req.Options, ",")
 		var cleanedOptions []string
 		for _, opt := range optionsList {
@@ -327,48 +327,48 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 		req.Config.Options = cleanedOptions
 	}
 
-	// 3. 输入验证和清理
+	// 3. Input validation and sanitization
 	req.Name = sanitizeFieldName(req.Name)
 	req.Description = sanitizeFieldDescription(req.Description)
 	req.Config = sanitizeFieldConfig(req.Config)
 
 	if err := validateFieldName(req.Name); err != nil {
-		return nil, fmt.Errorf("字段名称验证失败: %w", err)
+		return nil, fmt.Errorf("field name validation failed: %w", err)
 	}
 
 	if err := validateFieldType(req.Type); err != nil {
-		return nil, fmt.Errorf("字段类型验证失败: %w", err)
+		return nil, fmt.Errorf("field type validation failed: %w", err)
 	}
 	if err := validateMutableFieldType(req.Type); err != nil {
-		return nil, fmt.Errorf("字段类型验证失败: %w", err)
+		return nil, fmt.Errorf("field type validation failed: %w", err)
 	}
 	req.Type = normalizeFieldType(req.Type)
 
 	if err := validateFieldDescription(req.Description); err != nil {
-		return nil, fmt.Errorf("字段备注验证失败: %w", err)
+		return nil, fmt.Errorf("field description validation failed: %w", err)
 	}
 
 	if err := validateFieldConfig(req.Config); err != nil {
-		return nil, fmt.Errorf("字段配置验证失败: %w", err)
+		return nil, fmt.Errorf("field config validation failed: %w", err)
 	}
 
-	// 4. 检查是否已存在同名字段
+	// 4. Check for duplicate field name
 	var existingField models.Field
 	err := s.db.Where("table_id = ? AND name = ? AND deleted_at IS NULL", req.TableID, req.Name).First(&existingField).Error
 	if err == nil {
-		return nil, errors.New("该表中已存在同名字段")
+		return nil, errors.New("a field with this name already exists in this table")
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("数据库查询失败: %w", err)
+		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 
-	// 5. 序列化配置
+	// 5. Serialize config
 	configJSON, err := json.Marshal(req.Config)
 	if err != nil {
-		return nil, fmt.Errorf("配置序列化失败: %w", err)
+		return nil, fmt.Errorf("config serialization failed: %w", err)
 	}
 
-	// 6. 创建字段
+	// 6. Create field
 	field := models.Field{
 		TableID:     req.TableID,
 		Name:        req.Name,
@@ -379,25 +379,25 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 	}
 
 	if err := s.db.Create(&field).Error; err != nil {
-		return nil, fmt.Errorf("创建字段失败: %w", err)
+		return nil, fmt.Errorf("failed to create field: %w", err)
 	}
 
 	InvalidateFieldCache(field.TableID)
 	return &field, nil
 }
 
-// ListFields 获取字段列表
+// ListFields lists fields for a table
 func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, error) {
-	// 1. 检查表访问权限
+	// 1. Check table access
 	if err := s.checkTableAccess(tableID, userID, []string{"owner", "admin", "editor", "viewer"}); err != nil {
 		return nil, err
 	}
 
-	// 2. 查询字段列表
+	// 2. Query fields
 	var fields []models.Field
 	err := s.db.Where("table_id = ? AND deleted_at IS NULL", tableID).Order("created_at ASC").Find(&fields).Error
 	if err != nil {
-		return nil, fmt.Errorf("数据库查询失败: %w", err)
+		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 	if len(fields) == 0 {
 		return []FieldResponse{}, nil
@@ -412,7 +412,7 @@ func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, erro
 		return nil, err
 	}
 
-	// 3. 转换为响应格式
+	// 3. Convert to response format
 	result := make([]FieldResponse, len(fields))
 	index := 0
 	for _, f := range fields {
@@ -423,7 +423,7 @@ func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, erro
 		var config FieldConfig
 		if f.Options != "" {
 			_ = json.Unmarshal([]byte(f.Options), &config)
-			// 配置已安全存储在数据库中，解析失败不影响核心功能
+			// config is safely stored in DB; parse failure does not affect core functionality
 		}
 
 		result[index] = FieldResponse{
@@ -445,15 +445,15 @@ func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, erro
 	return result[:index], nil
 }
 
-// GetField 获取字段详情
+// GetField gets field details
 func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) {
-	// 1. 获取字段信息
+	// 1. Get field info
 	field, err := s.getActiveField(fieldID)
 	if err != nil {
-		return nil, fmt.Errorf("字段不存在: %w", err)
+		return nil, fmt.Errorf("field not found: %w", err)
 	}
 
-	// 2. 检查表访问权限
+	// 2. Check table access
 	if err := s.checkTableAccess(field.TableID, userID, []string{"owner", "admin", "editor", "viewer"}); err != nil {
 		return nil, err
 	}
@@ -461,11 +461,11 @@ func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) 
 		return nil, err
 	}
 
-	// 3. 解析配置
+	// 3. Parse config
 	var config FieldConfig
 	if field.Options != "" {
 		_ = json.Unmarshal([]byte(field.Options), &config)
-		// 配置已安全存储在数据库中，解析失败不影响核心功能
+		// config is safely stored in DB; parse failure does not affect core functionality
 	}
 
 	return &FieldResponse{
@@ -483,20 +483,20 @@ func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) 
 	}, nil
 }
 
-// UpdateField 更新字段信息
+// UpdateField updates a field
 func (s *FieldService) UpdateField(fieldID string, req UpdateFieldRequest, userID string) (*models.Field, error) {
-	// 1. 获取字段信息
+	// 1. Get field info
 	field, err := s.getActiveField(fieldID)
 	if err != nil {
-		return nil, fmt.Errorf("字段不存在: %w", err)
+		return nil, fmt.Errorf("field not found: %w", err)
 	}
 
-	// 2. 检查表访问权限（只有owner, admin, editor可以修改）
+	// 2. Check table access (only owner, admin, editor can modify)
 	if err := s.checkTableAccess(field.TableID, userID, []string{"owner", "admin", "editor"}); err != nil {
 		return nil, err
 	}
 
-	// 3. 输入验证和清理
+	// 3. Input validation and sanitization
 	if req.Options != "" && supportsFieldOptions(req.Type) {
 		optionsList := strings.Split(req.Options, ",")
 		var cleanedOptions []string
@@ -514,42 +514,42 @@ func (s *FieldService) UpdateField(fieldID string, req UpdateFieldRequest, userI
 	req.Config = sanitizeFieldConfig(req.Config)
 
 	if err := validateFieldName(req.Name); err != nil {
-		return nil, fmt.Errorf("字段名称验证失败: %w", err)
+		return nil, fmt.Errorf("field name validation failed: %w", err)
 	}
 
 	if err := validateFieldType(req.Type); err != nil {
-		return nil, fmt.Errorf("字段类型验证失败: %w", err)
+		return nil, fmt.Errorf("field type validation failed: %w", err)
 	}
 	if err := validateMutableFieldType(req.Type); err != nil {
-		return nil, fmt.Errorf("字段类型验证失败: %w", err)
+		return nil, fmt.Errorf("field type validation failed: %w", err)
 	}
 	req.Type = normalizeFieldType(req.Type)
 
 	if err := validateFieldDescription(req.Description); err != nil {
-		return nil, fmt.Errorf("字段备注验证失败: %w", err)
+		return nil, fmt.Errorf("field description validation failed: %w", err)
 	}
 
 	if err := validateFieldConfig(req.Config); err != nil {
-		return nil, fmt.Errorf("字段配置验证失败: %w", err)
+		return nil, fmt.Errorf("field config validation failed: %w", err)
 	}
 
-	// 4. 检查是否已存在同名字段（排除当前字段）
+	// 4. Check for duplicate field name (excluding current field)
 	var existingField models.Field
 	err = s.db.Where("table_id = ? AND name = ? AND id != ? AND deleted_at IS NULL", field.TableID, req.Name, fieldID).First(&existingField).Error
 	if err == nil {
-		return nil, errors.New("该表中已存在同名字段")
+		return nil, errors.New("a field with this name already exists in this table")
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("数据库查询失败: %w", err)
+		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 
-	// 5. 序列化配置
+	// 5. Serialize config
 	configJSON, err := json.Marshal(req.Config)
 	if err != nil {
-		return nil, fmt.Errorf("配置序列化失败: %w", err)
+		return nil, fmt.Errorf("config serialization failed: %w", err)
 	}
 
-	// 6. 更新字段信息
+	// 6. Update field info
 	field.Name = req.Name
 	field.Type = req.Type
 	field.Description = req.Description
@@ -557,27 +557,27 @@ func (s *FieldService) UpdateField(fieldID string, req UpdateFieldRequest, userI
 	field.Options = string(configJSON)
 
 	if err := s.db.Save(field).Error; err != nil {
-		return nil, fmt.Errorf("更新字段失败: %w", err)
+		return nil, fmt.Errorf("failed to update field: %w", err)
 	}
 
 	InvalidateFieldCache(field.TableID)
 	return field, nil
 }
 
-// DeleteField 删除字段（软删除）
+// DeleteField soft-deletes a field
 func (s *FieldService) DeleteField(fieldID, userID string) error {
-	// 1. 获取字段信息
+	// 1. Get field info
 	field, err := s.getActiveField(fieldID)
 	if err != nil {
-		return fmt.Errorf("字段不存在: %w", err)
+		return fmt.Errorf("field not found: %w", err)
 	}
 
-	// 2. 检查表访问权限（只有owner, admin可以删除）
+	// 2. Check table access (only owner, admin can delete)
 	if err := s.checkTableAccess(field.TableID, userID, []string{"owner", "admin"}); err != nil {
 		return err
 	}
 
-	// 3. 软删除字段
+	// 3. Soft-delete field
 	now := time.Now()
 	result := s.db.Model(&models.Field{}).
 		Where("id = ? AND deleted_at IS NULL", fieldID).
@@ -587,29 +587,29 @@ func (s *FieldService) DeleteField(fieldID, userID string) error {
 			"updated_at": now,
 		})
 	if result.Error != nil {
-		return fmt.Errorf("删除字段失败: %w", result.Error)
+		return fmt.Errorf("failed to delete field: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("字段不存在: %w", gorm.ErrRecordNotFound)
+		return fmt.Errorf("field not found: %w", gorm.ErrRecordNotFound)
 	}
 
 	InvalidateFieldCache(field.TableID)
 	return nil
 }
 
-// CheckFieldPermission 检查用户对特定字段的权限
+// CheckFieldPermission checks user permission for a specific field
 func (s *FieldService) CheckFieldPermission(userID, fieldID, action string) error {
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
 	if err != nil {
 		return err
 	}
 	if !authorizer.CanAccessField(fieldID, action) {
-		return errors.New("无权访问该字段")
+		return errors.New("permission denied: cannot access this field")
 	}
 	return nil
 }
 
-// CheckFieldPermissions 批量检查字段权限，只查一次数据库。
+// CheckFieldPermissions batch-checks field permissions with a single DB query.
 func (s *FieldService) CheckFieldPermissions(userID string, fieldIDs []string, action string) (map[string]bool, error) {
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
 	if err != nil {

@@ -8,22 +8,22 @@ import (
 	"github.com/jiangfire/cornerstone/pkg/db"
 )
 
-// version 由 main 包通过 SetVersion 注入,避免 handlers 反向依赖 main 包。
+// version is injected by the main package via SetVersion to avoid a circular dependency from handlers back to main.
 var version = "dev"
 
-// SetVersion 由 main 在路由注册前调用,把构建版本号注入到 /health /ready 响应。
+// SetVersion is called by main before route registration to inject the build version into /health and /ready responses.
 func SetVersion(v string) {
 	if v != "" {
 		version = v
 	}
 }
 
-// readinessProbeTimeout 是 /ready 内部 PingContext 的上限。
-// 短于 docker HEALTHCHECK 的 timeout(3s),避免连接挂死时把整个探针拖到 docker 端超时。
+// readinessProbeTimeout is the upper bound for PingContext inside /ready.
+// Shorter than the docker HEALTHCHECK timeout (3s) to prevent a hung connection from dragging the probe past the docker-side timeout.
 const readinessProbeTimeout = 2 * time.Second
 
-// Health 是 liveness 探针:进程在跑就返回 200。不查任何外部依赖。
-// 用途:k8s livenessProbe / docker HEALTHCHECK 中的最低门槛。
+// Health is the liveness probe: returns 200 as long as the process is running. Does not check any external dependencies.
+// Used for: k8s livenessProbe / docker HEALTHCHECK minimum threshold.
 //
 // @Summary      Health check
 // @Description  Liveness probe. Returns 200 if the process is running.
@@ -44,9 +44,9 @@ func Health(c *gin.Context) {
 	})
 }
 
-// Ready 是 readiness 探针:进程在跑 + 关键依赖可用(目前是 DB)才返回 200。
-// DB ping 失败返回 503,部署工具/LB 据此把流量摘掉。
-// 用途:k8s readinessProbe / docker compose healthcheck。
+// Ready is the readiness probe: returns 200 only when the process is running and critical dependencies (currently DB) are available.
+// DB ping failure returns 503 so deployment tools/LB can drain traffic.
+// Used for: k8s readinessProbe / docker compose healthcheck.
 //
 // @Summary      Readiness check
 // @Description  Readiness probe. Returns 200 if the process is running and the database is reachable.

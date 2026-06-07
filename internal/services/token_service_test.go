@@ -134,7 +134,7 @@ func TestTokenService_DeleteToken_NonMasterCantDeleteOthers(t *testing.T) {
 
 	err := svc.DeleteToken(worker1.ID, worker2.ID, false)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "无权删除其他 Token")
+	assert.Contains(t, err.Error(), "permission denied: cannot delete other tokens")
 }
 
 func TestTokenService_DeleteToken_Nonexistent(t *testing.T) {
@@ -146,7 +146,7 @@ func TestTokenService_DeleteToken_Nonexistent(t *testing.T) {
 
 	err := svc.DeleteToken(master.ID, "nonexistent_id", true)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "token 不存在")
+	assert.Contains(t, err.Error(), "token not found")
 }
 
 func TestTokenService_DeleteToken_NonMasterCantDeleteMaster(t *testing.T) {
@@ -161,7 +161,7 @@ func TestTokenService_DeleteToken_NonMasterCantDeleteMaster(t *testing.T) {
 
 	err := svc.DeleteToken(worker.ID, master.ID, false)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "无权删除")
+	assert.Contains(t, err.Error(), "permission denied: cannot delete other tokens")
 }
 
 func TestTokenService_UpdateToken(t *testing.T) {
@@ -201,7 +201,7 @@ func TestTokenService_UpdateToken_CantUpdateMaster(t *testing.T) {
 
 	_, err := svc.UpdateToken(master.ID, `{"databases":{}}`, nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "不能修改 Master Token 权限")
+	assert.Contains(t, err.Error(), "cannot modify master token permissions")
 }
 
 func TestTokenService_UpdateToken_Nonexistent(t *testing.T) {
@@ -210,7 +210,7 @@ func TestTokenService_UpdateToken_Nonexistent(t *testing.T) {
 
 	_, err := svc.UpdateToken("nonexistent_id", "{}", nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "token 不存在")
+	assert.Contains(t, err.Error(), "token not found")
 }
 
 func TestTokenService_DeleteToken_InvalidatesCache(t *testing.T) {

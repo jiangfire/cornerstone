@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -130,7 +131,7 @@ func TestQuery_Post_MissingFromAndTable(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeQueryResp(t, rec)
-	assert.Contains(t, resp["message"], "缺少查询参数")
+	assert.Contains(t, resp["message"], "missing query parameter")
 }
 
 func TestQuery_Post_DisallowedTable(t *testing.T) {
@@ -213,7 +214,7 @@ func TestQuery_Get_MissingQ(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeQueryResp(t, rec)
-	assert.Contains(t, resp["message"], "缺少查询参数")
+	assert.Contains(t, resp["message"], "missing query parameter")
 }
 
 func TestQuery_Get_InvalidQ(t *testing.T) {
@@ -224,7 +225,7 @@ func TestQuery_Get_InvalidQ(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeQueryResp(t, rec)
-	assert.Contains(t, resp["message"], "查询格式错误")
+	assert.Contains(t, resp["message"], "invalid query format")
 }
 
 func TestQueryExplain_Success(t *testing.T) {
@@ -296,7 +297,7 @@ func TestQueryValidate_Valid(t *testing.T) {
 	assert.Equal(t, http.StatusOK, rec.Code)
 	resp := decodeQueryResp(t, rec)
 	assert.Equal(t, float64(0), resp["code"])
-	assert.Contains(t, resp["message"], "查询验证通过")
+	assert.Contains(t, resp["message"], "query validation passed")
 }
 
 func TestQueryValidate_DisallowedTable(t *testing.T) {
@@ -368,7 +369,7 @@ func TestBatchQuery_InvalidBody(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeQueryResp(t, rec)
-	assert.Contains(t, resp["message"], "请求格式错误")
+	assert.Contains(t, resp["message"], "invalid request format")
 }
 
 func TestQueryListTables_Success(t *testing.T) {
@@ -433,7 +434,7 @@ func TestSimplifiedQuery_MissingTable(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeQueryResp(t, rec)
-	assert.Contains(t, resp["message"], "必须指定表名")
+	assert.Contains(t, resp["message"], "table name is required")
 }
 
 func TestSimplifiedQuery_WithFilter(t *testing.T) {
@@ -490,47 +491,31 @@ func TestIsPermissionError_Unauthorized(t *testing.T) {
 }
 
 func TestIsPermissionError_PermissionCN(t *testing.T) {
-	assert.True(t, isPermissionError(fmt.Errorf("权限不足")))
+	assert.True(t, isPermissionError(fmt.Errorf("insufficient permission")))
 }
 
 func TestIsPermissionError_NoAccess(t *testing.T) {
-	assert.True(t, isPermissionError(fmt.Errorf("无权访问")))
+	assert.True(t, isPermissionError(fmt.Errorf("access denied")))
 }
 
 func TestIsPermissionError_Rejected(t *testing.T) {
-	assert.True(t, isPermissionError(fmt.Errorf("拒绝访问")))
+	assert.True(t, isPermissionError(fmt.Errorf("forbidden")))
 }
 
 func TestIsPermissionError_NotAllowed(t *testing.T) {
-	assert.True(t, isPermissionError(fmt.Errorf("不允许操作")))
+	assert.True(t, isPermissionError(fmt.Errorf("unauthorized access")))
 }
 
 func TestIsPermissionError_NotPermission(t *testing.T) {
 	assert.False(t, isPermissionError(fmt.Errorf("syntax error")))
 }
 
-func TestContainsString_Match(t *testing.T) {
-	assert.True(t, containsString("hello world", "world"))
-}
-
-func TestContainsString_ExactMatch(t *testing.T) {
-	assert.True(t, containsString("hello", "hello"))
-}
-
-func TestContainsString_NoMatch(t *testing.T) {
-	assert.False(t, containsString("hello", "xyz"))
-}
-
-func TestContainsString_EmptySubstr(t *testing.T) {
-	assert.True(t, containsString("hello", ""))
-}
-
 func TestContainsSubstring_Match(t *testing.T) {
-	assert.True(t, containsSubstring("abcdef", "cde"))
+	assert.True(t, strings.Contains("abcdef", "cde"))
 }
 
 func TestContainsSubstring_NoMatch(t *testing.T) {
-	assert.False(t, containsSubstring("abcdef", "xyz"))
+	assert.False(t, strings.Contains("abcdef", "xyz"))
 }
 
 func TestParseInt_Valid(t *testing.T) {
@@ -652,7 +637,7 @@ func TestQuery_Post_InvalidJSONBody(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var resp map[string]interface{}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	assert.Contains(t, resp["message"], "缺少查询参数")
+	assert.Contains(t, resp["message"], "missing query parameter")
 }
 
 func TestQueryValidate_MissingBody(t *testing.T) {

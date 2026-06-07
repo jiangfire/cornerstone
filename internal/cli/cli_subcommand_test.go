@@ -220,7 +220,7 @@ func TestDBDeleteCmd_Success(t *testing.T) {
 		err := dbDeleteCmd.RunE(dbDeleteCmd, []string{created.ID})
 		require.NoError(t, err)
 	})
-	assert.Contains(t, out, "已删除")
+	assert.Contains(t, out, "deleted")
 }
 
 func TestDBListCmd_NoMasterToken(t *testing.T) {
@@ -298,7 +298,7 @@ func TestTableDeleteCmd_Success(t *testing.T) {
 		err := tableDeleteCmd.RunE(tableDeleteCmd, []string{createdTbl.ID})
 		require.NoError(t, err)
 	})
-	assert.Contains(t, out, "已删除")
+	assert.Contains(t, out, "deleted")
 }
 
 func TestFieldListCmd_Success(t *testing.T) {
@@ -364,7 +364,7 @@ func TestFieldDeleteCmd_Success(t *testing.T) {
 		err := fieldDeleteCmd.RunE(fieldDeleteCmd, []string{createdFld.ID})
 		require.NoError(t, err)
 	})
-	assert.Contains(t, out, "已删除")
+	assert.Contains(t, out, "deleted")
 }
 
 func TestTokenListCmd_Success(t *testing.T) {
@@ -382,7 +382,7 @@ func TestTokenCreateCmd_Success(t *testing.T) {
 		err := tokenCreateCmd.RunE(tokenCreateCmd, []string{"mytoken"})
 		require.NoError(t, err)
 	})
-	assert.Contains(t, out, "Token 创建成功")
+	assert.Contains(t, out, "token created successfully!")
 	assert.Contains(t, out, "mytoken")
 }
 
@@ -399,7 +399,7 @@ func TestTokenDeleteCmd_Success(t *testing.T) {
 		err := tokenDeleteCmd.RunE(tokenDeleteCmd, []string{created.ID})
 		require.NoError(t, err)
 	})
-	assert.Contains(t, out, "已删除")
+	assert.Contains(t, out, "deleted")
 }
 
 func TestRecordListCmd_Success(t *testing.T) {
@@ -432,21 +432,21 @@ func TestRecordBatchCmd_InvalidCount(t *testing.T) {
 	setupCLIEnv(t)
 	err := recordBatchCmd.RunE(recordBatchCmd, []string{"tbl_x", `{"k":"v"}`, "0"})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "1-100")
+	assert.Contains(t, err.Error(), "count must be between")
 }
 
 func TestRecordBatchCmd_NonNumericCount(t *testing.T) {
 	setupCLIEnv(t)
 	err := recordBatchCmd.RunE(recordBatchCmd, []string{"tbl_x", `{"k":"v"}`, "abc"})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "1-100")
+	assert.Contains(t, err.Error(), "count must be between")
 }
 
 func TestRecordBatchCmd_CountTooLarge(t *testing.T) {
 	setupCLIEnv(t)
 	err := recordBatchCmd.RunE(recordBatchCmd, []string{"tbl_x", `{"k":"v"}`, "101"})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "1-100")
+	assert.Contains(t, err.Error(), "count must be between")
 }
 
 func TestTokenCreateCmd_InvalidExpires(t *testing.T) {
@@ -471,7 +471,7 @@ func TestCacheClearCmd_Success(t *testing.T) {
 		err := cacheClearCmd.RunE(cacheClearCmd, []string{})
 		require.NoError(t, err)
 	})
-	assert.Contains(t, out, "缓存已清空")
+	assert.Contains(t, out, "all caches cleared")
 	_, ok := services.SharedFieldCache.Get("test_key")
 	assert.False(t, ok)
 }
@@ -525,7 +525,7 @@ func TestRecordBatchCmd_Success(t *testing.T) {
 		err := recordBatchCmd.RunE(recordBatchCmd, []string{createdTbl.ID, `{"name":"batch"}`, "3"})
 		require.NoError(t, err)
 	})
-	assert.Contains(t, out, "成功创建 3 条记录")
+	assert.Contains(t, out, "created 3 records")
 }
 
 func TestRecordDeleteCmd_Success(t *testing.T) {
@@ -557,7 +557,7 @@ func TestRecordDeleteCmd_Success(t *testing.T) {
 		err := recordDeleteCmd.RunE(recordDeleteCmd, []string{createdRec.ID})
 		require.NoError(t, err)
 	})
-	assert.Contains(t, out, "已删除")
+	assert.Contains(t, out, "deleted")
 }
 
 func extractJSON(s string) string {

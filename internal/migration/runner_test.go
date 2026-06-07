@@ -85,7 +85,7 @@ func TestRunnerPreviewAndRun(t *testing.T) {
 	require.NoError(t, targetDB.Where("table_id = ?", table.ID).Find(&records).Error)
 	require.Len(t, records, 2)
 
-	// 不依赖数据库插入顺序，按 name 查找对应记录
+	// Find corresponding records by name without relying on DB insertion order
 	recordMap := make(map[string]map[string]any)
 	for _, rec := range records {
 		payload := map[string]any{}

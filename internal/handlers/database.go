@@ -30,7 +30,7 @@ func CreateDatabase(c *gin.Context) {
 
 	var req services.CreateDBRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
 	}
 
@@ -104,7 +104,7 @@ func GetDatabase(c *gin.Context) {
 	dbService := services.NewDatabaseService(db.DB())
 	database, err := dbService.GetDatabase(dbID, tokenID)
 	if err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
@@ -137,14 +137,14 @@ func UpdateDatabase(c *gin.Context) {
 
 	var req services.UpdateDBRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
 	}
 
 	dbService := services.NewDatabaseService(db.DB())
 	database, err := dbService.UpdateDatabase(dbID, req, tokenID)
 	if err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
@@ -179,12 +179,12 @@ func DeleteDatabase(c *gin.Context) {
 
 	dbService := services.NewDatabaseService(db.DB())
 	if err := dbService.DeleteDatabase(dbID, tokenID); err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
 	dto.Success(c, gin.H{
-		"message": "数据库已删除",
+		"message": "database deleted",
 	})
 }
 
@@ -213,7 +213,7 @@ func CreateDatabaseWithTables(c *gin.Context) {
 
 	var req services.CreateDBWithTablesRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
 	}
 

@@ -10,24 +10,24 @@ import (
 	"gorm.io/gorm"
 )
 
-// TokenService Token 管理服务
+// TokenService manages token operations
 type TokenService struct {
 	db *gorm.DB
 }
 
-// NewTokenService 创建 Token 服务实例
+// NewTokenService creates a new TokenService instance
 func NewTokenService(db *gorm.DB) *TokenService {
 	return &TokenService{db: db}
 }
 
-// CreateTokenRequest 创建 Token 请求
+// CreateTokenRequest is the request to create a token
 type CreateTokenRequest struct {
 	Name      string     `json:"name" binding:"required,min=1,max=255"`
 	Scopes    string     `json:"scopes"`
 	ExpiresAt *time.Time `json:"expires_at"`
 }
 
-// CreateToken 创建 Token（需 Master Token）
+// CreateToken creates a new token (requires master token)
 func (s *TokenService) CreateToken(req CreateTokenRequest) (*models.Token, error) {
 	token := &models.Token{
 		Name:      req.Name,
@@ -37,13 +37,13 @@ func (s *TokenService) CreateToken(req CreateTokenRequest) (*models.Token, error
 	}
 
 	if err := s.db.Create(token).Error; err != nil {
-		return nil, fmt.Errorf("创建 Token 失败: %w", err)
+		return nil, fmt.Errorf("failed to create token: %w", err)
 	}
 	return token, nil
 }
 
-// ListTokens 列出 Token
-// Master Token 看全部，普通 Token 只看自己
+// ListTokens lists tokens
+// Master token sees all; regular tokens see only themselves
 func (s *TokenService) ListTokens(tokenID string, isMaster bool) ([]models.Token, error) {
 	var tokens []models.Token
 	query := s.db.Where("is_master = ?", false).Order("created_at DESC")
@@ -53,49 +53,49 @@ func (s *TokenService) ListTokens(tokenID string, isMaster bool) ([]models.Token
 	}
 
 	if err := query.Find(&tokens).Error; err != nil {
-		return nil, fmt.Errorf("查询 Token 列表失败: %w", err)
+		return nil, fmt.Errorf("failed to list tokens: %w", err)
 	}
 	return tokens, nil
 }
 
-// DeleteToken 删除 Token
-// Master Token 可删除任意，普通 Token 只能删除自己
+// DeleteToken deletes a token
+// Master token can delete any; regular tokens can only delete themselves
 func (s *TokenService) DeleteToken(tokenID string, targetID string, isMaster bool) error {
 	if !isMaster && tokenID != targetID {
-		return errors.New("无权删除其他 Token")
+		return errors.New("permission denied: cannot delete other tokens")
 	}
 
 	var t models.Token
 	if err := s.db.Where("id = ?", targetID).First(&t).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return errors.New("token 不存在")
+			return errors.New("token not found")
 		}
-		return fmt.Errorf("查询 Token 失败: %w", err)
+		return fmt.Errorf("failed to query token: %w", err)
 	}
 
 	if t.IsMaster && !isMaster {
-		return errors.New("无权删除 Master Token")
+		return errors.New("permission denied: cannot delete master token")
 	}
 
 	if err := s.db.Delete(&t).Error; err != nil {
-		return fmt.Errorf("删除 Token 失败: %w", err)
+		return fmt.Errorf("failed to delete token: %w", err)
 	}
 	authz.InvalidateTokenCache(targetID)
 	return nil
 }
 
-// UpdateToken 更新 Token 权限（需 Master Token）
+// UpdateToken updates token permissions (requires master token)
 func (s *TokenService) UpdateToken(targetID string, scopes string, expiresAt *time.Time) (*models.Token, error) {
 	var t models.Token
 	if err := s.db.Where("id = ?", targetID).First(&t).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("token 不存在")
+			return nil, errors.New("token not found")
 		}
-		return nil, fmt.Errorf("查询 Token 失败: %w", err)
+		return nil, fmt.Errorf("failed to query token: %w", err)
 	}
 
 	if t.IsMaster {
-		return nil, errors.New("不能修改 Master Token 权限")
+		return nil, errors.New("cannot modify master token permissions")
 	}
 
 	updates := map[string]interface{}{
@@ -103,12 +103,12 @@ func (s *TokenService) UpdateToken(targetID string, scopes string, expiresAt *ti
 		"expires_at": expiresAt,
 	}
 	if err := s.db.Model(&t).Updates(updates).Error; err != nil {
-		return nil, fmt.Errorf("更新 Token 失败: %w", err)
+		return nil, fmt.Errorf("failed to update token: %w", err)
 	}
 
-	// 重新查询返回最新数据
+	// Re-query to return latest data
 	if err := s.db.Where("id = ?", targetID).First(&t).Error; err != nil {
-		return nil, fmt.Errorf("查询最新 Token 失败: %w", err)
+		return nil, fmt.Errorf("failed to query updated token: %w", err)
 	}
 	authz.InvalidateTokenCache(targetID)
 	return &t, nil

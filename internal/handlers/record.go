@@ -15,9 +15,8 @@ import (
 	"go.uber.org/zap"
 )
 
-// decodeRecordData 将 Record.Data(JSON 字符串)解码为可序列化值。
-// 解析失败时记录 Warn 日志,返回空对象 + corrupted=true 供调用方在响应里打标记,
-// 避免历史脏数据让整个接口 500,但客户端仍能感知到需要修复。
+// decodeRecordData decodes Record.Data (JSON string) into serializable values.
+// When parsing fails, log a Warn and return empty object + corrupted=true so the caller can mark it in the response, preventing historical dirty data from causing a 500 while still allowing the client to detect the need for repair.
 func decodeRecordData(record *models.Record) (any, bool) {
 	if record == nil || record.Data == "" {
 		return map[string]any{}, false
@@ -44,7 +43,7 @@ func recordResponseWithData(record *models.Record, extra gin.H) gin.H {
 	return resp
 }
 
-// CreateRecord 创建记录
+// CreateRecord creates a record
 //
 // @Summary      Create a record
 // @Description  Create a new record in a table.
@@ -68,7 +67,7 @@ func CreateRecord(c *gin.Context) {
 
 	var req services.CreateRecordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
 	}
 
@@ -87,7 +86,7 @@ func CreateRecord(c *gin.Context) {
 	}))
 }
 
-// ExportRecords 导出记录
+// ExportRecords exports records
 //
 // @Summary      Export records as CSV or JSON
 // @Description  Export records from a table as a downloadable file.
@@ -111,7 +110,7 @@ func ExportRecords(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Query("table_id")
 	if tableID == "" {
-		dto.Error(c, 400, "table_id 不能为空")
+		dto.Error(c, 400, "table ID is required")
 		return
 	}
 
@@ -130,7 +129,7 @@ func ExportRecords(c *gin.Context) {
 	c.Data(http.StatusOK, contentType, data)
 }
 
-// ListRecords 获取记录列表
+// ListRecords lists records
 //
 // @Summary      List records in a table
 // @Description  Query records from a table with pagination and optional filtering.
@@ -155,14 +154,14 @@ func ListRecords(c *gin.Context) {
 
 	var req services.QueryRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
 	}
 
 	recordService := services.NewRecordService(db.DB())
 	result, err := recordService.ListRecords(req, userID)
 	if err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
@@ -173,7 +172,7 @@ func ListRecords(c *gin.Context) {
 	})
 }
 
-// GetRecord 获取单个记录
+// GetRecord gets a single record
 //
 // @Summary      Get a record by ID
 // @Description  Retrieve a single record by its ID.
@@ -197,14 +196,14 @@ func GetRecord(c *gin.Context) {
 	recordService := services.NewRecordService(db.DB())
 	record, err := recordService.GetRecord(recordID, userID)
 	if err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
 	dto.Success(c, record)
 }
 
-// UpdateRecord 更新记录
+// UpdateRecord updates a record
 //
 // @Summary      Update a record
 // @Description  Update record data. Supports optimistic locking via the version field.
@@ -231,7 +230,7 @@ func UpdateRecord(c *gin.Context) {
 
 	var req services.UpdateRecordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
 	}
 
@@ -249,7 +248,7 @@ func UpdateRecord(c *gin.Context) {
 	}))
 }
 
-// DeleteRecord 删除记录
+// DeleteRecord deletes a record
 //
 // @Summary      Delete a record
 // @Description  Delete a record by ID.
@@ -272,16 +271,16 @@ func DeleteRecord(c *gin.Context) {
 
 	recordService := services.NewRecordService(db.DB())
 	if err := recordService.DeleteRecord(recordID, userID); err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
 	dto.Success(c, gin.H{
-		"message": "记录已删除",
+		"message": "record deleted",
 	})
 }
 
-// BatchCreateRecords 批量创建记录
+// BatchCreateRecords creates records in batch
 //
 // @Summary      Batch create records
 // @Description  Create multiple identical records in one request (1-100 records).
@@ -306,15 +305,15 @@ func BatchCreateRecords(c *gin.Context) {
 
 	var req services.CreateRecordRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
 	}
 
-	// 获取批量数量参数
+	// Get batch count parameter
 	count := c.DefaultQuery("count", "1")
 	var batchCount int
 	if _, err := fmt.Sscanf(count, "%d", &batchCount); err != nil || batchCount < 1 || batchCount > 100 {
-		dto.Error(c, 400, "批量数量必须在1-100之间")
+		dto.Error(c, 400, "batch count must be between 1 and 100")
 		return
 	}
 
@@ -325,7 +324,7 @@ func BatchCreateRecords(c *gin.Context) {
 		return
 	}
 
-	// 解析数据返回
+	// Parse and return data
 	result := make([]interface{}, len(records))
 	for i, record := range records {
 		result[i] = recordResponseWithData(record, gin.H{

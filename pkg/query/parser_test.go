@@ -275,7 +275,7 @@ func TestParse_JoinInvalidType(t *testing.T) {
 
 	_, err = p.Parse(data)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "JOIN 类型")
+	assert.Contains(t, err.Error(), "JOIN type")
 }
 
 func TestParse_JoinMissingTable(t *testing.T) {
@@ -889,7 +889,7 @@ func TestParse_CustomLimitsMaxFields(t *testing.T) {
 
 	_, err = p.Parse(data)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "字段数")
+	assert.Contains(t, err.Error(), "field count")
 }
 
 func TestParse_NegativePageDefaultsToOne(t *testing.T) {

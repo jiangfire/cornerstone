@@ -10,7 +10,7 @@ import (
 	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
-// ListTokens 列出 Token
+// ListTokens lists tokens
 //
 // @Summary      List all tokens
 // @Description  Returns all tokens visible to the current token.
@@ -40,7 +40,7 @@ func ListTokens(c *gin.Context) {
 	dto.Success(c, gin.H{"tokens": tokens, "total": len(tokens)})
 }
 
-// CreateToken 创建 Token（需 Master Token）
+// CreateToken creates a token (requires master token)
 //
 // @Summary      Create a new token
 // @Description  Create a new API token. Requires Master Token.
@@ -67,7 +67,7 @@ func ListTokens(c *gin.Context) {
 func CreateToken(c *gin.Context) {
 	var req services.CreateTokenRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
 	}
 
@@ -88,7 +88,7 @@ func CreateToken(c *gin.Context) {
 	})
 }
 
-// DeleteToken 删除 Token
+// DeleteToken deletes a token
 //
 // @Summary      Delete a token
 // @Description  Delete a token by ID.
@@ -112,14 +112,14 @@ func DeleteToken(c *gin.Context) {
 
 	tokenService := services.NewTokenService(db.DB())
 	if err := tokenService.DeleteToken(tokenID, targetID, isMaster); err != nil {
-		dto.Error(c, 400, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
 	dto.Success(c, gin.H{"id": targetID})
 }
 
-// UpdateToken 更新 Token 权限（需 Master Token）
+// UpdateToken updates token permissions (requires master token)
 //
 // @Summary      Update a token
 // @Description  Update token scopes and/or expiration date. Requires Master Token.
@@ -148,14 +148,14 @@ func UpdateToken(c *gin.Context) {
 		ExpiresAt *time.Time `json:"expires_at"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
 	}
 
 	tokenService := services.NewTokenService(db.DB())
 	token, err := tokenService.UpdateToken(targetID, req.Scopes, req.ExpiresAt)
 	if err != nil {
-		dto.Error(c, 400, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 

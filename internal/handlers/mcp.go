@@ -32,14 +32,14 @@ var (
 	mcpReplayBuffer      = defaultMCPReplayBuffer
 )
 
-// MCPOptions 是 HTTP MCP/SSE 的运行时配置。
+// MCPOptions is the runtime configuration for HTTP MCP/SSE.
 type MCPOptions struct {
 	SSEKeepaliveInterval time.Duration
 	SSERetryInterval     time.Duration
 	SSEReplayBuffer      int
 }
 
-// ConfigureMCP 应用 HTTP MCP/SSE 的运行时配置。
+// ConfigureMCP applies the HTTP MCP/SSE runtime configuration.
 func ConfigureMCP(options MCPOptions) {
 	if options.SSEKeepaliveInterval > 0 {
 		mcpKeepaliveInterval = options.SSEKeepaliveInterval
@@ -53,7 +53,7 @@ func ConfigureMCP(options MCPOptions) {
 	}
 }
 
-// HandleMCP 处理 HTTP 版 MCP 请求
+// HandleMCP handles HTTP MCP requests
 //
 // @Summary      Handle MCP request (SSE)
 // @Description  Streamable HTTP MCP protocol endpoint.
@@ -116,7 +116,7 @@ func HandleMCP(c *gin.Context) {
 	c.JSON(http.StatusOK, responses)
 }
 
-// HandleMCPGet 返回 GET 形式的 SSE 通道
+// HandleMCPGet returns the SSE channel for GET requests
 //
 // @Summary      Open MCP SSE stream
 // @Description  Opens a Server-Sent Events stream for receiving MCP notifications.
@@ -206,7 +206,7 @@ func HandleMCPGet(c *gin.Context) {
 	}
 }
 
-// HandleMCPOptions 处理 MCP 端点预检请求
+// HandleMCPOptions handles MCP endpoint preflight requests
 func HandleMCPOptions(c *gin.Context) {
 	c.Header("Allow", "POST, GET, OPTIONS")
 	c.Status(http.StatusNoContent)
@@ -360,7 +360,7 @@ func acceptsSSE(accept string) bool {
 func disableWriteTimeout(c *gin.Context) {
 	controller := http.NewResponseController(c.Writer)
 	if err := controller.SetWriteDeadline(time.Time{}); err != nil && err != http.ErrNotSupported {
-		// 某些 ResponseWriter 实现可能不支持 deadline 控制；这种情况下退化为默认行为。
+		// Some ResponseWriter implementations may not support deadline control; fall back to default behavior in that case.
 		return
 	}
 }

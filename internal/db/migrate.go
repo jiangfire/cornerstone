@@ -58,22 +58,22 @@ var (
 	tokenCleanupBreaker = newCircuitBreaker(3, 2*time.Minute)
 )
 
-// InitDB 初始化数据库连接
+// InitDB initializes the database connection
 func InitDB(cfg config.DatabaseConfig) error {
 	return pkgdb.InitDB(cfg)
 }
 
-// CloseDB 关闭数据库连接
+// CloseDB closes the database connection
 func CloseDB() error {
 	return pkgdb.CloseDB()
 }
 
-// Migrate 执行所有数据库迁移
+// Migrate runs all database migrations
 func Migrate() error {
 	database := pkgdb.DB()
 	logger := zap.L()
 
-	logger.Info("开始数据库迁移...")
+	logger.Info("starting database migration...")
 
 	if err := database.AutoMigrate(
 		&models.Token{},
@@ -84,34 +84,34 @@ func Migrate() error {
 		&models.RecordFieldIndex{},
 		&models.File{},
 	); err != nil {
-		return fmt.Errorf("自动迁移失败: %w", err)
+		return fmt.Errorf("auto migration failed: %w", err)
 	}
 
-	logger.Info("表结构迁移完成")
+	logger.Info("schema migration completed")
 
 	if err := createIndexes(database); err != nil {
-		return fmt.Errorf("创建索引失败: %w", err)
+		return fmt.Errorf("failed to create indexes: %w", err)
 	}
 
-	logger.Info("索引创建完成")
+	logger.Info("index creation completed")
 
 	if err := backfillRecordFieldIndexes(database); err != nil {
-		return fmt.Errorf("回填记录字段索引失败: %w", err)
+		return fmt.Errorf("failed to backfill record field indexes: %w", err)
 	}
 
 	masterToken := os.Getenv("MASTER_TOKEN")
 	if masterToken == "" {
-		logger.Warn("MASTER_TOKEN 环境变量未设置，Master Token 认证将不可用")
+		logger.Warn("MASTER_TOKEN environment variable is not set, Master Token authentication will be unavailable")
 	} else {
-		logger.Info("MASTER_TOKEN 已从环境变量加载")
+		logger.Info("MASTER_TOKEN loaded from environment variable")
 	}
 
-	logger.Info("数据库迁移完成 ✅")
+	logger.Info("database migration completed")
 	return nil
 }
 
 func createIndexes(db *gorm.DB) error {
-	// records 列表主路径需要覆盖 table_id + deleted_at + created_at 排序
+	// records list primary path needs to cover table_id + deleted_at + created_at ordering
 	if err := createIndexIfNotExists(db, "records", "idx_records_table_deleted_created", "table_id, deleted_at, created_at DESC"); err != nil {
 		return err
 	}
@@ -125,7 +125,7 @@ func createIndexes(db *gorm.DB) error {
 		return err
 	}
 
-	// PostgreSQL: GIN 索引加速 JSONB 查询（data @>, JSON 路径等）
+	// PostgreSQL: GIN index to accelerate JSONB queries (data @>, JSON path, etc.)
 	if isPostgres(db) {
 		if err := db.Exec("CREATE INDEX IF NOT EXISTS idx_records_data_gin ON records USING GIN (data)").Error; err != nil {
 			return err
@@ -287,7 +287,7 @@ func backfillRecordFieldIndexJSONText(value interface{}) (string, bool) {
 	return string(encoded), true
 }
 
-// createIndexIfNotExists 跨数据库兼容的索引创建
+// createIndexIfNotExists creates indexes in a cross-database compatible way
 func createIndexIfNotExists(db *gorm.DB, table, indexName, column string) error {
 	exists, err := indexExists(db, table, indexName)
 	if err != nil {
@@ -300,27 +300,27 @@ func createIndexIfNotExists(db *gorm.DB, table, indexName, column string) error 
 	return db.Exec(sql).Error
 }
 
-// indexExists 检查索引是否已存在
+// indexExists checks if an index already exists
 func indexExists(db *gorm.DB, table, indexName string) (bool, error) {
 	var count int64
 	switch db.Name() {
 	case "sqlite":
-		// SQLite: 查询 sqlite_master
+		// SQLite: query sqlite_master
 		if err := db.Raw("SELECT COUNT(*) FROM sqlite_master WHERE type='index' AND name=?", indexName).Scan(&count).Error; err != nil {
 			return false, err
 		}
 	case "postgres":
-		// PostgreSQL: 查询 pg_indexes
+		// PostgreSQL: query pg_indexes
 		if err := db.Raw("SELECT COUNT(*) FROM pg_indexes WHERE indexname=?", indexName).Scan(&count).Error; err != nil {
 			return false, err
 		}
 	case "mysql":
-		// MySQL: 查询 information_schema.STATISTICS
+		// MySQL: query information_schema.STATISTICS
 		if err := db.Raw("SELECT COUNT(*) FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?", table, indexName).Scan(&count).Error; err != nil {
 			return false, err
 		}
 	default:
-		return false, fmt.Errorf("不支持的数据库类型: %s", db.Name())
+		return false, fmt.Errorf("unsupported database type: %s", db.Name())
 	}
 	return count > 0, nil
 }
@@ -329,24 +329,24 @@ func isPostgres(db *gorm.DB) bool {
 	return db.Name() == "postgres"
 }
 
-// CleanupExpiredTokens 清理过期的 Token
+// CleanupExpiredTokens cleans up expired tokens
 func CleanupExpiredTokens() error {
 	database := pkgdb.DB()
 	logger := zap.L()
 
 	result := database.Where("expires_at IS NOT NULL AND expires_at <= ?", time.Now()).Delete(&models.Token{})
 	if result.Error != nil {
-		return fmt.Errorf("清理过期 Token 失败: %w", result.Error)
+		return fmt.Errorf("failed to cleanup expired tokens: %w", result.Error)
 	}
 
 	if result.RowsAffected > 0 {
-		logger.Info("清理过期 Token", zap.Int64("count", result.RowsAffected))
+		logger.Info("cleaned up expired tokens", zap.Int64("count", result.RowsAffected))
 		authz.ClearTokenCache()
 	}
 	return nil
 }
 
-// SetupPeriodicTasks 设置定时任务
+// SetupPeriodicTasks sets up periodic tasks
 func SetupPeriodicTasks(ctx context.Context) *sync.WaitGroup {
 	wg := &sync.WaitGroup{}
 
@@ -361,8 +361,8 @@ func SetupPeriodicTasks(ctx context.Context) *sync.WaitGroup {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				if err := runProtectedTask("清理过期 Token", tokenCleanupBreaker, CleanupExpiredTokens); err != nil {
-					zap.L().Error("定时清理过期 Token 失败", zap.Error(err))
+				if err := runProtectedTask("cleanup expired tokens", tokenCleanupBreaker, CleanupExpiredTokens); err != nil {
+					zap.L().Error("scheduled cleanup of expired tokens failed", zap.Error(err))
 				}
 			}
 		}
@@ -373,7 +373,7 @@ func SetupPeriodicTasks(ctx context.Context) *sync.WaitGroup {
 
 func runProtectedTask(name string, breaker *circuitBreaker, task func() error) error {
 	if !breaker.allow() {
-		zap.L().Warn("任务熔断中，跳过执行", zap.String("task", name))
+		zap.L().Warn("task circuit breaker open, skipping execution", zap.String("task", name))
 		return nil
 	}
 

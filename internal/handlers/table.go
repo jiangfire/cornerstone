@@ -8,7 +8,7 @@ import (
 	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
-// CreateTable 创建表
+// CreateTable creates a table
 //
 // @Summary      Create a table
 // @Description  Create a new table inside a database.
@@ -31,7 +31,7 @@ func CreateTable(c *gin.Context) {
 
 	var req services.CreateTableRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
 	}
 
@@ -51,7 +51,7 @@ func CreateTable(c *gin.Context) {
 	})
 }
 
-// ListTables 获取表列表
+// ListTables lists tables
 //
 // @Summary      List tables in a database
 // @Description  Returns all tables in the specified database.
@@ -74,7 +74,7 @@ func ListTables(c *gin.Context) {
 	tableService := services.NewTableService(db.DB())
 	tables, err := tableService.ListTables(dbID, userID)
 	if err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
@@ -84,7 +84,7 @@ func ListTables(c *gin.Context) {
 	})
 }
 
-// GetTable 获取表详情
+// GetTable gets table details
 //
 // @Summary      Get a table by ID
 // @Description  Retrieve full details of a single table by its ID.
@@ -107,14 +107,14 @@ func GetTable(c *gin.Context) {
 	tableService := services.NewTableService(db.DB())
 	table, err := tableService.GetTable(tableID, userID)
 	if err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
 	dto.Success(c, table)
 }
 
-// UpdateTable 更新表信息
+// UpdateTable updates a table
 //
 // @Summary      Update a table
 // @Description  Update table name and/or description.
@@ -140,14 +140,14 @@ func UpdateTable(c *gin.Context) {
 
 	var req services.UpdateTableRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
 	}
 
 	tableService := services.NewTableService(db.DB())
 	table, err := tableService.UpdateTable(tableID, req, userID)
 	if err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
@@ -159,7 +159,7 @@ func UpdateTable(c *gin.Context) {
 	})
 }
 
-// DeleteTable 删除表
+// DeleteTable deletes a table
 //
 // @Summary      Delete a table
 // @Description  Delete a table and all of its associated fields and records.
@@ -182,11 +182,11 @@ func DeleteTable(c *gin.Context) {
 
 	tableService := services.NewTableService(db.DB())
 	if err := tableService.DeleteTable(tableID, userID); err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
 	dto.Success(c, gin.H{
-		"message": "表已删除",
+		"message": "table deleted",
 	})
 }

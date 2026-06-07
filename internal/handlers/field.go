@@ -37,7 +37,7 @@ func CreateField(c *gin.Context) {
 
 	var req services.CreateFieldRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
 	}
 
@@ -82,7 +82,7 @@ func ListFields(c *gin.Context) {
 	fieldService := services.NewFieldService(db.DB())
 	fields, err := fieldService.ListFields(tableID, tokenID)
 	if err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
@@ -116,7 +116,7 @@ func GetField(c *gin.Context) {
 	fieldService := services.NewFieldService(db.DB())
 	field, err := fieldService.GetField(fieldID, tokenID)
 	if err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
@@ -151,14 +151,14 @@ func UpdateField(c *gin.Context) {
 
 	var req services.UpdateFieldRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.Error(c, 400, "参数错误: "+err.Error())
+		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
 	}
 
 	fieldService := services.NewFieldService(db.DB())
 	field, err := fieldService.UpdateField(fieldID, req, tokenID)
 	if err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
@@ -195,11 +195,11 @@ func DeleteField(c *gin.Context) {
 
 	fieldService := services.NewFieldService(db.DB())
 	if err := fieldService.DeleteField(fieldID, tokenID); err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
 	dto.Success(c, gin.H{
-		"message": "字段已删除",
+		"message": "field deleted",
 	})
 }

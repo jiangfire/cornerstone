@@ -102,7 +102,7 @@ func TestQueryExplain_EmptyQParam(t *testing.T) {
 	rec := makePostEmptyBody(t, router, "/api/v1/query/explain", master.Token)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeQueryResp(t, rec)
-	assert.Contains(t, resp["message"], "缺少查询参数")
+	assert.Contains(t, resp["message"], "missing query parameter")
 }
 
 func TestQueryValidate_EmptyQParam(t *testing.T) {
@@ -111,7 +111,7 @@ func TestQueryValidate_EmptyQParam(t *testing.T) {
 	rec := makePostEmptyBody(t, router, "/api/v1/query/validate", master.Token)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeQueryResp(t, rec)
-	assert.Contains(t, resp["message"], "缺少查询参数")
+	assert.Contains(t, resp["message"], "missing query parameter")
 }
 
 func TestSimplifiedQuery_WithSelect(t *testing.T) {
@@ -159,7 +159,7 @@ func TestQueryExplain_QParamInvalidJSON(t *testing.T) {
 	rec := makePostEmptyBody(t, router, path, master.Token)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeQueryResp(t, rec)
-	assert.Contains(t, resp["message"], "查询格式错误")
+	assert.Contains(t, resp["message"], "invalid query format")
 }
 
 func TestQueryValidate_QParamInvalidJSON(t *testing.T) {
@@ -169,5 +169,5 @@ func TestQueryValidate_QParamInvalidJSON(t *testing.T) {
 	rec := makePostEmptyBody(t, router, path, master.Token)
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeQueryResp(t, rec)
-	assert.Contains(t, resp["message"], "查询格式错误")
+	assert.Contains(t, resp["message"], "invalid query format")
 }

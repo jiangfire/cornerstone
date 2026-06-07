@@ -39,7 +39,7 @@ func TestValidateRequest_NilRequest(t *testing.T) {
 	v := NewValidator(db)
 	err := v.ValidateRequest(context.Background(), nil, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "查询请求不能为空")
+	assert.Contains(t, err.Error(), "query request cannot be nil")
 }
 
 func TestValidateRequest_DisallowedTable(t *testing.T) {
@@ -48,7 +48,7 @@ func TestValidateRequest_DisallowedTable(t *testing.T) {
 	req := &QueryRequest{From: "secret_table", Select: []string{"*"}}
 	err := v.ValidateRequest(context.Background(), req, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "不在允许访问的列表中")
+	assert.Contains(t, err.Error(), "not in the allowed list")
 }
 
 func TestValidateRequest_AllowedTable(t *testing.T) {
@@ -165,7 +165,7 @@ func TestCheckTableAccess_DisallowedTable(t *testing.T) {
 	v := NewValidator(db)
 	err := v.CheckTableAccess(context.Background(), "user1", "users")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "不在允许访问的列表中")
+	assert.Contains(t, err.Error(), "not in the allowed list")
 }
 
 func TestCheckTableAccess_TokensRequiresMaster(t *testing.T) {
@@ -178,7 +178,7 @@ func TestCheckTableAccess_TokensRequiresMaster(t *testing.T) {
 	v := NewValidator(db)
 	err := v.CheckTableAccess(context.Background(), "nm1", "tokens")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "无权访问 tokens")
+	assert.Contains(t, err.Error(), "access to tokens denied")
 
 	authz.ClearTokenCache()
 	err = v.CheckTableAccess(context.Background(), "user1", "tokens")
@@ -723,7 +723,7 @@ func TestNormalize_MissingFromTable(t *testing.T) {
 	req := &QueryRequest{}
 	err := executor.normalize(req)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "必须指定表名")
+	assert.Contains(t, err.Error(), "table name is required")
 }
 
 func TestNormalize_ConvertsFilterToWhere(t *testing.T) {

@@ -14,50 +14,50 @@ import (
 	"gorm.io/gorm"
 )
 
-// FileService 文件管理服务
+// FileService manages file operations
 type FileService struct {
 	db *gorm.DB
 }
 
-// fileUploadDir 文件存储根目录（相对于进程工作目录）。
-// 所有下载/删除路径都必须通过 ResolveSecureStoragePath 校验落在该目录下，
-// 防止 DB 中的 StorageURL 被恶意篡改后导致路径穿越。
+// fileUploadDir is the root directory for file storage (relative to process working directory).
+// All download/delete paths must be validated by ResolveSecureStoragePath to be within this directory,
+// preventing path traversal if StorageURL in DB is tampered with.
 const fileUploadDir = "./uploads"
 
-// ResolveSecureStoragePath 把 storageURL 解析为绝对路径，
-// 并校验其位于 fileUploadDir 之内。返回安全可读的绝对路径或错误。
+// ResolveSecureStoragePath resolves storageURL to an absolute path,
+// validates it is within fileUploadDir, and returns the safe absolute path or an error.
 func ResolveSecureStoragePath(storageURL string) (string, error) {
 	if strings.TrimSpace(storageURL) == "" {
-		return "", errors.New("文件路径为空")
+		return "", errors.New("file path is empty")
 	}
 	rootAbs, err := filepath.Abs(fileUploadDir)
 	if err != nil {
-		return "", fmt.Errorf("解析上传目录失败: %w", err)
+		return "", fmt.Errorf("failed to resolve upload directory: %w", err)
 	}
 	targetAbs, err := filepath.Abs(storageURL)
 	if err != nil {
-		return "", fmt.Errorf("解析文件路径失败: %w", err)
+		return "", fmt.Errorf("failed to resolve file path: %w", err)
 	}
 	rel, err := filepath.Rel(rootAbs, targetAbs)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", errors.New("非法的文件路径")
+		return "", errors.New("illegal file path")
 	}
 	return targetAbs, nil
 }
 
-// NewFileService 创建文件服务实例
+// NewFileService creates a new FileService instance
 func NewFileService(db *gorm.DB) *FileService {
 	return &FileService{db: db}
 }
 
-// UploadFileRequest 文件上传请求
+// UploadFileRequest is the file upload request
 type UploadFileRequest struct {
 	RecordID string
 	FieldID  string
 	File     *multipart.FileHeader
 }
 
-// FileResponse 文件响应
+// FileResponse is the file API response
 type FileResponse struct {
 	ID         string `json:"id"`
 	RecordID   string `json:"record_id"`
@@ -73,9 +73,9 @@ func (s *FileService) getAccessibleRecord(recordID, userID string, requiredRoles
 	var record models.Record
 	if err := s.db.Where("id = ? AND deleted_at IS NULL", recordID).First(&record).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("记录不存在")
+			return nil, errors.New("record not found")
 		}
-		return nil, fmt.Errorf("查询记录失败: %w", err)
+		return nil, fmt.Errorf("failed to query record: %w", err)
 	}
 
 	if err := NewRecordService(s.db).checkTableAccess(record.TableID, userID, requiredRoles); err != nil {
@@ -89,9 +89,9 @@ func (s *FileService) getAccessibleField(fieldID, userID string, requiredRoles [
 	var field models.Field
 	if err := s.db.Where("id = ? AND deleted_at IS NULL", fieldID).First(&field).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("字段不存在")
+			return nil, errors.New("field not found")
 		}
-		return nil, fmt.Errorf("查询字段失败: %w", err)
+		return nil, fmt.Errorf("failed to query field: %w", err)
 	}
 
 	if err := NewFieldService(s.db).checkTableAccess(field.TableID, userID, requiredRoles); err != nil {
@@ -105,9 +105,9 @@ func (s *FileService) getAccessibleFile(fileID, userID string, requiredRoles []s
 	var file models.File
 	if err := s.db.Where("id = ?", fileID).First(&file).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, nil, errors.New("文件不存在")
+			return nil, nil, errors.New("file not found")
 		}
-		return nil, nil, fmt.Errorf("查询文件失败: %w", err)
+		return nil, nil, fmt.Errorf("failed to query file: %w", err)
 	}
 
 	if file.RecordID != "" {
@@ -125,7 +125,7 @@ func (s *FileService) getAccessibleFile(fileID, userID string, requiredRoles []s
 		return &file, nil, nil
 	}
 
-	return nil, nil, errors.New("文件缺少关联记录或字段，无法访问")
+	return nil, nil, errors.New("file has no associated record or field, cannot access")
 }
 
 func (s *FileService) getMaxUploadSizeBytes() int64 {
@@ -181,10 +181,10 @@ func fileMatchesAllowedTypes(fileName, fileType string, allowedTypes []string) b
 	return false
 }
 
-// UploadFile 上传文件
+// UploadFile uploads a file
 func (s *FileService) UploadFile(req UploadFileRequest, userID string) (*models.File, error) {
 	if req.RecordID == "" && req.FieldID == "" {
-		return nil, errors.New("记录ID或字段ID至少需要提供一个")
+		return nil, errors.New("at least one of record ID or field ID is required")
 	}
 
 	var record *models.Record
@@ -204,26 +204,26 @@ func (s *FileService) UploadFile(req UploadFileRequest, userID string) (*models.
 			return nil, err
 		}
 		if !isAttachmentFieldType(field.Type) {
-			return nil, errors.New("仅 file 类型字段支持绑定上传文件")
+			return nil, errors.New("only file type fields support file uploads")
 		}
 		if record != nil && field.TableID != record.TableID {
-			return nil, errors.New("字段不属于当前记录所在表")
+			return nil, errors.New("field does not belong to the record's table")
 		}
 	}
 
-	// 2. 验证文件大小（读取系统设置）
+	// Validate file size (from system settings)
 	maxSize := s.getMaxUploadSizeBytes()
 	if req.File.Size > maxSize {
-		return nil, fmt.Errorf("文件大小超过限制（最大%dMB）", maxSize/1024/1024)
+		return nil, fmt.Errorf("file size exceeds limit (max %dMB)", maxSize/1024/1024)
 	}
 
-	// 3. 验证文件名和文件类型
+	// Validate file name and file type
 	fileName := strings.TrimSpace(req.File.Filename)
 	if fileName == "" {
-		return nil, errors.New("文件名不能为空")
+		return nil, errors.New("file name is required")
 	}
 	if strings.Contains(fileName, "/") || strings.Contains(fileName, "\\") || filepath.Base(fileName) != fileName {
-		return nil, errors.New("非法的文件名")
+		return nil, errors.New("illegal file name")
 	}
 
 	allowedTypes := []string{".jpg", ".jpeg", ".png", ".gif", ".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".zip"}
@@ -240,72 +240,72 @@ func (s *FileService) UploadFile(req UploadFileRequest, userID string) (*models.
 		}
 	}
 	if !allowed {
-		return nil, errors.New("不支持的文件类型")
+		return nil, errors.New("unsupported file type")
 	}
 
 	if field != nil {
 		config := parseStoredFieldConfig(field.Options)
 		if config.MaxFileSizeMB > 0 && req.File.Size > int64(config.MaxFileSizeMB)*1024*1024 {
-			return nil, fmt.Errorf("文件大小超过字段限制（最大%dMB）", config.MaxFileSizeMB)
+			return nil, fmt.Errorf("file size exceeds field limit (max %dMB)", config.MaxFileSizeMB)
 		}
 		if !fileMatchesAllowedTypes(fileName, contentType, config.AllowedTypes) {
-			return nil, errors.New("文件类型不符合字段限制")
+			return nil, errors.New("file type does not match field restrictions")
 		}
 	}
 
-	// 4. 创建上传目录
+	// Create upload directory
 	uploadDir := fileUploadDir
 	if err := os.MkdirAll(uploadDir, 0o750); err != nil {
-		return nil, fmt.Errorf("创建上传目录失败: %w", err)
+		return nil, fmt.Errorf("failed to create upload directory: %w", err)
 	}
 
-	// 5. 生成唯一文件名
+	// Generate unique file name
 	filename := fmt.Sprintf("%s_%s", models.GenerateID("file"), fileName)
 	targetFilepath := filepath.Join(uploadDir, filename)
 
-	// 5.1 验证文件路径安全（防止目录遍历攻击）
+	// Validate file path safety (prevent directory traversal)
 	uploadDirAbs, err := filepath.Abs(uploadDir)
 	if err != nil {
-		return nil, fmt.Errorf("获取上传目录绝对路径失败: %w", err)
+		return nil, fmt.Errorf("failed to get upload directory absolute path: %w", err)
 	}
 	targetFilepathAbs, err := filepath.Abs(targetFilepath)
 	if err != nil {
-		return nil, fmt.Errorf("获取文件绝对路径失败: %w", err)
+		return nil, fmt.Errorf("failed to get file absolute path: %w", err)
 	}
-	// 检查文件路径是否在上传目录内
+	// Check file path is within upload directory
 	if !strings.HasPrefix(targetFilepathAbs, uploadDirAbs) {
-		return nil, errors.New("非法的文件路径")
+		return nil, errors.New("illegal file path")
 	}
 
-	// 6. 保存文件
+	// Save file
 	src, err := req.File.Open()
 	if err != nil {
-		return nil, fmt.Errorf("打开上传文件失败: %w", err)
+		return nil, fmt.Errorf("failed to open uploaded file: %w", err)
 	}
 	defer func() {
 		//nolint:staticcheck // SA9003 - Close errors are informational in defer
 		if err := src.Close(); err != nil {
-			// 记录关闭错误
+			// Log close error
 		}
 	}()
 
-	// #nosec G304 - 已通过filepath.Abs()验证路径在允许的目录内
+	// #nosec G304 - path validated by filepath.Abs() to be within allowed directory
 	dst, err := os.Create(targetFilepath)
 	if err != nil {
-		return nil, fmt.Errorf("创建文件失败: %w", err)
+		return nil, fmt.Errorf("failed to create file: %w", err)
 	}
 	defer func() {
 		//nolint:staticcheck // SA9003 - Close errors are informational in defer
 		if err := dst.Close(); err != nil {
-			// 记录关闭错误
+			// Log close error
 		}
 	}()
 
 	if _, err := io.Copy(dst, src); err != nil {
-		return nil, fmt.Errorf("保存文件失败: %w", err)
+		return nil, fmt.Errorf("failed to save file: %w", err)
 	}
 
-	// 7. 创建文件记录
+	// Create file record
 	file := models.File{
 		RecordID:   req.RecordID,
 		FieldID:    req.FieldID,
@@ -316,18 +316,18 @@ func (s *FileService) UploadFile(req UploadFileRequest, userID string) (*models.
 	}
 
 	if err := s.db.Create(&file).Error; err != nil {
-		// 删除已保存的文件
+		// Delete saved file
 		//nolint:staticcheck // SA9003 - Cleanup error is informational
 		if rmErr := os.Remove(targetFilepath); rmErr != nil {
-			// 记录删除失败错误，但返回主要错误
+			// Log deletion failure but return primary error
 		}
-		return nil, fmt.Errorf("创建文件记录失败: %w", err)
+		return nil, fmt.Errorf("failed to create file record: %w", err)
 	}
 
 	return &file, nil
 }
 
-// GetFile 获取文件信息
+// GetFile gets file information
 func (s *FileService) GetFile(fileID, userID string) (*models.File, error) {
 	file, _, err := s.getAccessibleFile(fileID, userID, []string{"owner", "admin", "editor", "viewer"})
 	if err != nil {
@@ -336,7 +336,7 @@ func (s *FileService) GetFile(fileID, userID string) (*models.File, error) {
 	return file, nil
 }
 
-// DeleteFile 删除文件
+// DeleteFile deletes a file
 func (s *FileService) DeleteFile(fileID, userID string) error {
 	file, _, err := s.getAccessibleFile(fileID, userID, []string{"owner", "admin", "editor"})
 	if err != nil {
@@ -347,14 +347,14 @@ func (s *FileService) DeleteFile(fileID, userID string) error {
 		return err
 	}
 
-	// 删除物理文件
+	// Delete physical file
 	if err := os.Remove(file.StorageURL); err != nil && !os.IsNotExist(err) {
-		return fmt.Errorf("删除物理文件失败: %w", err)
+		return fmt.Errorf("failed to delete physical file: %w", err)
 	}
 
-	// 删除数据库记录
+	// Delete database record
 	if err := s.db.Delete(&file).Error; err != nil {
-		return fmt.Errorf("删除文件记录失败: %w", err)
+		return fmt.Errorf("failed to delete file record: %w", err)
 	}
 
 	return nil
@@ -404,7 +404,7 @@ func (s *FileService) removeFileReferenceFromRecord(file *models.File) error {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
 		}
-		return fmt.Errorf("查询关联记录失败: %w", err)
+		return fmt.Errorf("failed to query associated record: %w", err)
 	}
 
 	var field models.Field
@@ -412,7 +412,7 @@ func (s *FileService) removeFileReferenceFromRecord(file *models.File) error {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil
 		}
-		return fmt.Errorf("查询附件字段失败: %w", err)
+		return fmt.Errorf("failed to query attachment field: %w", err)
 	}
 
 	payload := parseRecordPayload(record.Data)
@@ -429,7 +429,7 @@ func (s *FileService) removeFileReferenceFromRecord(file *models.File) error {
 
 	dataJSON, err := json.Marshal(payload)
 	if err != nil {
-		return fmt.Errorf("更新记录附件引用失败: %w", err)
+		return fmt.Errorf("failed to update record attachment reference: %w", err)
 	}
 
 	if err := s.db.Model(&models.Record{}).Where("id = ?", record.ID).Updates(map[string]interface{}{
@@ -437,13 +437,13 @@ func (s *FileService) removeFileReferenceFromRecord(file *models.File) error {
 		"updated_at": gorm.Expr("CURRENT_TIMESTAMP"),
 		"version":    gorm.Expr("version + 1"),
 	}).Error; err != nil {
-		return fmt.Errorf("保存记录附件引用失败: %w", err)
+		return fmt.Errorf("failed to save record attachment reference: %w", err)
 	}
 
 	return nil
 }
 
-// ListRecordFiles 列出记录的所有文件
+// ListRecordFiles lists all files for a record
 func (s *FileService) ListRecordFiles(recordID, userID string) ([]models.File, error) {
 	if _, err := s.getAccessibleRecord(recordID, userID, []string{"owner", "admin", "editor", "viewer"}); err != nil {
 		return nil, err
@@ -451,7 +451,7 @@ func (s *FileService) ListRecordFiles(recordID, userID string) ([]models.File, e
 
 	var files []models.File
 	if err := s.db.Where("record_id = ?", recordID).Find(&files).Error; err != nil {
-		return nil, fmt.Errorf("查询文件列表失败: %w", err)
+		return nil, fmt.Errorf("failed to query file list: %w", err)
 	}
 	return files, nil
 }

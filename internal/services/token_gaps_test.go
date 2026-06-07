@@ -23,7 +23,7 @@ func TestTokenService_CreateToken_DBError(t *testing.T) {
 		Scopes: "{}",
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "创建 Token 失败")
+	assert.Contains(t, err.Error(), "failed to create token")
 }
 
 func TestTokenService_ListTokens_DBError(t *testing.T) {
@@ -35,7 +35,7 @@ func TestTokenService_ListTokens_DBError(t *testing.T) {
 	svc := NewTokenService(d)
 	_, err = svc.ListTokens("some_id", true)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "查询 Token 列表失败")
+	assert.Contains(t, err.Error(), "failed to list tokens")
 }
 
 func TestTokenService_DeleteToken_DBErrorOnQuery(t *testing.T) {
@@ -54,7 +54,7 @@ func TestTokenService_DeleteToken_DBErrorOnQuery(t *testing.T) {
 
 	err = svc.DeleteToken(master.ID, target.ID, true)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "查询 Token 失败")
+	assert.Contains(t, err.Error(), "failed to query token")
 }
 
 func TestTokenService_DeleteToken_DBErrorOnDelete(t *testing.T) {
@@ -74,7 +74,7 @@ func TestTokenService_DeleteToken_DBErrorOnDelete(t *testing.T) {
 
 	err := svc.DeleteToken(master.ID, target.ID, true)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "删除 Token 失败")
+	assert.Contains(t, err.Error(), "failed to delete token")
 }
 
 func TestTokenService_UpdateToken_DBErrorOnFirst(t *testing.T) {
@@ -86,7 +86,7 @@ func TestTokenService_UpdateToken_DBErrorOnFirst(t *testing.T) {
 	svc := NewTokenService(d)
 	_, err = svc.UpdateToken("any_id", "{}", nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "查询 Token 失败")
+	assert.Contains(t, err.Error(), "failed to query token")
 }
 
 func TestTokenService_UpdateToken_DBErrorOnUpdate(t *testing.T) {
@@ -103,7 +103,7 @@ func TestTokenService_UpdateToken_DBErrorOnUpdate(t *testing.T) {
 
 	_, err := svc.UpdateToken(worker.ID, `{"databases":{}}`, nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "更新 Token 失败")
+	assert.Contains(t, err.Error(), "failed to update token")
 }
 
 func TestTokenService_UpdateToken_DBErrorOnRequery(t *testing.T) {
@@ -124,5 +124,5 @@ func TestTokenService_UpdateToken_DBErrorOnRequery(t *testing.T) {
 
 	_, err := svc.UpdateToken(worker.ID, `{"databases":{}}`, nil)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "查询最新 Token 失败")
+	assert.Contains(t, err.Error(), "failed to query updated token")
 }

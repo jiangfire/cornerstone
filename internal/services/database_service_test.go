@@ -73,7 +73,7 @@ func TestDatabaseService_CreateDatabaseWithTables(t *testing.T) {
 
 		_, err := svc.CreateDatabaseWithTables(req, "test_user")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "已存在同名数据库")
+		assert.Contains(t, err.Error(), "database name already exists")
 	})
 
 	t.Run("invalid database name", func(t *testing.T) {
@@ -84,7 +84,7 @@ func TestDatabaseService_CreateDatabaseWithTables(t *testing.T) {
 
 		_, err := svc.CreateDatabaseWithTables(req, "test_user")
 		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "数据库名称验证失败")
+		assert.Contains(t, err.Error(), "database name validation failed")
 	})
 }
 

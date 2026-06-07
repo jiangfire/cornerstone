@@ -10,14 +10,14 @@ type entry[V any] struct {
 	expiry time.Time
 }
 
-// MemoryCache 是带 TTL 的线程安全内存缓存，实现 Cache[K, V] 接口。
+// MemoryCache is a thread-safe in-memory cache with TTL implementing the Cache[K, V] interface.
 type MemoryCache[K comparable, V any] struct {
 	mu   sync.RWMutex
 	data map[K]entry[V]
 	ttl  time.Duration
 }
 
-// NewMemoryCache 创建内存缓存实例。
+// NewMemoryCache creates an in-memory cache instance.
 func NewMemoryCache[K comparable, V any](ttl time.Duration) *MemoryCache[K, V] {
 	return &MemoryCache[K, V]{
 		data: make(map[K]entry[V]),
@@ -25,7 +25,7 @@ func NewMemoryCache[K comparable, V any](ttl time.Duration) *MemoryCache[K, V] {
 	}
 }
 
-// Get 获取缓存值。key 不存在或已过期返回 (zero, false)。过期条目会被清理。
+// Get retrieves a cached value. Returns (zero, false) if key does not exist or has expired. Expired entries are cleaned up.
 func (c *MemoryCache[K, V]) Get(key K) (V, bool) {
 	c.mu.RLock()
 	e, ok := c.data[key]
@@ -54,21 +54,21 @@ func (c *MemoryCache[K, V]) Get(key K) (V, bool) {
 	return e.value, true
 }
 
-// Set 写入缓存值。
+// Set writes a cached value.
 func (c *MemoryCache[K, V]) Set(key K, value V) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.data[key] = entry[V]{value: value, expiry: time.Now().Add(c.ttl)}
 }
 
-// Delete 删除指定 key。
+// Delete removes the specified key.
 func (c *MemoryCache[K, V]) Delete(key K) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	delete(c.data, key)
 }
 
-// Clear 清空全部缓存条目。
+// Clear clears all cache entries.
 func (c *MemoryCache[K, V]) Clear() {
 	c.mu.Lock()
 	defer c.mu.Unlock()

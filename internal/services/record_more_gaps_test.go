@@ -33,7 +33,7 @@ func TestUpdateRecord_UnknownField(t *testing.T) {
 		Data: map[string]interface{}{"nonexistent_field": "value"},
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "不存在")
+	assert.Contains(t, err.Error(), "does not exist")
 }
 
 func TestUpdateRecord_InvalidFieldType(t *testing.T) {
@@ -58,7 +58,7 @@ func TestUpdateRecord_InvalidFieldType(t *testing.T) {
 		Data: map[string]interface{}{"count": "not-a-number"},
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "数字类型")
+	assert.Contains(t, err.Error(), "expected number type")
 }
 
 func TestGetRecord_NonMasterDenied(t *testing.T) {
@@ -85,7 +85,7 @@ func TestGetRecord_NonMasterDenied(t *testing.T) {
 
 	_, err = s.GetRecord(record.ID, viewer.ID)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "无权访问该表")
+	assert.Contains(t, err.Error(), "permission denied: cannot access this table")
 }
 
 func TestListRecords_NonMasterDenied(t *testing.T) {
@@ -109,7 +109,7 @@ func TestListRecords_NonMasterDenied(t *testing.T) {
 		Limit:   10,
 	}, viewer.ID)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "无权访问该表")
+	assert.Contains(t, err.Error(), "permission denied: cannot access this table")
 }
 
 func TestExportRecords_ListFieldValues(t *testing.T) {

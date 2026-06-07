@@ -12,7 +12,7 @@ func TestGenerate_NilRequest(t *testing.T) {
 	query, err := g.Generate(nil)
 	assert.Nil(t, query)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "查询请求不能为空")
+	assert.Contains(t, err.Error(), "query request cannot be nil")
 }
 
 func TestGenerate_UnionAndIntersect(t *testing.T) {
@@ -348,14 +348,14 @@ func TestGenerateCondition_In_NotArray(t *testing.T) {
 	g := NewSQLGenerator(true)
 	_, _, err := g.generateCondition(Condition{Field: "status", Op: "in", Value: "active"})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "'in' 操作符需要数组值")
+	assert.Contains(t, err.Error(), "'in' operator requires an array value")
 }
 
 func TestGenerateCondition_In_EmptyArray(t *testing.T) {
 	g := NewSQLGenerator(true)
 	_, _, err := g.generateCondition(Condition{Field: "status", Op: "in", Value: []interface{}{}})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "'in' 操作符数组不能为空")
+	assert.Contains(t, err.Error(), "'in' operator array cannot be empty")
 }
 
 func TestGenerateCondition_Between(t *testing.T) {
@@ -374,7 +374,7 @@ func TestGenerateCondition_Between_Invalid(t *testing.T) {
 	g := NewSQLGenerator(true)
 	_, _, err := g.generateCondition(Condition{Field: "age", Op: "between", Value: 18})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "'between' 操作符需要包含两个值的数组")
+	assert.Contains(t, err.Error(), "'between' operator requires an array with two values")
 }
 
 func TestGenerateCondition_Between_WrongLength(t *testing.T) {
@@ -385,7 +385,7 @@ func TestGenerateCondition_Between_WrongLength(t *testing.T) {
 		Value: []interface{}{1, 2, 3},
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "'between' 操作符需要包含两个值的数组")
+	assert.Contains(t, err.Error(), "'between' operator requires an array with two values")
 }
 
 func TestGenerateCondition_IsNull(t *testing.T) {
@@ -416,7 +416,7 @@ func TestGenerateCondition_UnknownOp(t *testing.T) {
 	g := NewSQLGenerator(true)
 	_, _, err := g.generateCondition(Condition{Field: "name", Op: "regex", Value: "test"})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "未知的操作符")
+	assert.Contains(t, err.Error(), "unknown operator")
 }
 
 func TestGenerateCondition_EmptyOp(t *testing.T) {

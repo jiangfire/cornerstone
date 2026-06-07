@@ -11,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// Executor 查询执行器
+// Executor executes queries.
 type Executor struct {
 	db        *gorm.DB
 	parser    *Parser
@@ -20,7 +20,7 @@ type Executor struct {
 	limits    QueryLimits
 }
 
-// NewExecutor 创建查询执行器
+// NewExecutor creates a query executor.
 func NewExecutor(database *gorm.DB) *Executor {
 	return &Executor{
 		db:        database,
@@ -31,7 +31,7 @@ func NewExecutor(database *gorm.DB) *Executor {
 	}
 }
 
-// NewExecutorWithConfig 创建带自定义配置的查询执行器
+// NewExecutorWithConfig creates an executor with custom config.
 func NewExecutorWithConfig(database *gorm.DB, limits QueryLimits, tables AllowedTables) *Executor {
 	return &Executor{
 		db:        database,
@@ -42,7 +42,7 @@ func NewExecutorWithConfig(database *gorm.DB, limits QueryLimits, tables Allowed
 	}
 }
 
-// dbType 获取数据库类型
+// dbType returns the database type.
 func dbType(gormDB *gorm.DB) string {
 	if gormDB == nil {
 		return ""
@@ -50,40 +50,40 @@ func dbType(gormDB *gorm.DB) string {
 	return gormDB.Name()
 }
 
-// Execute 执行查询
+// Execute runs a query.
 func (e *Executor) Execute(ctx context.Context, req *QueryRequest, userID string) (*QueryResult, error) {
 	req = cloneQueryRequest(req)
 
-	// 1. 规范化和验证请求
+	// 1. Normalize and validate request
 	if err := e.Prepare(ctx, req, userID); err != nil {
 		return nil, err
 	}
 
-	// 2. 生成查询 SQL
+	// 2. generate query SQL
 	query, err := e.generator.Generate(req)
 	if err != nil {
-		return nil, fmt.Errorf("SQL生成失败: %w", err)
+		return nil, fmt.Errorf("SQL generation failed: %w", err)
 	}
 
-	// 3. 生成 COUNT SQL
+	// 3. generate COUNT SQL
 	countQuery, err := e.generator.GenerateCount(req)
 	if err != nil {
-		return nil, fmt.Errorf("COUNT SQL生成失败: %w", err)
+		return nil, fmt.Errorf("COUNT SQL generation failed: %w", err)
 	}
 
-	// 4. 执行查询
+	// 4. execute query
 	data, err := e.executeQuery(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("查询执行失败: %w", err)
+		return nil, fmt.Errorf("query execution failed: %w", err)
 	}
 
-	// 5. 获取总数
+	// 5. get total count
 	total, err := e.executeCount(ctx, countQuery)
 	if err != nil {
-		return nil, fmt.Errorf("总数查询失败: %w", err)
+		return nil, fmt.Errorf("total count query failed: %w", err)
 	}
 
-	// 6. 构建结果
+	// 6. Build result
 	result := &QueryResult{
 		Data:    data,
 		Total:   total,
@@ -95,7 +95,7 @@ func (e *Executor) Execute(ctx context.Context, req *QueryRequest, userID string
 	return result, nil
 }
 
-// Prepare 规范化、鉴权并注入权限过滤条件
+// Prepare normalizes, authorizes, and injects permission filters.
 func (e *Executor) Prepare(ctx context.Context, req *QueryRequest, userID string) error {
 	if err := e.normalize(req); err != nil {
 		return err
@@ -103,11 +103,11 @@ func (e *Executor) Prepare(ctx context.Context, req *QueryRequest, userID string
 
 	scope, err := e.validator.newAccessScope(userID)
 	if err != nil {
-		return fmt.Errorf("权限验证失败: %w", err)
+		return fmt.Errorf("permission check failed: %w", err)
 	}
 
 	if err := e.validator.validateRequestWithScope(ctx, req, userID, scope); err != nil {
-		return fmt.Errorf("权限验证失败: %w", err)
+		return fmt.Errorf("permission check failed: %w", err)
 	}
 
 	if err := e.validator.autoFilterByPermissionWithScope(req, scope); err != nil {
@@ -119,35 +119,35 @@ func (e *Executor) Prepare(ctx context.Context, req *QueryRequest, userID string
 	return nil
 }
 
-// ExecuteRaw 执行原始 JSON 查询
+// ExecuteRaw executes a raw JSON query.
 func (e *Executor) ExecuteRaw(ctx context.Context, jsonData []byte, userID string) (*QueryResult, error) {
-	// 1. 解析请求
+	// 1. Parse request
 	req, err := e.parser.Parse(jsonData)
 	if err != nil {
 		return nil, err
 	}
 
-	// 2. 执行查询
+	// 2. Execute query
 	return e.Execute(ctx, req, userID)
 }
 
-// ExecuteFromMap 从 map 执行查询
+// ExecuteFromMap executes a query from a map.
 func (e *Executor) ExecuteFromMap(ctx context.Context, data map[string]interface{}, userID string) (*QueryResult, error) {
 	jsonData, err := json.Marshal(data)
 	if err != nil {
-		return nil, fmt.Errorf("序列化失败: %w", err)
+		return nil, fmt.Errorf("serialization failed: %w", err)
 	}
 	return e.ExecuteRaw(ctx, jsonData, userID)
 }
 
-// ExecuteBatch 执行批量查询
+// ExecuteBatch executes a batch of queries.
 func (e *Executor) ExecuteBatch(ctx context.Context, req *BatchQueryRequest, userID string) (*BatchQueryResult, error) {
 	results := make(map[string]*QueryResult)
 
 	for name, query := range req.Queries {
 		result, err := e.Execute(ctx, &query, userID)
 		if err != nil {
-			return nil, fmt.Errorf("查询 '%s' 执行失败: %w", name, err)
+			return nil, fmt.Errorf("query '%s' execution failed: %w", name, err)
 		}
 		results[name] = result
 	}
@@ -155,7 +155,7 @@ func (e *Executor) ExecuteBatch(ctx context.Context, req *BatchQueryRequest, use
 	return &BatchQueryResult{Results: results}, nil
 }
 
-// ExecuteBatchRaw 执行原始 JSON 批量查询
+// ExecuteBatchRaw executes a raw JSON batch query.
 func (e *Executor) ExecuteBatchRaw(ctx context.Context, jsonData []byte, userID string) (*BatchQueryResult, error) {
 	req, err := e.parser.ParseBatch(jsonData)
 	if err != nil {
@@ -164,7 +164,7 @@ func (e *Executor) ExecuteBatchRaw(ctx context.Context, jsonData []byte, userID 
 	return e.ExecuteBatch(ctx, req, userID)
 }
 
-// executeQuery 执行查询并返回结果
+// executeQuery executes a query and returns results.
 func (e *Executor) executeQuery(ctx context.Context, query *SQLQuery) ([]map[string]interface{}, error) {
 	rows, err := e.db.WithContext(ctx).Raw(query.SQL, query.Params...).Rows()
 	if err != nil {
@@ -175,7 +175,7 @@ func (e *Executor) executeQuery(ctx context.Context, query *SQLQuery) ([]map[str
 	return e.scanRows(rows)
 }
 
-// executeCount 执行 COUNT 查询
+// executeCount executes a COUNT query.
 func (e *Executor) executeCount(ctx context.Context, query *SQLQuery) (int64, error) {
 	var total int64
 	err := e.db.WithContext(ctx).Raw(query.SQL, query.Params...).Scan(&total).Error
@@ -185,7 +185,7 @@ func (e *Executor) executeCount(ctx context.Context, query *SQLQuery) (int64, er
 	return total, nil
 }
 
-// scanRows 扫描查询结果
+// scanRows scans query results.
 func (e *Executor) scanRows(rows *sql.Rows) ([]map[string]interface{}, error) {
 	columns, err := rows.Columns()
 	if err != nil {
@@ -200,17 +200,17 @@ func (e *Executor) scanRows(rows *sql.Rows) ([]map[string]interface{}, error) {
 	}
 
 	for rows.Next() {
-		// 扫描行
+		// Scan row
 		if err := rows.Scan(valuePtrs...); err != nil {
 			return nil, err
 		}
 
-		// 构建结果映射
+		// Build result map
 		row := make(map[string]interface{}, len(columns))
 		for i, col := range columns {
 			val := values[i]
 
-			// 处理字节数组（如 JSONB）
+			// Handle byte arrays (e.g., JSONB)
 			if b, ok := val.([]byte); ok {
 				row[col] = decodeScannedBytes(b)
 			} else {
@@ -283,18 +283,18 @@ func looksLikeJSONNumber(b []byte) bool {
 	return seenDigit
 }
 
-// Validate 验证查询请求（不执行）
+// Validate validates a query request (without executing).
 func (e *Executor) Validate(ctx context.Context, req *QueryRequest, userID string) error {
 	req = cloneQueryRequest(req)
 	return e.Prepare(ctx, req, userID)
 }
 
-// Explain 解释查询（返回生成的 SQL）
+// Explain explains a query (returns generated SQL).
 func (e *Executor) Explain(req *QueryRequest) (*SQLQuery, error) {
 	return e.generator.Generate(req)
 }
 
-// ExplainAuthorized 在权限过滤后的上下文中生成 SQL
+// ExplainAuthorized generates SQL after applying permission filters.
 func (e *Executor) ExplainAuthorized(ctx context.Context, req *QueryRequest, userID string) (*SQLQuery, error) {
 	req = cloneQueryRequest(req)
 	if err := e.Prepare(ctx, req, userID); err != nil {
@@ -303,27 +303,27 @@ func (e *Executor) ExplainAuthorized(ctx context.Context, req *QueryRequest, use
 	return e.generator.Generate(req)
 }
 
-// GetParser 获取解析器
+// GetParser returns the parser.
 func (e *Executor) GetParser() *Parser {
 	return e.parser
 }
 
-// GetValidator 获取验证器
+// GetValidator returns the validator.
 func (e *Executor) GetValidator() *Validator {
 	return e.validator
 }
 
-// GetGenerator 获取 SQL 生成器
+// GetGenerator returns the SQL generator.
 func (e *Executor) GetGenerator() *SQLGenerator {
 	return e.generator
 }
 
-// DB 返回数据库连接
+// DB returns the database connection.
 func (e *Executor) DB() *gorm.DB {
 	return e.db
 }
 
-// WithDB 创建使用指定数据库的执行器副本
+// WithDB creates an executor copy using the given database.
 func (e *Executor) WithDB(database *gorm.DB) *Executor {
 	return &Executor{
 		db:        database,
@@ -334,8 +334,7 @@ func (e *Executor) WithDB(database *gorm.DB) *Executor {
 	}
 }
 
-// SimplifiedQuery 简化查询接口
-// 适用于简单的单表查询场景
+// SimplifiedQuery is a simplified query interface for simple single-table queries.
 func (e *Executor) SimplifiedQuery(ctx context.Context, table string, filter map[string]interface{}, sort string, page, size int, userID string) (*QueryResult, error) {
 	req := &QueryRequest{
 		Table:  table,
@@ -345,7 +344,7 @@ func (e *Executor) SimplifiedQuery(ctx context.Context, table string, filter map
 		Size:   size,
 	}
 
-	// 规范化
+	// Normalize
 	if err := e.normalize(req); err != nil {
 		return nil, err
 	}
@@ -353,16 +352,16 @@ func (e *Executor) SimplifiedQuery(ctx context.Context, table string, filter map
 	return e.Execute(ctx, req, userID)
 }
 
-// normalize 规范化请求（内部使用，跳过解析器的验证）
+// normalize normalizes the request (internal use, skips parser validation).
 func (e *Executor) normalize(req *QueryRequest) error {
-	// 处理简化语法
+	// Handle simplified syntax
 	if req.Table != "" {
 		req.From = req.Table
 	}
 
-	// 设置默认值
+	// Set defaults
 	if req.From == "" {
-		return fmt.Errorf("必须指定表名")
+		return fmt.Errorf("table name is required")
 	}
 
 	if req.Page <= 0 {
@@ -373,7 +372,7 @@ func (e *Executor) normalize(req *QueryRequest) error {
 		req.Size = 20
 	}
 
-	// 转换简化语法的 filter 到 Where
+	// Convert simplified filter to Where
 	if len(req.Filter) > 0 && req.Where == nil {
 		where, err := e.parser.parseSimplifiedFilter(req.Filter)
 		if err != nil {
@@ -382,7 +381,7 @@ func (e *Executor) normalize(req *QueryRequest) error {
 		req.Where = where
 	}
 
-	// 转换简化语法的 sort 到 OrderBy
+	// Convert simplified sort to OrderBy
 	if req.Sort != "" && len(req.OrderBy) == 0 {
 		orderBy, err := e.parser.parseSimplifiedSort(req.Sort)
 		if err != nil {
@@ -391,7 +390,7 @@ func (e *Executor) normalize(req *QueryRequest) error {
 		req.OrderBy = orderBy
 	}
 
-	// 如果没有指定 select，默认查询所有字段
+	// Default to all fields if select is not specified
 	if len(req.Select) == 0 {
 		req.Select = []string{"*"}
 	}
@@ -490,18 +489,18 @@ func cloneStringAnyMap(src map[string]interface{}) map[string]interface{} {
 	return cloned
 }
 
-// GlobalExecutor 全局执行器实例（单例模式）
+// GlobalExecutor is the global executor instance (singleton).
 var GlobalExecutor *Executor
 
-// InitGlobalExecutor 初始化全局执行器
+// InitGlobalExecutor initializes the global executor.
 func InitGlobalExecutor(database *gorm.DB) {
 	GlobalExecutor = NewExecutor(database)
 }
 
-// GetGlobalExecutor 获取全局执行器
+// GetGlobalExecutor returns the global executor.
 func GetGlobalExecutor() *Executor {
 	if GlobalExecutor == nil {
-		// 尝试从全局 DB 初始化
+		// Try to initialize from global DB
 		if database := db.DB(); database != nil {
 			InitGlobalExecutor(database)
 		}

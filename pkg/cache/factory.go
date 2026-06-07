@@ -5,15 +5,15 @@ import (
 	"time"
 )
 
-// New 创建内存缓存实例，支持任意 comparable key 类型。
+// New creates an in-memory cache instance supporting any comparable key type.
 func New[K comparable, V any](ttl time.Duration) Cache[K, V] {
 	return NewMemoryCache[K, V](ttl)
 }
 
-// NewString 创建以 string 为 key 的缓存实例。
-// 根据 REDIS_URL 环境变量选择后端：
-//   - 空值：使用 MemoryCache（默认）
-//   - 有值：使用 RedisCache
+// NewString creates a cache instance with string keys.
+// Selects backend based on the REDIS_URL environment variable:
+//   - Empty: use MemoryCache (default)
+//   - Set: use RedisCache
 func NewString[V any](prefix string, ttl time.Duration) Cache[string, V] {
 	redisURL := os.Getenv("REDIS_URL")
 	if redisURL == "" {

@@ -98,7 +98,7 @@ func TestValidate_UnsupportedDBType(t *testing.T) {
 	}
 	err := cfg.Validate()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "不支持的数据库类型")
+	assert.Contains(t, err.Error(), "unsupported database type")
 }
 
 func TestValidate_EmptyPort(t *testing.T) {

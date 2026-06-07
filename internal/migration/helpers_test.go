@@ -242,12 +242,12 @@ func TestMigrationError_Error(t *testing.T) {
 	var e *MigrationError
 	assert.Equal(t, "", e.Error())
 
-	e = &MigrationError{Code: "MIG-001", Message: "连接失败"}
-	assert.Equal(t, "MIG-001: 连接失败", e.Error())
+	e = &MigrationError{Code: "MIG-001", Message: "connection failed"}
+	assert.Equal(t, "MIG-001: connection failed", e.Error())
 
 	cause := errors.New("dial tcp: connection refused")
-	e = &MigrationError{Code: "MIG-001", Message: "连接失败", Cause: cause}
-	assert.Equal(t, "MIG-001: 连接失败: dial tcp: connection refused", e.Error())
+	e = &MigrationError{Code: "MIG-001", Message: "connection failed", Cause: cause}
+	assert.Equal(t, "MIG-001: connection failed: dial tcp: connection refused", e.Error())
 }
 
 func TestMigrationError_Unwrap(t *testing.T) {
@@ -363,7 +363,7 @@ func TestConfig_Validate_AllBranches(t *testing.T) {
 	}
 	err := bothDSNAndFields.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "互斥")
+	assert.Contains(t, err.Error(), "mutually exclusive")
 
 	neitherDSNNorFields := Config{
 		Source:  SourceConfig{Type: "mysql"},
@@ -372,7 +372,7 @@ func TestConfig_Validate_AllBranches(t *testing.T) {
 	}
 	err = neitherDSNNorFields.Validate()
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "必须提供")
+	assert.Contains(t, err.Error(), "must be provided")
 
 	sqliteMissing := Config{
 		Source:  SourceConfig{Type: "sqlite", Host: "localhost"},

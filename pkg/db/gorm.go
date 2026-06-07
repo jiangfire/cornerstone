@@ -15,7 +15,7 @@ import (
 
 var db *gorm.DB
 
-// DB 返回数据库连接对象
+// DB returns the database connection object
 func DB() *gorm.DB {
 	if db == nil {
 		panic("database not initialized")
@@ -23,17 +23,17 @@ func DB() *gorm.DB {
 	return db
 }
 
-// SetDB 设置数据库连接对象（用于测试）
+// SetDB sets the database connection object (for testing)
 func SetDB(d *gorm.DB) {
 	db = d
 }
 
-// IsInitialized 检查数据库是否已初始化
+// IsInitialized checks whether the database is initialized
 func IsInitialized() bool {
 	return db != nil
 }
 
-// IsSQLite 检查当前是否为 SQLite 数据库
+// IsSQLite checks whether the current database is SQLite
 func IsSQLite() bool {
 	if db == nil {
 		return false
@@ -41,7 +41,7 @@ func IsSQLite() bool {
 	return db.Name() == "sqlite"
 }
 
-// IsPostgres 检查当前是否为 PostgreSQL 数据库
+// IsPostgres checks whether the current database is PostgreSQL
 func IsPostgres() bool {
 	if db == nil {
 		return false
@@ -49,7 +49,7 @@ func IsPostgres() bool {
 	return db.Name() == "postgres"
 }
 
-// IsMySQL 检查当前是否为 MySQL 数据库
+// IsMySQL checks whether the current database is MySQL
 func IsMySQL() bool {
 	if db == nil {
 		return false
@@ -57,7 +57,7 @@ func IsMySQL() bool {
 	return db.Name() == "mysql"
 }
 
-// InitDB 初始化数据库连接
+// InitDB initializes the database connection
 func InitDB(cfg config.DatabaseConfig) error {
 	var err error
 
@@ -74,13 +74,13 @@ func InitDB(cfg config.DatabaseConfig) error {
 		return err
 	}
 
-	// 设置连接池
+	// configure connection pool
 	sqlDB, err := db.DB()
 	if err != nil {
 		return err
 	}
 
-	// SQLite :memory: 每个连接都是独立的数据库，必须限制为单连接
+	// SQLite :memory: each connection is an independent database, must be limited to a single connection
 	if cfg.Type == "sqlite" && cfg.URL == ":memory:" {
 		sqlDB.SetMaxOpenConns(1)
 		sqlDB.SetMaxIdleConns(1)
@@ -95,13 +95,13 @@ func InitDB(cfg config.DatabaseConfig) error {
 	return nil
 }
 
-// initMySQL 初始化 MySQL 连接
+// initMySQL initializes MySQL connection
 func initMySQL(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	dsn, err := mysql.ParseDSN(cfg.URL)
 	if err != nil {
-		return nil, fmt.Errorf("解析 MySQL DSN 失败: %w", err)
+		return nil, fmt.Errorf("failed to parse MySQL DSN: %w", err)
 	}
-	// 确保 time.Time 字段能正确扫描
+	// ensure time.Time fields are scanned correctly
 	if !dsn.ParseTime {
 		dsn.ParseTime = true
 	}
@@ -112,16 +112,16 @@ func initMySQL(cfg config.DatabaseConfig) (*gorm.DB, error) {
 		return nil, err
 	}
 
-	// MySQL 8.0 默认启用 NO_ZERO_DATE，会导致 time.Time 零值插入失败。
-	// SET SESSION 确保当前连接立即生效（SET GLOBAL 仅影响新连接）。
+	// MySQL 8.0 enables NO_ZERO_DATE by default, causing zero-value time.Time inserts to fail.
+	// SET SESSION ensures the current connection takes effect immediately (SET GLOBAL only affects new connections).
 	if err := db.Exec("SET SESSION sql_mode='ONLY_FULL_GROUP_BY,STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'").Error; err != nil {
-		return nil, fmt.Errorf("设置 MySQL sql_mode 失败: %w", err)
+		return nil, fmt.Errorf("failed to set MySQL sql_mode: %w", err)
 	}
 
 	return db, nil
 }
 
-// initPostgres 初始化 PostgreSQL 连接
+// initPostgres initializes PostgreSQL connection
 func initPostgres(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	return gorm.Open(postgres.New(postgres.Config{
 		DSN:                  cfg.URL,
@@ -131,14 +131,14 @@ func initPostgres(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	})
 }
 
-// initSQLite 初始化 SQLite 连接
+// initSQLite initializes SQLite connection
 func initSQLite(cfg config.DatabaseConfig) (*gorm.DB, error) {
 	return gorm.Open(sqlite.Open(cfg.URL), &gorm.Config{
 		Logger: NewZapLogger(zap.L()),
 	})
 }
 
-// CloseDB 关闭底层数据库连接池
+// CloseDB closes the underlying database connection pool
 func CloseDB() error {
 	if db == nil {
 		return nil

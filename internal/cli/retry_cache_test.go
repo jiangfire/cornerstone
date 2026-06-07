@@ -59,5 +59,5 @@ func TestCacheClear(t *testing.T) {
 	require.NoError(t, err)
 	buf := make([]byte, 1024)
 	n, _ := r.Read(buf)
-	assert.Contains(t, string(buf[:n]), "所有缓存已清空")
+	assert.Contains(t, string(buf[:n]), "all caches cleared")
 }

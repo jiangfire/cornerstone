@@ -9,7 +9,7 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Config 包含所有应用配置
+// Config holds all application configuration
 type Config struct {
 	Database DatabaseConfig
 	Server   ServerConfig
@@ -18,7 +18,7 @@ type Config struct {
 	MCP      MCPConfig
 }
 
-// DatabaseConfig 数据库配置
+// DatabaseConfig is the database configuration
 type DatabaseConfig struct {
 	Type        string
 	URL         string
@@ -27,25 +27,25 @@ type DatabaseConfig struct {
 	MaxLifetime int
 }
 
-// ServerConfig 服务器配置
+// ServerConfig is the server configuration
 type ServerConfig struct {
 	Mode string
 	Port string
 }
 
-// LoggerConfig 日志配置
+// LoggerConfig is the logger configuration
 type LoggerConfig struct {
 	Level string
 }
 
-// LLMConfig LLM 配置
+// LLMConfig is the LLM configuration
 type LLMConfig struct {
 	APIKey  string
 	Model   string
 	BaseURL string
 }
 
-// MCPConfig HTTP MCP / SSE 配置
+// MCPConfig is the HTTP MCP / SSE configuration
 type MCPConfig struct {
 	SSEKeepaliveSec int
 	SSERetryMS      int
@@ -65,7 +65,7 @@ func loadEnvFiles() {
 	}
 }
 
-// Load 加载配置
+// Load loads configuration from environment
 func Load() (*Config, error) {
 	loadEnvFiles()
 
@@ -97,22 +97,22 @@ func Load() (*Config, error) {
 	}
 
 	if err := config.Validate(); err != nil {
-		return nil, fmt.Errorf("配置验证失败: %w", err)
+		return nil, fmt.Errorf("config validation failed: %w", err)
 	}
 
 	return config, nil
 }
 
-// Validate 验证配置
+// Validate validates the configuration
 func (c *Config) Validate() error {
 	switch c.Database.Type {
 	case "postgres":
 		if strings.TrimSpace(c.Database.URL) == "" {
-			return fmt.Errorf("DATABASE_URL 不能为空")
+			return fmt.Errorf("DATABASE_URL is required")
 		}
 	case "mysql":
 		if strings.TrimSpace(c.Database.URL) == "" {
-			return fmt.Errorf("DATABASE_URL 不能为空")
+			return fmt.Errorf("DATABASE_URL is required")
 		}
 	case "sqlite":
 		url := strings.TrimSpace(c.Database.URL)
@@ -121,20 +121,20 @@ func (c *Config) Validate() error {
 		} else if url == ":memory:" {
 			// OK
 		} else if strings.HasPrefix(url, "postgres://") || strings.HasPrefix(url, "postgresql://") {
-			return fmt.Errorf("DATABASE_URL 看起来是 PostgreSQL 连接串，但 DB_TYPE 配置为 sqlite")
+			return fmt.Errorf("DATABASE_URL looks like a PostgreSQL connection string, but DB_TYPE is set to sqlite")
 		} else if strings.HasPrefix(url, "mysql://") || strings.HasPrefix(url, "tcp(") {
-			return fmt.Errorf("DATABASE_URL 看起来是 MySQL 连接串，但 DB_TYPE 配置为 sqlite")
+			return fmt.Errorf("DATABASE_URL looks like a MySQL connection string, but DB_TYPE is set to sqlite")
 		} else if !filepath.IsAbs(url) && url != ":memory:" {
 			if absPath, err := os.Getwd(); err == nil {
 				c.Database.URL = filepath.Join(absPath, url)
 			}
 		}
 	default:
-		return fmt.Errorf("不支持的数据库类型: %s，支持 sqlite、postgres 或 mysql", c.Database.Type)
+		return fmt.Errorf("unsupported database type: %s, supported: sqlite, postgres, mysql", c.Database.Type)
 	}
 
 	if strings.TrimSpace(c.Server.Port) == "" {
-		return fmt.Errorf("PORT 不能为空")
+		return fmt.Errorf("PORT is required")
 	}
 
 	if c.MCP.SSEKeepaliveSec <= 0 {

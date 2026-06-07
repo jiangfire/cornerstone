@@ -41,18 +41,18 @@ type DBResponse struct {
 func validateDatabaseName(name string) error {
 	name = strings.TrimSpace(name)
 	if len(name) < 2 || len(name) > 255 {
-		return errors.New("数据库名称长度必须在2-255个字符之间")
+		return errors.New("database name must be between 2 and 255 characters")
 	}
 	matched, _ := regexp.MatchString(`^[\p{L}\p{N}_\-\s]+$`, name)
 	if !matched {
-		return errors.New("数据库名称只能包含字母、数字、下划线、连字符和空格")
+		return errors.New("database name can only contain letters, numbers, underscores, hyphens and spaces")
 	}
 	return nil
 }
 
 func validateDescription(desc string) error {
 	if len(desc) > 500 {
-		return errors.New("描述长度不能超过500个字符")
+		return errors.New("description must not exceed 500 characters")
 	}
 	return nil
 }
@@ -77,26 +77,26 @@ func (s *DatabaseService) CreateDatabase(req CreateDBRequest, ownerID string) (*
 		return nil, err
 	}
 	if !authorizer.CanCreateDatabase() {
-		return nil, errors.New("此操作需要 Master Token")
+		return nil, errors.New("master token required for this operation")
 	}
 
 	req.Name, req.Description = sanitizeDatabaseInput(req.Name, req.Description)
 
 	if err := validateDatabaseName(req.Name); err != nil {
-		return nil, fmt.Errorf("数据库名称验证失败: %w", err)
+		return nil, fmt.Errorf("database name validation failed: %w", err)
 	}
 
 	if err := validateDescription(req.Description); err != nil {
-		return nil, fmt.Errorf("描述验证失败: %w", err)
+		return nil, fmt.Errorf("description validation failed: %w", err)
 	}
 
 	var existingDB models.Database
 	err = s.db.Where("name = ? AND deleted_at IS NULL", req.Name).First(&existingDB).Error
 	if err == nil {
-		return nil, errors.New("已存在同名数据库")
+		return nil, errors.New("database name already exists")
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("数据库查询失败: %w", err)
+		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 
 	database := models.Database{
@@ -104,7 +104,7 @@ func (s *DatabaseService) CreateDatabase(req CreateDBRequest, ownerID string) (*
 		Description: req.Description,
 	}
 	if err := s.db.Create(&database).Error; err != nil {
-		return nil, fmt.Errorf("创建数据库失败: %w", err)
+		return nil, fmt.Errorf("failed to create database: %w", err)
 	}
 
 	return &database, nil
@@ -130,7 +130,7 @@ func (s *DatabaseService) ListDatabases(userID string) ([]DBResponse, error) {
 	}
 	err = query.Find(&databases).Error
 	if err != nil {
-		return nil, fmt.Errorf("数据库查询失败: %w", err)
+		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 
 	dbs := make([]DBResponse, len(databases))
@@ -153,16 +153,16 @@ func (s *DatabaseService) GetDatabase(dbID, userID string) (*DBResponse, error) 
 		return nil, err
 	}
 	if !authorizer.CanAccessDatabase(dbID, authz.ActionRead) {
-		return nil, errors.New("无权访问该数据库")
+		return nil, errors.New("permission denied: cannot access this database")
 	}
 
 	var database models.Database
 	err = s.db.Where("id = ? AND deleted_at IS NULL", dbID).First(&database).Error
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("数据库不存在")
+			return nil, errors.New("database not found")
 		}
-		return nil, fmt.Errorf("数据库查询失败: %w", err)
+		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 
 	return &DBResponse{
@@ -180,36 +180,36 @@ func (s *DatabaseService) UpdateDatabase(dbID string, req UpdateDBRequest, userI
 		return nil, err
 	}
 	if !authorizer.CanAccessDatabase(dbID, authz.ActionManage) {
-		return nil, errors.New("无权修改该数据库")
+		return nil, errors.New("permission denied: cannot modify this database")
 	}
 
 	req.Name, req.Description = sanitizeDatabaseInput(req.Name, req.Description)
 
 	if err := validateDatabaseName(req.Name); err != nil {
-		return nil, fmt.Errorf("数据库名称验证失败: %w", err)
+		return nil, fmt.Errorf("database name validation failed: %w", err)
 	}
 
 	if err := validateDescription(req.Description); err != nil {
-		return nil, fmt.Errorf("描述验证失败: %w", err)
+		return nil, fmt.Errorf("description validation failed: %w", err)
 	}
 
 	var database models.Database
 	err = s.db.Where("id = ? AND deleted_at IS NULL", dbID).First(&database).Error
 	if err != nil {
-		return nil, errors.New("数据库不存在")
+		return nil, errors.New("database not found")
 	}
 
 	var duplicate models.Database
 	err = s.db.Where("name = ? AND id <> ? AND deleted_at IS NULL", req.Name, dbID).First(&duplicate).Error
 	if err == nil {
-		return nil, errors.New("已存在同名数据库")
+		return nil, errors.New("database name already exists")
 	}
 
 	database.Name = req.Name
 	database.Description = req.Description
 
 	if err := s.db.Save(&database).Error; err != nil {
-		return nil, fmt.Errorf("更新数据库失败: %w", err)
+		return nil, fmt.Errorf("failed to update database: %w", err)
 	}
 
 	return &database, nil
@@ -221,13 +221,13 @@ func (s *DatabaseService) DeleteDatabase(dbID, userID string) error {
 		return err
 	}
 	if !authorizer.CanAccessDatabase(dbID, authz.ActionManage) {
-		return errors.New("无权删除该数据库")
+		return errors.New("permission denied: cannot delete this database")
 	}
 
 	var database models.Database
 	err = s.db.Where("id = ? AND deleted_at IS NULL", dbID).First(&database).Error
 	if err != nil {
-		return errors.New("数据库不存在")
+		return errors.New("database not found")
 	}
 
 	now := time.Now()
@@ -238,16 +238,16 @@ func (s *DatabaseService) DeleteDatabase(dbID, userID string) error {
 			"updated_at": now,
 		})
 	if result.Error != nil {
-		return fmt.Errorf("删除数据库失败: %w", result.Error)
+		return fmt.Errorf("failed to delete database: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return errors.New("数据库不存在")
+		return errors.New("database not found")
 	}
 
 	return nil
 }
 
-// CreateDatabaseWithTables 通过 JSON 定义创建数据库及嵌套的表和字段
+// CreateDatabaseWithTables creates a database with nested tables and fields from a JSON definition
 type CreateTableWithFieldsRequest struct {
 	Name        string `json:"name" binding:"required"`
 	Description string `json:"description"`
@@ -277,26 +277,26 @@ func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest
 		return nil, err
 	}
 	if !authorizer.CanCreateDatabase() {
-		return nil, errors.New("此操作需要 Master Token")
+		return nil, errors.New("master token required for this operation")
 	}
 
 	req.Name, req.Description = sanitizeDatabaseInput(req.Name, req.Description)
 
 	if err := validateDatabaseName(req.Name); err != nil {
-		return nil, fmt.Errorf("数据库名称验证失败: %w", err)
+		return nil, fmt.Errorf("database name validation failed: %w", err)
 	}
 
 	if err := validateDescription(req.Description); err != nil {
-		return nil, fmt.Errorf("描述验证失败: %w", err)
+		return nil, fmt.Errorf("description validation failed: %w", err)
 	}
 
 	var existingDB models.Database
 	err = s.db.Where("name = ? AND deleted_at IS NULL", req.Name).First(&existingDB).Error
 	if err == nil {
-		return nil, errors.New("已存在同名数据库")
+		return nil, errors.New("database name already exists")
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("数据库查询失败: %w", err)
+		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 
 	result := &CreateDBWithTablesResult{
@@ -310,7 +310,7 @@ func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest
 			Description: req.Description,
 		}
 		if err := tx.Create(&database).Error; err != nil {
-			return fmt.Errorf("创建数据库失败: %w", err)
+			return fmt.Errorf("failed to create database: %w", err)
 		}
 		result.Database = &database
 
@@ -321,7 +321,7 @@ func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest
 			tableReq.Name, tableReq.Description = sanitizeTableInput(tableReq.Name, tableReq.Description)
 
 			if err := validateTableName(tableReq.Name); err != nil {
-				return fmt.Errorf("表名称验证失败: %w", err)
+				return fmt.Errorf("table name validation failed: %w", err)
 			}
 
 			table, err := tableService.CreateTable(CreateTableRequest{
@@ -330,7 +330,7 @@ func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest
 				Description: tableReq.Description,
 			}, ownerID)
 			if err != nil {
-				return fmt.Errorf("创建表 %s 失败: %w", tableReq.Name, err)
+				return fmt.Errorf("failed to create table %s: %w", tableReq.Name, err)
 			}
 			result.Tables = append(result.Tables, table)
 
@@ -338,11 +338,11 @@ func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest
 				fieldReq.Name = sanitizeFieldName(fieldReq.Name)
 
 				if err := validateFieldName(fieldReq.Name); err != nil {
-					return fmt.Errorf("字段名称验证失败: %w", err)
+					return fmt.Errorf("field name validation failed: %w", err)
 				}
 
 				if err := validateFieldType(fieldReq.Type); err != nil {
-					return fmt.Errorf("字段类型验证失败: %w", err)
+					return fmt.Errorf("field type validation failed: %w", err)
 				}
 
 				field, err := fieldService.CreateField(CreateFieldRequest{
@@ -353,7 +353,7 @@ func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest
 					Required:    fieldReq.Required,
 				}, ownerID)
 				if err != nil {
-					return fmt.Errorf("创建字段 %s 失败: %w", fieldReq.Name, err)
+					return fmt.Errorf("failed to create field %s: %w", fieldReq.Name, err)
 				}
 				result.Fields = append(result.Fields, field)
 			}

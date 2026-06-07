@@ -13,19 +13,19 @@ import (
 	"github.com/jiangfire/cornerstone/pkg/query"
 )
 
-// QueryHandler 查询处理器
+// QueryHandler handles query operations
 type QueryHandler struct {
 	executor *query.Executor
 }
 
-// NewQueryHandler 创建查询处理器
+// NewQueryHandler creates a new QueryHandler
 func NewQueryHandler() *QueryHandler {
 	return &QueryHandler{
 		executor: query.NewExecutor(db.DB()),
 	}
 }
 
-// Query 统一查询接口
+// Query is the unified query endpoint
 // POST /api/query
 // GET /api/query?q={json_string}
 //
@@ -54,35 +54,35 @@ func (h *QueryHandler) Query(c *gin.Context) {
 
 	var req query.QueryRequest
 
-	// 尝试从 POST body 解析
+	// Try parsing from POST body
 	if c.Request.Method == "POST" && c.Request.Body != nil {
 		body, err := io.ReadAll(c.Request.Body)
 		if err == nil && len(body) > 0 {
 			if err := json.Unmarshal(body, &req); err != nil {
-				dto.BadRequest(c, "请求格式错误: "+err.Error())
+				dto.BadRequest(c, "invalid request format: "+err.Error())
 				return
 			}
 		}
 	}
 
-	// 如果 body 为空，尝试从 URL 参数解析
+	// If body is empty, try parsing from URL parameters
 	if req.From == "" && req.Table == "" {
 		q := c.Query("q")
 		if q == "" {
-			dto.BadRequest(c, "缺少查询参数")
+			dto.BadRequest(c, "missing query parameter")
 			return
 		}
 
 		if err := json.Unmarshal([]byte(q), &req); err != nil {
-			dto.BadRequest(c, "查询格式错误: "+err.Error())
+			dto.BadRequest(c, "invalid query format: "+err.Error())
 			return
 		}
 	}
 
-	// 执行查询
+	// Execute query
 	result, err := h.executor.Execute(c.Request.Context(), &req, userID)
 	if err != nil {
-		// 区分权限错误和其他错误
+		// Distinguish permission errors from other errors
 		if isPermissionError(err) {
 			dto.Forbidden(c, err.Error())
 			return
@@ -94,7 +94,7 @@ func (h *QueryHandler) Query(c *gin.Context) {
 	dto.Success(c, result)
 }
 
-// QueryExplain 查询解释接口（返回生成的 SQL，用于调试）
+// QueryExplain returns generated SQL for debugging
 // POST /api/query/explain
 //
 // @Summary      Explain a query
@@ -120,22 +120,22 @@ func (h *QueryHandler) QueryExplain(c *gin.Context) {
 	var req query.QueryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if !errors.Is(err, io.EOF) {
-			dto.BadRequest(c, "请求格式错误: "+err.Error())
+			dto.BadRequest(c, "invalid request format: "+err.Error())
 			return
 		}
-		// 尝试从 URL 参数解析
+		// Try parsing from URL parameters
 		q := c.Query("q")
 		if q == "" {
-			dto.BadRequest(c, "缺少查询参数")
+			dto.BadRequest(c, "missing query parameter")
 			return
 		}
 		if err := json.Unmarshal([]byte(q), &req); err != nil {
-			dto.BadRequest(c, "查询格式错误: "+err.Error())
+			dto.BadRequest(c, "invalid query format: "+err.Error())
 			return
 		}
 	}
 
-	// 在权限过滤后的上下文中生成 SQL
+	// Generate SQL in permission-filtered context
 	sqlQuery, err := h.executor.ExplainAuthorized(c.Request.Context(), &req, userID)
 	if err != nil {
 		if isPermissionError(err) {
@@ -152,7 +152,7 @@ func (h *QueryHandler) QueryExplain(c *gin.Context) {
 	})
 }
 
-// QueryValidate 查询验证接口（验证查询权限，不执行）
+// QueryValidate validates query permissions without executing
 // POST /api/query/validate
 //
 // @Summary      Validate a query
@@ -177,31 +177,31 @@ func (h *QueryHandler) QueryValidate(c *gin.Context) {
 	var req query.QueryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		if !errors.Is(err, io.EOF) {
-			dto.BadRequest(c, "请求格式错误: "+err.Error())
+			dto.BadRequest(c, "invalid request format: "+err.Error())
 			return
 		}
-		// 尝试从 URL 参数解析
+		// Try parsing from URL parameters
 		q := c.Query("q")
 		if q == "" {
-			dto.BadRequest(c, "缺少查询参数")
+			dto.BadRequest(c, "missing query parameter")
 			return
 		}
 		if err := json.Unmarshal([]byte(q), &req); err != nil {
-			dto.BadRequest(c, "查询格式错误: "+err.Error())
+			dto.BadRequest(c, "invalid query format: "+err.Error())
 			return
 		}
 	}
 
-	// 验证查询
+	// Validate query
 	if err := h.executor.Validate(c.Request.Context(), &req, userID); err != nil {
 		dto.Forbidden(c, err.Error())
 		return
 	}
 
-	dto.SuccessWithMessage(c, "查询验证通过", nil)
+	dto.SuccessWithMessage(c, "query validation passed", nil)
 }
 
-// BatchQuery 批量查询接口
+// BatchQuery is the batch query endpoint
 // POST /api/query/batch
 //
 // @Summary      Execute a batch query
@@ -226,11 +226,11 @@ func (h *QueryHandler) BatchQuery(c *gin.Context) {
 
 	var req query.BatchQueryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		dto.BadRequest(c, "请求格式错误: "+err.Error())
+		dto.BadRequest(c, "invalid request format: "+err.Error())
 		return
 	}
 
-	// 执行批量查询
+	// Execute batch query
 	result, err := h.executor.ExecuteBatch(c.Request.Context(), &req, userID)
 	if err != nil {
 		if isPermissionError(err) {
@@ -244,7 +244,7 @@ func (h *QueryHandler) BatchQuery(c *gin.Context) {
 	dto.Success(c, result)
 }
 
-// ListTables 获取可访问的表列表
+// ListTables lists accessible tables
 // GET /api/query/tables
 //
 // @Summary      List queryable tables
@@ -266,7 +266,7 @@ func (h *QueryHandler) ListTables(c *gin.Context) {
 
 	tables, err := h.executor.GetValidator().GetAllowedTables(c.Request.Context(), userID)
 	if err != nil {
-		dto.InternalServerError(c, "获取表列表失败: "+err.Error())
+		dto.InternalServerError(c, "failed to get table list: "+err.Error())
 		return
 	}
 
@@ -275,7 +275,7 @@ func (h *QueryHandler) ListTables(c *gin.Context) {
 	})
 }
 
-// GetTableSchema 获取表结构信息
+// GetTableSchema gets table schema
 // GET /api/query/schema/:table
 //
 // @Summary      Get table schema for query
@@ -300,7 +300,7 @@ func (h *QueryHandler) GetTableSchema(c *gin.Context) {
 
 	validator := h.executor.GetValidator()
 
-	// 检查表是否允许访问
+	// Check if table is allowed
 	if err := validator.CheckTableAccess(c.Request.Context(), userID, table); err != nil {
 		dto.Forbidden(c, err.Error())
 		return
@@ -314,7 +314,7 @@ func (h *QueryHandler) GetTableSchema(c *gin.Context) {
 	})
 }
 
-// SimplifiedQuery 简化查询接口（URL 参数形式）
+// SimplifiedQuery is a simplified query endpoint (URL params)
 // GET /api/query/simple?table=records&filter={}&sort=-created_at&page=1&size=20
 //
 // @Summary      Execute a simplified query
@@ -342,21 +342,21 @@ func (h *QueryHandler) SimplifiedQuery(c *gin.Context) {
 
 	table := c.Query("table")
 	if table == "" {
-		dto.BadRequest(c, "必须指定表名")
+		dto.BadRequest(c, "table name is required")
 		return
 	}
 
-	// 解析 filter
+	// Parse filter
 	var filter map[string]interface{}
 	filterStr := c.Query("filter")
 	if filterStr != "" {
 		if err := json.Unmarshal([]byte(filterStr), &filter); err != nil {
-			dto.BadRequest(c, "filter 格式错误: "+err.Error())
+			dto.BadRequest(c, "invalid filter format: "+err.Error())
 			return
 		}
 	}
 
-	// 解析其他参数
+	// Parse other parameters
 	sort := c.DefaultQuery("sort", "-created_at")
 	page := 1
 	size := 20
@@ -373,7 +373,7 @@ func (h *QueryHandler) SimplifiedQuery(c *gin.Context) {
 		}
 	}
 
-	// 执行简化查询
+	// Execute simplified query
 	result, err := h.executor.SimplifiedQuery(c.Request.Context(), table, filter, sort, page, size, userID)
 	if err != nil {
 		if isPermissionError(err) {
@@ -387,44 +387,11 @@ func (h *QueryHandler) SimplifiedQuery(c *gin.Context) {
 	dto.Success(c, result)
 }
 
-// isPermissionError 判断是否为权限错误
-func isPermissionError(err error) bool {
-	if err == nil {
-		return false
-	}
-	msg := err.Error()
-	permissionKeywords := []string{
-		"权限", "无权", "拒绝", "denied", "forbidden",
-		"不能访问", "不允许", "未授权", "unauthorized",
-	}
-	for _, keyword := range permissionKeywords {
-		if containsString(msg, keyword) {
-			return true
-		}
-	}
-	return false
-}
-
-// containsString 检查字符串是否包含子串
-func containsString(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || s != "" && containsSubstring(s, substr))
-}
-
-// containsSubstring 简单子串检查
-func containsSubstring(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
-// parseInt 解析整数
+// parseInt parses an integer
 func parseInt(s string) (int, error) {
 	var n int
 	if err := json.Unmarshal([]byte(s), &n); err != nil {
-		// 尝试手动解析
+		// Try manual parsing
 		n = 0
 		for _, ch := range s {
 			if ch < '0' || ch > '9' {

@@ -7,7 +7,7 @@ const (
 	defaultProtocolVersion = "2025-03-26"
 )
 
-// Request 表示 MCP 的 JSON-RPC 请求
+// Request represents an MCP JSON-RPC request.
 type Request struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id,omitempty"`
@@ -15,7 +15,7 @@ type Request struct {
 	Params  json.RawMessage `json:"params,omitempty"`
 }
 
-// Response 表示 JSON-RPC 响应
+// Response represents a JSON-RPC response.
 type Response struct {
 	JSONRPC string          `json:"jsonrpc"`
 	ID      json.RawMessage `json:"id,omitempty"`
@@ -23,27 +23,27 @@ type Response struct {
 	Error   *ResponseError  `json:"error,omitempty"`
 }
 
-// ResponseError 表示 JSON-RPC 错误
+// ResponseError represents a JSON-RPC error.
 type ResponseError struct {
 	Code    int         `json:"code"`
 	Message string      `json:"message"`
 	Data    interface{} `json:"data,omitempty"`
 }
 
-// TextContent 是 MCP 文本内容块
+// TextContent is an MCP text content block.
 type TextContent struct {
 	Type string `json:"type"`
 	Text string `json:"text"`
 }
 
-// ToolDefinition 描述 MCP tool
+// ToolDefinition describes an MCP tool.
 type ToolDefinition struct {
 	Name        string                 `json:"name"`
 	Description string                 `json:"description"`
 	InputSchema map[string]interface{} `json:"inputSchema"`
 }
 
-// ToolCallResult 是 tools/call 的返回值
+// ToolCallResult is the return value of tools/call.
 type ToolCallResult struct {
 	Content           []TextContent `json:"content"`
 	StructuredContent interface{}   `json:"structuredContent,omitempty"`

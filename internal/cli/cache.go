@@ -10,18 +10,18 @@ import (
 
 var cacheCmd = &cobra.Command{
 	Use:   "cache",
-	Short: "缓存管理",
-	Long:  "管理 Cornerstone 的缓存，支持 clear 子命令。",
+	Short: "cache management",
+	Long:  "Manage Cornerstone caches. Supports the clear subcommand.",
 }
 
 var cacheClearCmd = &cobra.Command{
 	Use:   "clear",
-	Short: "清空所有缓存",
-	Long:  "清空字段缓存和 Token 缓存。",
+	Short: "clear all caches",
+	Long:  "Clear field cache and token cache.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		services.SharedFieldCache.Clear()
 		authz.ClearTokenCache()
-		fmt.Println("所有缓存已清空")
+		fmt.Println("all caches cleared")
 		return nil
 	},
 }

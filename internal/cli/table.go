@@ -11,13 +11,13 @@ import (
 
 var tableCmd = &cobra.Command{
 	Use:   "table",
-	Short: "表管理",
-	Long:  `管理 Cornerstone 表资源。支持 list、create、get、update、delete 子命令。`,
+	Short: "table management",
+	Long:  `Manage Cornerstone table resources. Supports list, create, get, update, delete subcommands.`,
 }
 
 var tableListCmd = &cobra.Command{
 	Use:   "list [database-id]",
-	Short: "列出数据库下的所有表",
+	Short: "list all tables in a database",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -40,7 +40,7 @@ var tableListCmd = &cobra.Command{
 
 var tableCreateCmd = &cobra.Command{
 	Use:   "create [database-id] [name]",
-	Short: "在数据库中创建表",
+	Short: "create a table in a database",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -68,7 +68,7 @@ var tableCreateCmd = &cobra.Command{
 
 var tableGetCmd = &cobra.Command{
 	Use:   "get [id]",
-	Short: "获取表详情",
+	Short: "get table details",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -91,7 +91,7 @@ var tableGetCmd = &cobra.Command{
 
 var tableUpdateCmd = &cobra.Command{
 	Use:   "update [id]",
-	Short: "更新表",
+	Short: "update a table",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -119,7 +119,7 @@ var tableUpdateCmd = &cobra.Command{
 
 var tableDeleteCmd = &cobra.Command{
 	Use:   "delete [id]",
-	Short: "删除表",
+	Short: "delete a table",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -135,7 +135,10 @@ var tableDeleteCmd = &cobra.Command{
 		if err := svc.DeleteTable(args[0], token); err != nil {
 			return err
 		}
-		fmt.Println("表已删除")
+		if jsonOutput {
+			return printJSON(map[string]interface{}{"id": args[0], "deleted": true})
+		}
+		fmt.Println("table deleted")
 		return nil
 	},
 }
@@ -148,7 +151,7 @@ func init() {
 	tableCmd.AddCommand(tableUpdateCmd)
 	tableCmd.AddCommand(tableDeleteCmd)
 
-	tableCreateCmd.Flags().StringP("description", "d", "", "表描述")
-	tableUpdateCmd.Flags().StringP("name", "n", "", "新名称")
-	tableUpdateCmd.Flags().StringP("description", "d", "", "新描述")
+	tableCreateCmd.Flags().StringP("description", "d", "", "table description")
+	tableUpdateCmd.Flags().StringP("name", "n", "", "new name")
+	tableUpdateCmd.Flags().StringP("description", "d", "", "new description")
 }

@@ -1,6 +1,6 @@
 package cache
 
-// Cache 是泛型缓存接口，支持任意可比较的 key 类型和任意 value 类型。
+// Cache is a generic cache interface supporting any comparable key type and any value type.
 type Cache[K comparable, V any] interface {
 	Get(key K) (V, bool)
 	Set(key K, value V)
@@ -8,7 +8,7 @@ type Cache[K comparable, V any] interface {
 	Clear()
 }
 
-// GetOrSet 从缓存获取值，不存在时调用 factory 生成并写入。
+// GetOrSet retrieves a value from cache; if absent, calls factory to generate and store it.
 func GetOrSet[K comparable, V any](c Cache[K, V], key K, factory func() V) V {
 	if v, ok := c.Get(key); ok {
 		return v

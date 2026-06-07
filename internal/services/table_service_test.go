@@ -59,7 +59,7 @@ func TestTableService_CreateTable_DuplicateName(t *testing.T) {
 		Name:       "orders",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "已存在同名表")
+	assert.Contains(t, err.Error(), "a table with this name already exists in the database")
 }
 
 func TestTableService_CreateTable_NonexistentDatabase(t *testing.T) {
@@ -70,7 +70,7 @@ func TestTableService_CreateTable_NonexistentDatabase(t *testing.T) {
 		Name:       "orders",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "数据库不存在")
+	assert.Contains(t, err.Error(), "database not found")
 }
 
 func TestTableService_CreateTable_NameTooShort(t *testing.T) {
@@ -81,7 +81,7 @@ func TestTableService_CreateTable_NameTooShort(t *testing.T) {
 		Name:       "a",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "表名称验证失败")
+	assert.Contains(t, err.Error(), "table name validation failed")
 }
 
 func TestTableService_CreateTable_NameTooLong(t *testing.T) {
@@ -92,7 +92,7 @@ func TestTableService_CreateTable_NameTooLong(t *testing.T) {
 		Name:       strings.Repeat("a", 256),
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "表名称验证失败")
+	assert.Contains(t, err.Error(), "table name validation failed")
 }
 
 func TestTableService_CreateTable_NameStartsWithDigit(t *testing.T) {
@@ -103,7 +103,7 @@ func TestTableService_CreateTable_NameStartsWithDigit(t *testing.T) {
 		Name:       "1table",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "不能以数字开头")
+	assert.Contains(t, err.Error(), "table name must not start with a digit")
 }
 
 func TestTableService_CreateTable_NameWithInvalidChars(t *testing.T) {
@@ -114,7 +114,7 @@ func TestTableService_CreateTable_NameWithInvalidChars(t *testing.T) {
 		Name:       "my table!",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "只能包含字母、数字和下划线")
+	assert.Contains(t, err.Error(), "table name can only contain letters, numbers and underscores")
 }
 
 // ============================================================
@@ -158,7 +158,7 @@ func TestTableService_ListTables_NoAccess(t *testing.T) {
 	tables, err := svc.ListTables(database.ID, viewer.ID)
 	assert.Error(t, err)
 	assert.Nil(t, tables)
-	assert.Contains(t, err.Error(), "无权访问该数据库的表")
+	assert.Contains(t, err.Error(), "permission denied: cannot access tables in this database")
 }
 
 // ============================================================
@@ -187,7 +187,7 @@ func TestTableService_GetTable_Nonexistent(t *testing.T) {
 
 	_, err := svc.GetTable("tbl_nonexistent", master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "表不存在")
+	assert.Contains(t, err.Error(), "table not found")
 }
 
 func TestTableService_GetTable_NoAccess(t *testing.T) {
@@ -209,7 +209,7 @@ func TestTableService_GetTable_NoAccess(t *testing.T) {
 
 	_, err = svc.GetTable(created.ID, viewer.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "无权访问该表")
+	assert.Contains(t, err.Error(), "permission denied: cannot access this table")
 }
 
 // ============================================================
@@ -254,7 +254,7 @@ func TestTableService_UpdateTable_DuplicateName(t *testing.T) {
 		Name: "orders",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "已存在同名表")
+	assert.Contains(t, err.Error(), "a table with this name already exists in the database")
 }
 
 func TestTableService_UpdateTable_Nonexistent(t *testing.T) {
@@ -264,7 +264,7 @@ func TestTableService_UpdateTable_Nonexistent(t *testing.T) {
 		Name: "new_name",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "表不存在")
+	assert.Contains(t, err.Error(), "table not found")
 }
 
 // ============================================================
@@ -285,7 +285,7 @@ func TestTableService_DeleteTable_Success(t *testing.T) {
 
 	_, err = svc.GetTable(created.ID, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "表不存在")
+	assert.Contains(t, err.Error(), "table not found")
 
 	var deleted models.Table
 	require.NoError(t, db.Unscoped().Where("id = ?", created.ID).First(&deleted).Error)
@@ -315,7 +315,7 @@ func TestTableService_DeleteTable_Nonexistent(t *testing.T) {
 
 	err := svc.DeleteTable("tbl_nonexistent", master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "表不存在")
+	assert.Contains(t, err.Error(), "table not found")
 }
 
 func TestTableService_DeleteTable_NoAccess(t *testing.T) {
@@ -337,7 +337,7 @@ func TestTableService_DeleteTable_NoAccess(t *testing.T) {
 
 	err = svc.DeleteTable(created.ID, viewer.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "无权删除该表")
+	assert.Contains(t, err.Error(), "permission denied: cannot delete this table")
 }
 
 // ============================================================
@@ -351,7 +351,7 @@ func TestValidateTableName_Valid(t *testing.T) {
 	}{
 		{"simple", "orders"},
 		{"underscore", "my_table"},
-		{"unicode", "用户表"},
+		{"unicode", "user_table"},
 		{"mixed", "table_1"},
 		{"two chars", "ab"},
 	}
@@ -368,13 +368,13 @@ func TestValidateTableName_Invalid(t *testing.T) {
 		in     string
 		substr string
 	}{
-		{"too short", "a", "2-255"},
-		{"too long", strings.Repeat("x", 256), "2-255"},
-		{"starts with digit", "1table", "不能以数字开头"},
-		{"spaces", "my table", "只能包含字母"},
-		{"special chars", "table!", "只能包含字母"},
-		{"hyphen", "my-table", "只能包含字母"},
-		{"empty", "", "2-255"},
+		{"too short", "a", "must be between"},
+		{"too long", strings.Repeat("x", 256), "must be between"},
+		{"starts with digit", "1table", "table name must not start with a digit"},
+		{"spaces", "my table", "table name can only contain letters, numbers and underscores"},
+		{"special chars", "table!", "table name can only contain letters, numbers and underscores"},
+		{"hyphen", "my-table", "table name can only contain letters, numbers and underscores"},
+		{"empty", "", "must be between"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

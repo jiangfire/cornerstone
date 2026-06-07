@@ -12,13 +12,13 @@ import (
 
 var tokenCmd = &cobra.Command{
 	Use:   "token",
-	Short: "Token 管理",
-	Long:  `管理 API Token。支持 list、create、update、delete 子命令。需要 MASTER_TOKEN 环境变量。`,
+	Short: "token management",
+	Long:  `Manage API tokens. Supports list, create, update, delete subcommands. Requires MASTER_TOKEN env var.`,
 }
 
 var tokenListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "列出所有 Token",
+	Short: "list all tokens",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
 			return err
@@ -40,7 +40,7 @@ var tokenListCmd = &cobra.Command{
 
 var tokenCreateCmd = &cobra.Command{
 	Use:   "create [name]",
-	Short: "创建新 Token",
+	Short: "create a new token",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -59,7 +59,7 @@ var tokenCreateCmd = &cobra.Command{
 		if expires != "" {
 			t, err := time.Parse(time.RFC3339, expires)
 			if err != nil {
-				return fmt.Errorf("过期时间格式错误，请使用 RFC3339 格式: %w", err)
+				return fmt.Errorf("invalid expiration format, use RFC3339: %w", err)
 			}
 			expiresAt = &t
 		}
@@ -74,18 +74,21 @@ var tokenCreateCmd = &cobra.Command{
 			return err
 		}
 
-		fmt.Printf("Token 创建成功!\n")
+		if jsonOutput {
+			return printJSON(map[string]interface{}{"id": token.ID, "name": token.Name, "token": token.Token})
+		}
+		fmt.Println("token created successfully!")
 		fmt.Printf("  ID:    %s\n", token.ID)
 		fmt.Printf("  Name:  %s\n", token.Name)
 		fmt.Printf("  Token: %s\n", token.Token)
-		fmt.Printf("\n请妥善保管 Token，此值仅显示一次。\n")
+		fmt.Println("\nPlease keep this token safe; it will only be shown once.")
 		return nil
 	},
 }
 
 var tokenUpdateCmd = &cobra.Command{
 	Use:   "update [id]",
-	Short: "更新 Token",
+	Short: "update a token",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -104,7 +107,7 @@ var tokenUpdateCmd = &cobra.Command{
 		if expires != "" {
 			t, err := time.Parse(time.RFC3339, expires)
 			if err != nil {
-				return fmt.Errorf("过期时间格式错误，请使用 RFC3339 格式: %w", err)
+				return fmt.Errorf("invalid expiration format, use RFC3339: %w", err)
 			}
 			expiresAt = &t
 		}
@@ -120,7 +123,7 @@ var tokenUpdateCmd = &cobra.Command{
 
 var tokenDeleteCmd = &cobra.Command{
 	Use:   "delete [id]",
-	Short: "删除 Token",
+	Short: "delete a token",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -136,7 +139,7 @@ var tokenDeleteCmd = &cobra.Command{
 		if err := svc.DeleteToken(masterToken, args[0], true); err != nil {
 			return err
 		}
-		fmt.Println("Token 已删除")
+		fmt.Println("token deleted")
 		return nil
 	},
 }
@@ -148,9 +151,9 @@ func init() {
 	tokenCmd.AddCommand(tokenUpdateCmd)
 	tokenCmd.AddCommand(tokenDeleteCmd)
 
-	tokenCreateCmd.Flags().StringP("scopes", "s", "", "权限范围(JSON)")
-	tokenCreateCmd.Flags().StringP("expires", "e", "", "过期时间(RFC3339)")
+	tokenCreateCmd.Flags().StringP("scopes", "s", "", "scopes (JSON)")
+	tokenCreateCmd.Flags().StringP("expires", "e", "", "expiration time (RFC3339)")
 
-	tokenUpdateCmd.Flags().StringP("scopes", "s", "", "权限范围(JSON)")
-	tokenUpdateCmd.Flags().StringP("expires", "e", "", "过期时间(RFC3339)")
+	tokenUpdateCmd.Flags().StringP("scopes", "s", "", "scopes (JSON)")
+	tokenUpdateCmd.Flags().StringP("expires", "e", "", "expiration time (RFC3339)")
 }

@@ -57,25 +57,25 @@ func TestResolveSecureStoragePath_ValidPath(t *testing.T) {
 func TestResolveSecureStoragePath_EmptyPath(t *testing.T) {
 	_, err := ResolveSecureStoragePath("")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "文件路径为空")
+	assert.Contains(t, err.Error(), "file path is empty")
 }
 
 func TestResolveSecureStoragePath_EmptyPathWhitespace(t *testing.T) {
 	_, err := ResolveSecureStoragePath("   ")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "文件路径为空")
+	assert.Contains(t, err.Error(), "file path is empty")
 }
 
 func TestResolveSecureStoragePath_PathTraversal(t *testing.T) {
 	_, err := ResolveSecureStoragePath("./uploads/../../etc/passwd")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "非法的文件路径")
+	assert.Contains(t, err.Error(), "illegal file path")
 }
 
 func TestResolveSecureStoragePath_AbsoluteOutsideUploads(t *testing.T) {
 	_, err := ResolveSecureStoragePath("/etc/passwd")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "非法的文件路径")
+	assert.Contains(t, err.Error(), "illegal file path")
 }
 
 // --- File type matching ---
@@ -226,7 +226,7 @@ func TestGetFile_NonexistentFile(t *testing.T) {
 
 	_, err := svc.GetFile("fil_nonexistent", "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "文件不存在")
+	assert.Contains(t, err.Error(), "file not found")
 }
 
 func TestDeleteFile_NonexistentFile(t *testing.T) {
@@ -235,7 +235,7 @@ func TestDeleteFile_NonexistentFile(t *testing.T) {
 
 	err := svc.DeleteFile("fil_nonexistent", "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "文件不存在")
+	assert.Contains(t, err.Error(), "file not found")
 }
 
 func TestListRecordFiles_NonexistentRecord(t *testing.T) {
@@ -244,7 +244,7 @@ func TestListRecordFiles_NonexistentRecord(t *testing.T) {
 
 	_, err := svc.ListRecordFiles("rec_nonexistent", "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "记录不存在")
+	assert.Contains(t, err.Error(), "record not found")
 }
 
 func TestUploadFile_MissingBothRecordIDAndFieldID(t *testing.T) {
@@ -253,7 +253,7 @@ func TestUploadFile_MissingBothRecordIDAndFieldID(t *testing.T) {
 
 	_, err := svc.UploadFile(UploadFileRequest{}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "记录ID或字段ID至少需要提供一个")
+	assert.Contains(t, err.Error(), "at least one of record ID or field ID is required")
 }
 
 func TestGetAccessibleRecord_NonexistentRecord(t *testing.T) {
@@ -262,7 +262,7 @@ func TestGetAccessibleRecord_NonexistentRecord(t *testing.T) {
 
 	_, err := svc.getAccessibleRecord("rec_nonexistent", "user1", []string{"owner"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "记录不存在")
+	assert.Contains(t, err.Error(), "record not found")
 }
 
 func TestGetAccessibleField_NonexistentField(t *testing.T) {
@@ -271,7 +271,7 @@ func TestGetAccessibleField_NonexistentField(t *testing.T) {
 
 	_, err := svc.getAccessibleField("fld_nonexistent", "user1", []string{"owner"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "字段不存在")
+	assert.Contains(t, err.Error(), "field not found")
 }
 
 func TestGetAccessibleFile_NonexistentFile(t *testing.T) {
@@ -280,7 +280,7 @@ func TestGetAccessibleFile_NonexistentFile(t *testing.T) {
 
 	_, _, err := svc.getAccessibleFile("fil_nonexistent", "user1", []string{"owner"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "文件不存在")
+	assert.Contains(t, err.Error(), "file not found")
 }
 
 func TestGetAccessibleFile_FileWithoutRecordIDOrFieldID(t *testing.T) {
@@ -290,7 +290,7 @@ func TestGetAccessibleFile_FileWithoutRecordIDOrFieldID(t *testing.T) {
 	file := createFileRecord(t, db, "", "")
 	_, _, err := svc.getAccessibleFile(file.ID, "user1", []string{"owner"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "文件缺少关联记录或字段")
+	assert.Contains(t, err.Error(), "file has no associated record or field, cannot access")
 }
 
 func TestGetMaxUploadSizeBytes(t *testing.T) {

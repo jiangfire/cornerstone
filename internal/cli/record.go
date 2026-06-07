@@ -13,13 +13,13 @@ import (
 
 var recordCmd = &cobra.Command{
 	Use:   "record",
-	Short: "记录管理",
-	Long:  `管理 Cornerstone 记录资源。支持 list、create、get、update、delete、batch 子命令。`,
+	Short: "record management",
+	Long:  `Manage Cornerstone record resources. Supports list, create, get, update, delete, batch subcommands.`,
 }
 
 var recordListCmd = &cobra.Command{
 	Use:   "list [table-id]",
-	Short: "列出表下的记录",
+	Short: "list records in a table",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -50,8 +50,8 @@ var recordListCmd = &cobra.Command{
 
 var recordCreateCmd = &cobra.Command{
 	Use:   "create [table-id] [data-json]",
-	Short: "创建记录",
-	Long: `创建记录。data-json 是 JSON 格式的字段数据，如：
+	Short: "create a record",
+	Long: `Create a record. data-json is JSON field data, e.g.:
   '{"name": "test", "age": 25}'`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -62,7 +62,7 @@ var recordCreateCmd = &cobra.Command{
 
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(args[1]), &data); err != nil {
-			return fmt.Errorf("无效的 JSON 数据: %w", err)
+			return fmt.Errorf("invalid JSON data: %w", err)
 		}
 
 		token, err := getMasterTokenID()
@@ -83,7 +83,7 @@ var recordCreateCmd = &cobra.Command{
 
 var recordGetCmd = &cobra.Command{
 	Use:   "get [id]",
-	Short: "获取记录详情",
+	Short: "get record details",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -106,7 +106,7 @@ var recordGetCmd = &cobra.Command{
 
 var recordUpdateCmd = &cobra.Command{
 	Use:   "update [id] [data-json]",
-	Short: "更新记录",
+	Short: "update a record",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -116,7 +116,7 @@ var recordUpdateCmd = &cobra.Command{
 
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(args[1]), &data); err != nil {
-			return fmt.Errorf("无效的 JSON 数据: %w", err)
+			return fmt.Errorf("invalid JSON data: %w", err)
 		}
 
 		version, _ := cmd.Flags().GetInt("version")
@@ -138,7 +138,7 @@ var recordUpdateCmd = &cobra.Command{
 
 var recordDeleteCmd = &cobra.Command{
 	Use:   "delete [id]",
-	Short: "删除记录",
+	Short: "delete a record",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -154,14 +154,17 @@ var recordDeleteCmd = &cobra.Command{
 		if err := svc.DeleteRecord(args[0], token); err != nil {
 			return err
 		}
-		fmt.Println("记录已删除")
+		if jsonOutput {
+			return printJSON(map[string]interface{}{"id": args[0], "deleted": true})
+		}
+		fmt.Println("record deleted")
 		return nil
 	},
 }
 
 var recordBatchCmd = &cobra.Command{
 	Use:   "batch [table-id] [data-json] [count]",
-	Short: "批量创建记录",
+	Short: "batch create records",
 	Args:  cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -171,12 +174,12 @@ var recordBatchCmd = &cobra.Command{
 
 		var data map[string]interface{}
 		if err := json.Unmarshal([]byte(args[1]), &data); err != nil {
-			return fmt.Errorf("无效的 JSON 数据: %w", err)
+			return fmt.Errorf("invalid JSON data: %w", err)
 		}
 
 		count, err := strconv.Atoi(args[2])
 		if err != nil || count < 1 || count > 100 {
-			return fmt.Errorf("数量必须在1-100之间")
+			return fmt.Errorf("count must be between 1 and 100")
 		}
 
 		token, err := getMasterTokenID()
@@ -191,7 +194,9 @@ var recordBatchCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		fmt.Printf("成功创建 %d 条记录\n", len(records))
+		if !jsonOutput {
+			fmt.Printf("created %d records\n", len(records))
+		}
 		return printJSON(records)
 	},
 }
@@ -205,9 +210,9 @@ func init() {
 	recordCmd.AddCommand(recordDeleteCmd)
 	recordCmd.AddCommand(recordBatchCmd)
 
-	recordListCmd.Flags().IntP("limit", "l", 20, "每页数量")
-	recordListCmd.Flags().IntP("offset", "o", 0, "偏移量")
-	recordListCmd.Flags().StringP("filter", "f", "", "过滤条件(JSON)")
+	recordListCmd.Flags().IntP("limit", "l", 20, "page size")
+	recordListCmd.Flags().IntP("offset", "o", 0, "offset")
+	recordListCmd.Flags().StringP("filter", "f", "", "filter condition (JSON)")
 
-	recordUpdateCmd.Flags().IntP("version", "v", 0, "乐观锁版本号")
+	recordUpdateCmd.Flags().IntP("version", "v", 0, "optimistic lock version")
 }

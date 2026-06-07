@@ -45,7 +45,7 @@ func NewStateStore(dir string) *StateStore {
 
 func (s *StateStore) Save(state MigrationState) error {
 	if err := os.MkdirAll(s.dir, 0o755); err != nil {
-		return fmt.Errorf("创建状态目录失败: %w", err)
+		return fmt.Errorf("failed to create state directory: %w", err)
 	}
 	state.UpdatedAt = time.Now().UTC()
 	if state.StartedAt.IsZero() {
@@ -54,10 +54,10 @@ func (s *StateStore) Save(state MigrationState) error {
 
 	data, err := json.MarshalIndent(state, "", "  ")
 	if err != nil {
-		return fmt.Errorf("序列化状态失败: %w", err)
+		return fmt.Errorf("failed to serialize state: %w", err)
 	}
 	if err := os.WriteFile(s.pathFor(state.MigrationID), data, 0o600); err != nil {
-		return fmt.Errorf("写入状态文件失败: %w", err)
+		return fmt.Errorf("failed to write state file: %w", err)
 	}
 	return nil
 }
@@ -65,11 +65,11 @@ func (s *StateStore) Save(state MigrationState) error {
 func (s *StateStore) Load(migrationID string) (MigrationState, error) {
 	data, err := os.ReadFile(s.pathFor(migrationID))
 	if err != nil {
-		return MigrationState{}, fmt.Errorf("读取状态文件失败: %w", err)
+		return MigrationState{}, fmt.Errorf("failed to read state file: %w", err)
 	}
 	var state MigrationState
 	if err := json.Unmarshal(data, &state); err != nil {
-		return MigrationState{}, newMigrationError(ErrCodeCorruptState, "解析状态文件失败", err)
+		return MigrationState{}, newMigrationError(ErrCodeCorruptState, "failed to parse state file", err)
 	}
 	if state.Tables == nil {
 		state.Tables = map[string]TableState{}

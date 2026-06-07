@@ -29,9 +29,9 @@ import (
 // @name Authorization
 var serveCmd = &cobra.Command{
 	Use:   "serve",
-	Short: "启动 HTTP API + MCP 服务器",
-	Long: `启动 Cornerstone HTTP API 和 MCP 协议服务器。
-提供 REST API、Query DSL、AI 助手和 MCP SSE 端点供外部客户端和 AI Agent 调用。`,
+	Short: "start HTTP API + MCP server",
+	Long: `Start Cornerstone HTTP API and MCP protocol server.
+Provides REST API, Query DSL, AI assistant and MCP SSE endpoints for external clients and AI agents.`,
 	RunE: runServe,
 }
 

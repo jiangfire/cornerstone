@@ -36,7 +36,7 @@ func TestCreateDatabase_NonMasterDenied(t *testing.T) {
 		Description: "test",
 	}, viewerID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "此操作需要 Master Token")
+	assert.Contains(t, err.Error(), "master token required for this operation")
 }
 
 func TestCreateDatabase_DescriptionTooLong(t *testing.T) {
@@ -48,7 +48,7 @@ func TestCreateDatabase_DescriptionTooLong(t *testing.T) {
 		Description: strings.Repeat("x", 501),
 	}, "user1")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "描述验证失败")
+	assert.Contains(t, err.Error(), "description validation failed")
 }
 
 func TestListDatabases_NonMasterEmptyScopes(t *testing.T) {
@@ -78,7 +78,7 @@ func TestGetDatabase_NonMasterDenied(t *testing.T) {
 
 	_, err = svc.GetDatabase(database.ID, viewerID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "无权访问该数据库")
+	assert.Contains(t, err.Error(), "permission denied: cannot access this database")
 }
 
 func TestUpdateDatabase_NonMasterDenied(t *testing.T) {
@@ -95,7 +95,7 @@ func TestUpdateDatabase_NonMasterDenied(t *testing.T) {
 		Description: "new desc",
 	}, viewerID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "无权修改该数据库")
+	assert.Contains(t, err.Error(), "permission denied: cannot modify this database")
 }
 
 func TestUpdateDatabase_DuplicateName(t *testing.T) {
@@ -111,7 +111,7 @@ func TestUpdateDatabase_DuplicateName(t *testing.T) {
 		Name: "db_beta",
 	}, "user1")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "已存在同名数据库")
+	assert.Contains(t, err.Error(), "database name already exists")
 }
 
 func TestDeleteDatabase_NonMasterDenied(t *testing.T) {
@@ -125,7 +125,7 @@ func TestDeleteDatabase_NonMasterDenied(t *testing.T) {
 
 	err = svc.DeleteDatabase(database.ID, viewerID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "无权删除该数据库")
+	assert.Contains(t, err.Error(), "permission denied: cannot delete this database")
 }
 
 func TestCreateDatabaseWithTables_NonMasterDenied(t *testing.T) {
@@ -151,7 +151,7 @@ func TestCreateDatabaseWithTables_NonMasterDenied(t *testing.T) {
 		},
 	}, viewerID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "此操作需要 Master Token")
+	assert.Contains(t, err.Error(), "master token required for this operation")
 }
 
 func TestCreateTable_NonMasterDenied(t *testing.T) {
@@ -167,7 +167,7 @@ func TestCreateTable_NonMasterDenied(t *testing.T) {
 		Name:       "denied_table",
 	}, viewerID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "无权在该数据库中创建表")
+	assert.Contains(t, err.Error(), "permission denied: cannot create tables in this database")
 }
 
 func TestUpdateTable_InvalidName(t *testing.T) {
@@ -189,7 +189,7 @@ func TestUpdateTable_InvalidName(t *testing.T) {
 		Name: "",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "表名称验证失败")
+	assert.Contains(t, err.Error(), "table name validation failed")
 }
 
 func TestListTables_NonMasterWithScopes(t *testing.T) {
@@ -243,7 +243,7 @@ func TestCreateField_DescriptionTooLong(t *testing.T) {
 		Description: strings.Repeat("x", 1001),
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "字段备注验证失败")
+	assert.Contains(t, err.Error(), "field description validation failed")
 }
 
 func TestUpdateField_DescriptionTooLong(t *testing.T) {
@@ -270,7 +270,7 @@ func TestUpdateField_DescriptionTooLong(t *testing.T) {
 		Description: strings.Repeat("y", 1001),
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "字段备注验证失败")
+	assert.Contains(t, err.Error(), "field description validation failed")
 }
 
 func TestUpdateField_WithOptionsString(t *testing.T) {
@@ -450,7 +450,7 @@ func TestGetDatabase_Nonexistent(t *testing.T) {
 
 	_, err := svc.GetDatabase("db_nonexistent", "user1")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "数据库不存在")
+	assert.Contains(t, err.Error(), "database not found")
 }
 
 func TestUpdateDatabase_Nonexistent(t *testing.T) {
@@ -462,7 +462,7 @@ func TestUpdateDatabase_Nonexistent(t *testing.T) {
 		Description: "desc",
 	}, "user1")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "数据库不存在")
+	assert.Contains(t, err.Error(), "database not found")
 }
 
 func TestDeleteDatabase_Nonexistent(t *testing.T) {
@@ -471,7 +471,7 @@ func TestDeleteDatabase_Nonexistent(t *testing.T) {
 
 	err := svc.DeleteDatabase("db_nonexistent", "user1")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "数据库不存在")
+	assert.Contains(t, err.Error(), "database not found")
 }
 
 func TestCreateDatabase_InvalidName(t *testing.T) {
@@ -480,7 +480,7 @@ func TestCreateDatabase_InvalidName(t *testing.T) {
 
 	_, err := svc.CreateDatabase(CreateDBRequest{Name: "a"}, "user1")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "数据库名称验证失败")
+	assert.Contains(t, err.Error(), "database name validation failed")
 }
 
 func TestCreateDatabase_SanitizesInput(t *testing.T) {
@@ -593,7 +593,7 @@ func TestCreateField_NameStartsWithDigit(t *testing.T) {
 		Type:    "string",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "字段名称验证失败")
+	assert.Contains(t, err.Error(), "field name validation failed")
 }
 
 func TestDeleteField_NonMasterDenied(t *testing.T) {
@@ -665,12 +665,12 @@ func TestUpdateField_NonMasterDenied(t *testing.T) {
 func TestValidateDatabaseName_InvalidChars(t *testing.T) {
 	err := validateDatabaseName("my db@!")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "只能包含字母")
+	assert.Contains(t, err.Error(), "can only contain letters")
 }
 
 func TestValidateDatabaseName_Valid(t *testing.T) {
 	assert.NoError(t, validateDatabaseName("my_database 123"))
-	assert.NoError(t, validateDatabaseName("测试数据库"))
+	assert.NoError(t, validateDatabaseName("test_database"))
 }
 
 func TestValidateDescription_TooLong(t *testing.T) {
@@ -722,7 +722,7 @@ func TestCheckTableAccess_NonexistentTable(t *testing.T) {
 
 	err := svc.checkTableAccess("tbl_nonexistent", master.ID, []string{"owner"})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "表不存在")
+	assert.Contains(t, err.Error(), "table not found")
 }
 
 func TestCreateField_WithFileField(t *testing.T) {

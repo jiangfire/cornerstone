@@ -71,14 +71,14 @@ func createTestData(t *testing.T, d *gorm.DB) (*models.Database, *models.Table, 
 func TestNewAuthorizer_NilDB(t *testing.T) {
 	_, err := NewAuthorizer(nil, "some-id")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "数据库未初始化")
+	assert.Contains(t, err.Error(), "database not initialized")
 }
 
 func TestNewAuthorizer_NonexistentToken(t *testing.T) {
 	d := setupDB(t)
 	_, err := NewAuthorizer(d, "nonexistent")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "token 不存在")
+	assert.Contains(t, err.Error(), "token not found")
 }
 
 func TestNewAuthorizer_MasterToken(t *testing.T) {
@@ -150,7 +150,7 @@ func TestParseScopes_ValidJSONWithNilCollections(t *testing.T) {
 func TestParseScopes_InvalidJSON(t *testing.T) {
 	_, err := parseScopes("{invalid}")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "解析 Token Scopes 失败")
+	assert.Contains(t, err.Error(), "failed to parse token scopes")
 }
 
 func TestCanCreateDatabase(t *testing.T) {

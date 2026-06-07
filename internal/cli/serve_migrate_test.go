@@ -34,7 +34,7 @@ func TestRunMigrate_Success(t *testing.T) {
 		err := runMigrate(migrateCmd, []string{})
 		require.NoError(t, err)
 	})
-	assert.Contains(t, out, "迁移完成")
+	assert.Contains(t, out, "database migration completed")
 }
 
 func TestRunMigrate_ConfigLoadError(t *testing.T) {

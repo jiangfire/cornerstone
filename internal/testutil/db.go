@@ -24,7 +24,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	databaseURL := os.Getenv("DATABASE_URL")
 
 	if dbType == "" {
-		// 默认使用 SQLite in-memory 进行单元测试
+		// Default to SQLite in-memory for unit tests
 		dbType = "sqlite"
 		databaseURL = ":memory:"
 	}
@@ -32,7 +32,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	isSQLiteMemory := dbType == "sqlite" && databaseURL == ":memory:"
 
 	if isSQLiteMemory {
-		// SQLite in-memory 每个连接都是独立的数据库，必须每次重新初始化
+		// SQLite in-memory: each connection is an independent database, must reinitialize every time
 		err := pkgdb.InitDB(config.DatabaseConfig{
 			Type: dbType,
 			URL:  databaseURL,
@@ -42,7 +42,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		db := pkgdb.DB()
 		require.NoError(t, internaldb.Migrate())
 
-		// 清理函数：硬删除所有测试数据，并关闭连接
+		// Cleanup function: hard-delete all test data and close connection
 		t.Cleanup(func() {
 			cleanupTables(db, t)
 			_ = pkgdb.CloseDB()
@@ -51,8 +51,8 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		return db
 	}
 
-	// PostgreSQL / MySQL：所有测试共享同一个数据库实例
-	// 如果连接被之前的测试关闭（如模拟 DB 错误的测试），需要重新初始化
+	// PostgreSQL / MySQL: all tests share the same database instance
+	// If the connection was closed by a previous test (e.g. simulating DB errors), reinitialize
 	needsInit := true
 	if pkgdb.IsInitialized() {
 		db := pkgdb.DB()
@@ -61,7 +61,7 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		}
 	}
 	if needsInit {
-		_ = pkgdb.CloseDB() // 清理可能已损坏的旧连接
+		_ = pkgdb.CloseDB() // Clean up possibly corrupted old connection
 		err := pkgdb.InitDB(config.DatabaseConfig{
 			Type:        dbType,
 			URL:         databaseURL,
@@ -71,13 +71,13 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 		})
 		require.NoError(t, err)
 		require.NoError(t, internaldb.Migrate())
-		// 前一个测试关闭了连接导致 cleanupTables 被跳过，重新初始化后立即清理残余数据
+		// Previous test closed connection causing cleanupTables to be skipped, clean up residual data immediately after reinitialization
 		cleanupTables(pkgdb.DB(), t)
 	}
 
 	db := pkgdb.DB()
 
-	// 清理函数：硬删除所有测试数据，但不关闭连接池（复用连接）
+	// Cleanup function: hard-delete all test data, but don't close the connection pool (reuse connections)
 	t.Cleanup(func() {
 		cleanupTables(db, t)
 	})
@@ -85,18 +85,18 @@ func SetupTestDB(t *testing.T) *gorm.DB {
 	return db
 }
 
-// cleanupTables 使用 db.Exec raw SQL 清空所有测试表，绕过 GORM callback/hook，
-// 避免被测试注册的 mock callback 干扰。同时验证表已清空并清理全局缓存。
+// cleanupTables uses db.Exec raw SQL to clear all test tables, bypassing GORM callbacks/hooks
+// to avoid interference from mock callbacks registered in tests. Also verifies tables are empty and clears global cache.
 func cleanupTables(db *gorm.DB, tb testing.TB) {
 	tb.Helper()
 
-	// 如果底层连接已被之前的测试关闭（如模拟 DB 错误的测试），跳过清理
+	// If the underlying connection was closed by a previous test (e.g. simulating DB errors), skip cleanup
 	if sqlDB, err := db.DB(); err != nil || sqlDB.Ping() != nil {
 		return
 	}
 
-	// MySQL 使用 SET FOREIGN_KEY_CHECKS=0 禁用外键检查，再按任意顺序截断
-	// PostgreSQL/SQLite 使用 TRUNCATE ... CASCADE 或直接 DELETE
+	// MySQL uses SET FOREIGN_KEY_CHECKS=0 to disable foreign key checks, then truncate in any order
+	// PostgreSQL/SQLite use TRUNCATE ... CASCADE or direct DELETE
 	if pkgdb.IsMySQL() {
 		if err := db.Exec("SET FOREIGN_KEY_CHECKS = 0").Error; err != nil {
 			tb.Logf("failed to disable FK checks: %v", err)
@@ -117,10 +117,10 @@ func cleanupTables(db *gorm.DB, tb testing.TB) {
 		}
 	}
 
-	// 清理全局缓存，避免测试间污染
+	// Clear global cache to avoid cross-test pollution
 	cache.ClearAll()
 
-	// 强制检查：确认所有表已清空
+	// Force check: confirm all tables are empty
 	var count int64
 	for _, m := range []any{&models.File{}, &models.RecordFieldIndex{}, &models.Record{}, &models.Field{}, &models.Table{}, &models.Database{}, &models.Token{}} {
 		if err := db.Model(m).Unscoped().Count(&count).Error; err != nil {
@@ -148,8 +148,8 @@ func SetupTestDBWithTokens(t *testing.T, tokenIDs ...string) *gorm.DB {
 	return db
 }
 
-// quoteIdentifier 根据数据库类型返回正确引用的标识符。
-// MySQL 使用反引号，PostgreSQL/SQLite 使用双引号。
+// quoteIdentifier returns the correctly quoted identifier for the database type.
+// MySQL uses backticks, PostgreSQL/SQLite use double quotes.
 func quoteIdentifier(db *gorm.DB, name string) string {
 	if pkgdb.IsMySQL() {
 		return fmt.Sprintf("`%s`", name)

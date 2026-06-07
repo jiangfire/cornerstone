@@ -60,7 +60,7 @@ func TestGetRecord_NotFound(t *testing.T) {
 
 	rec := doJSON(t, router, "GET", "/api/v1/records/nonexistent_record_id", master.Token, nil)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -98,7 +98,7 @@ func TestDeleteRecord_NotFound(t *testing.T) {
 
 	rec := doJSON(t, router, "DELETE", "/api/v1/records/nonexistent_record_id", master.Token, nil)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -113,7 +113,7 @@ func TestBatchCreateRecords_MissingTableID(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
-	assert.Contains(t, resp["message"], "参数错误")
+	assert.Contains(t, resp["message"], "invalid request")
 }
 
 func TestBatchCreateRecords_CountOutOfRange(t *testing.T) {
@@ -129,21 +129,21 @@ func TestBatchCreateRecords_CountOutOfRange(t *testing.T) {
 		rec := doJSON(t, router, "POST", "/api/v1/records/batch?count=0", master.Token, body)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 		resp := decodeResp(t, rec)
-		assert.Contains(t, resp["message"], "批量数量必须在1-100之间")
+		assert.Contains(t, resp["message"], "batch count must be between 1 and 100")
 	})
 
 	t.Run("count_101", func(t *testing.T) {
 		rec := doJSON(t, router, "POST", "/api/v1/records/batch?count=101", master.Token, body)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 		resp := decodeResp(t, rec)
-		assert.Contains(t, resp["message"], "批量数量必须在1-100之间")
+		assert.Contains(t, resp["message"], "batch count must be between 1 and 100")
 	})
 
 	t.Run("count_negative", func(t *testing.T) {
 		rec := doJSON(t, router, "POST", "/api/v1/records/batch?count=-1", master.Token, body)
 		assert.Equal(t, http.StatusBadRequest, rec.Code)
 		resp := decodeResp(t, rec)
-		assert.Contains(t, resp["message"], "批量数量必须在1-100之间")
+		assert.Contains(t, resp["message"], "batch count must be between 1 and 100")
 	})
 }
 
@@ -160,7 +160,7 @@ func TestBatchCreateRecords_NonNumericCount(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
-	assert.Contains(t, resp["message"], "批量数量必须在1-100之间")
+	assert.Contains(t, resp["message"], "batch count must be between 1 and 100")
 }
 
 func TestDecodeRecordData_NilRecord(t *testing.T) {

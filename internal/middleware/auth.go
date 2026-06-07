@@ -17,7 +17,7 @@ func Auth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractToken(c)
 		if token == "" {
-			dto.Unauthorized(c, "缺少 API Key")
+			dto.Unauthorized(c, "missing API Key")
 			c.Abort()
 			return
 		}
@@ -33,13 +33,13 @@ func Auth() gin.HandlerFunc {
 
 		tokenRecord, err := validateToken(token)
 		if err != nil {
-			dto.Unauthorized(c, "无效的 API Key")
+			dto.Unauthorized(c, "invalid API Key")
 			c.Abort()
 			return
 		}
 
 		if tokenRecord.ExpiresAt != nil && tokenRecord.ExpiresAt.Before(time.Now()) {
-			dto.Unauthorized(c, "API Key 已过期")
+			dto.Unauthorized(c, "API Key expired")
 			c.Abort()
 			return
 		}
@@ -88,7 +88,7 @@ func GetTokenScopes(c *gin.Context) map[string]bool {
 func RequireMaster() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !IsMasterToken(c) {
-			dto.Forbidden(c, "此操作需要 Master Token")
+			dto.Forbidden(c, "master token required for this operation")
 			c.Abort()
 			return
 		}

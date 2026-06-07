@@ -15,7 +15,7 @@ import (
 )
 
 // ============================================================
-// 1. 日期/时间格式验证 (P1)
+// 1. Date/time format validation (P1)
 // ============================================================
 
 func TestValidateFieldValue_DateValid(t *testing.T) {
@@ -34,7 +34,7 @@ func TestValidateFieldValue_DateInvalid(t *testing.T) {
 	field := models.Field{Type: "date"}
 	err := s.validateFieldValue(field, "not-a-date")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "日期格式")
+	assert.Contains(t, err.Error(), "invalid date format")
 }
 
 func TestValidateFieldValue_DateTimeValid(t *testing.T) {
@@ -53,11 +53,11 @@ func TestValidateFieldValue_DateTimeInvalid(t *testing.T) {
 	field := models.Field{Type: "datetime"}
 	err := s.validateFieldValue(field, "hello-world")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "日期格式")
+	assert.Contains(t, err.Error(), "invalid date format")
 }
 
 // ============================================================
-// 2. JSON 类型验证 (P1)
+// 2. JSON type validation (P1)
 // ============================================================
 
 func TestValidateFieldValue_JSONValid(t *testing.T) {
@@ -74,10 +74,10 @@ func TestValidateFieldValue_JSONInvalid(t *testing.T) {
 	s := NewRecordService(db)
 
 	field := models.Field{Type: "json"}
-	// json.Number("NaN") 不能被标准库序列化，属于非法 JSON 值
+	// json.Number("NaN") cannot be serialized by the standard library, it is an invalid JSON value
 	err := s.validateFieldValue(field, map[string]any{"bad": json.Number("NaN")})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "无效的 JSON")
+	assert.Contains(t, err.Error(), "invalid JSON")
 }
 
 func TestValidateFieldValue_JSONStringInvalid(t *testing.T) {
@@ -85,14 +85,14 @@ func TestValidateFieldValue_JSONStringInvalid(t *testing.T) {
 	s := NewRecordService(db)
 
 	field := models.Field{Type: "json"}
-	// 测试非法 JSON 字符串是否能被拦截——当前实现直接返回 nil，应该改进
+	// Test whether invalid JSON strings can be intercepted — current implementation returns nil directly, should be improved
 	err := s.validateFieldValue(field, "{not json")
-	// 期望报错
+	// Expect error
 	require.Error(t, err)
 }
 
 // ============================================================
-// 3. number 类型支持 json.Number (P1)
+// 3. number type supports json.Number (P1)
 // ============================================================
 
 func TestValidateFieldValue_NumberJSONNumber(t *testing.T) {
@@ -123,14 +123,14 @@ func TestValidateFieldValue_NumberStringRejected(t *testing.T) {
 }
 
 // ============================================================
-// 4. 字段配置解析缓存 (P0) — validateRecordData 不应重复 Unmarshal
+// 4. Field config parse cache (P0) — validateRecordData should not repeat Unmarshal
 // ============================================================
 
 func TestValidateRecordData_PreParsesFieldConfig(t *testing.T) {
 	db := setupTestDB(t)
 	s := NewRecordService(db)
 
-	// 创建表、字段（带 Options）
+	// Create table, field (with Options)
 	dbModel := &models.Database{Name: "test"}
 	require.NoError(t, db.Create(dbModel).Error)
 	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "items"}
@@ -147,18 +147,18 @@ func TestValidateRecordData_PreParsesFieldConfig(t *testing.T) {
 	}
 	require.NoError(t, db.Create(field).Error)
 
-	// 正常值
+	// Normal value
 	err := s.validateRecordData(tbl.ID, map[string]any{"title": "hi"}, "", "user1")
 	assert.NoError(t, err)
 
-	// 超长值——应触发配置中的 max_length 限制
+	// Exceeds max length — should trigger max_length limit in config
 	err = s.validateRecordData(tbl.ID, map[string]any{"title": "hello world"}, "", "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "长度不能超过")
+	assert.Contains(t, err.Error(), "length must not exceed")
 }
 
 // ============================================================
-// 5. BatchCreateRecords 大批量创建 (P2)
+// 5. BatchCreateRecords large batch creation (P2)
 // ============================================================
 
 func TestBatchCreateRecords_LargeBatchSuccess(t *testing.T) {
@@ -170,10 +170,10 @@ func TestBatchCreateRecords_LargeBatchSuccess(t *testing.T) {
 	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "items"}
 	require.NoError(t, db.Create(tbl).Error)
 
-	// 创建两个字段，确保有字段定义
+	// Create two fields to ensure field definitions exist
 	require.NoError(t, db.Create(&models.Field{TableID: tbl.ID, Name: "name", Type: "string"}).Error)
 
-	// 批量创建 150 条（超过默认批次大小 100），验证大批量场景
+	// Batch create 150 records (exceeds default batch size 100), verify large batch scenario
 	records, err := s.BatchCreateRecords(CreateRecordRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "batch"},
@@ -181,7 +181,7 @@ func TestBatchCreateRecords_LargeBatchSuccess(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, records, 150)
 
-	// 验证数据库中确实有 150 条
+	// Verify there are indeed 150 records in the database
 	var count int64
 	require.NoError(t, db.Model(&models.Record{}).Where("table_id = ?", tbl.ID).Count(&count).Error)
 	assert.Equal(t, int64(150), count)
@@ -207,7 +207,7 @@ func TestBatchCreateRecords_EmptyData(t *testing.T) {
 }
 
 // ============================================================
-// 6. 字段权限批量检查 (P0)
+// 6. Batch field permission check (P0)
 // ============================================================
 
 func TestFieldService_CheckFieldPermissions_Batch(t *testing.T) {
@@ -224,7 +224,7 @@ func TestFieldService_CheckFieldPermissions_Batch(t *testing.T) {
 	f2, err := s.CreateField(CreateFieldRequest{TableID: tbl.ID, Name: "b", Type: "string"}, "user1")
 	require.NoError(t, err)
 
-	// Master token 可以访问所有字段
+	// Master token can access all fields
 	results, err := s.CheckFieldPermissions("user1", []string{f1.ID, f2.ID}, "read")
 	require.NoError(t, err)
 	assert.True(t, results[f1.ID])
@@ -232,7 +232,7 @@ func TestFieldService_CheckFieldPermissions_Batch(t *testing.T) {
 }
 
 // ============================================================
-// 7. BatchCreateRecords 原子性测试
+// 7. BatchCreateRecords atomicity test
 // ============================================================
 
 func TestBatchCreateRecords_AtomicRollback(t *testing.T) {
@@ -245,7 +245,7 @@ func TestBatchCreateRecords_AtomicRollback(t *testing.T) {
 	require.NoError(t, db.Create(tbl).Error)
 	require.NoError(t, db.Create(&models.Field{TableID: tbl.ID, Name: "name", Type: "string"}).Error)
 
-	// 先正常创建 50 条
+	// First normally create 50 records
 	_, err := s.BatchCreateRecords(CreateRecordRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "batch"},
@@ -256,28 +256,28 @@ func TestBatchCreateRecords_AtomicRollback(t *testing.T) {
 	require.NoError(t, db.Model(&models.Record{}).Where("table_id = ?", tbl.ID).Count(&beforeCount).Error)
 	require.Equal(t, int64(50), beforeCount)
 
-	// 注入 Create 错误，使后续批量创建失败
+	// Inject Create error to make subsequent batch creation fail
 	err = db.Callback().Create().Before("gorm:create").Register("test_batch_rollback", func(d *gorm.DB) {
 		d.Error = fmt.Errorf("injected batch create error")
 	})
 	require.NoError(t, err)
 	t.Cleanup(func() { _ = db.Callback().Create().Remove("test_batch_rollback") })
 
-	// 尝试创建 100 条，应失败并回滚
+	// Try to create 100 records, should fail and rollback
 	_, err = s.BatchCreateRecords(CreateRecordRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "batch2"},
 	}, "user1", 100)
 	assert.Error(t, err)
 
-	// 验证回滚：数据库中仍只有最初 50 条
+	// Verify rollback: database still only has initial 50 records
 	var afterCount int64
 	require.NoError(t, db.Model(&models.Record{}).Where("table_id = ?", tbl.ID).Count(&afterCount).Error)
-	assert.Equal(t, int64(50), afterCount, "事务回滚后记录数应保持不变")
+	assert.Equal(t, int64(50), afterCount, "record count should remain unchanged after transaction rollback")
 }
 
 // ============================================================
-// 8. CheckFieldPermissions 空数组保护
+// 8. CheckFieldPermissions empty array protection
 // ============================================================
 
 func TestFieldService_CheckFieldPermissions_Empty(t *testing.T) {
@@ -290,7 +290,7 @@ func TestFieldService_CheckFieldPermissions_Empty(t *testing.T) {
 }
 
 // ============================================================
-// 9. UpdateRecord 错误路径
+// 9. UpdateRecord error paths
 // ============================================================
 
 func TestRecordService_UpdateRecord_VersionConflict(t *testing.T) {
@@ -311,7 +311,7 @@ func TestRecordService_UpdateRecord_VersionConflict(t *testing.T) {
 		Version: 999,
 	}, "user1")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "版本")
+	assert.Contains(t, err.Error(), "version")
 }
 
 func TestRecordService_UpdateRecord_NonexistentRecord(t *testing.T) {
@@ -322,7 +322,7 @@ func TestRecordService_UpdateRecord_NonexistentRecord(t *testing.T) {
 		Data: map[string]any{"name": "bob"},
 	}, "user1")
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "记录不存在")
+	assert.Contains(t, err.Error(), "record not found")
 }
 
 func TestRecordService_DeleteRecord_NonexistentRecord(t *testing.T) {
@@ -342,7 +342,7 @@ func TestRecordService_GetRecord_NonexistentRecord(t *testing.T) {
 }
 
 // ============================================================
-// 辅助函数
+// Helper functions
 // ============================================================
 
 func intPtr(v int) *int {
@@ -350,7 +350,7 @@ func intPtr(v int) *int {
 }
 
 // ============================================================
-// 从 record_gaps_test.go 合并：validateRecordData 边界
+// Merged from record_gaps_test.go: validateRecordData boundaries
 // ============================================================
 
 func TestValidateRecordData_AttachmentFieldValidation(t *testing.T) {
@@ -414,7 +414,7 @@ func TestValidateRecordData_EmptyStringOnOptionalField(t *testing.T) {
 }
 
 // ============================================================
-// 从 record_gaps_test.go 合并：BatchCreateRecords 边界
+// Merged from record_gaps_test.go: BatchCreateRecords boundaries
 // ============================================================
 
 func TestBatchCreateRecords_AttachmentFieldWithFileIDs(t *testing.T) {
@@ -438,7 +438,7 @@ func TestBatchCreateRecords_AttachmentFieldWithFileIDs(t *testing.T) {
 		Data:    map[string]interface{}{"doc": []string{"fil_123"}},
 	}, "user1", 3)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "批量创建暂不支持 file 字段")
+	assert.Contains(t, err.Error(), "batch creation does not support file fields")
 }
 
 func TestBatchCreateRecords_RequiredFieldMissing(t *testing.T) {
@@ -462,7 +462,7 @@ func TestBatchCreateRecords_RequiredFieldMissing(t *testing.T) {
 		Data:    map[string]interface{}{},
 	}, "user1", 5)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "必填")
+	assert.Contains(t, err.Error(), "is required")
 }
 
 func TestBatchCreateRecords_NonWritableField(t *testing.T) {
@@ -488,11 +488,11 @@ func TestBatchCreateRecords_NonWritableField(t *testing.T) {
 		Data:    map[string]interface{}{"name": "test"},
 	}, viewer.ID, 3)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "无权访问该表")
+	assert.Contains(t, err.Error(), "permission denied: cannot access this table")
 }
 
 // ============================================================
-// 从 record_gaps_test.go 合并：结构化过滤错误路径
+// Merged from record_gaps_test.go: structured filter error paths
 // ============================================================
 
 func TestBuildStructuredFilterClauses_MalformedJSON(t *testing.T) {
@@ -506,7 +506,7 @@ func TestBuildStructuredFilterClauses_MalformedJSON(t *testing.T) {
 		"status": json.Number("not-a-number"),
 	})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "过滤值序列化失败")
+	assert.Contains(t, err.Error(), "filter value serialization failed")
 }
 
 func TestBuildRecordFieldIndexRows_SupportedScalarValues(t *testing.T) {

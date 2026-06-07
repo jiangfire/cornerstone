@@ -35,13 +35,13 @@ func UploadFile(c *gin.Context) {
 	fieldID := c.PostForm("field_id")
 
 	if recordID == "" && fieldID == "" {
-		dto.Error(c, 400, "记录ID或字段ID不能为空")
+		dto.Error(c, 400, "record ID or field ID is required")
 		return
 	}
 
 	file, err := c.FormFile("file")
 	if err != nil {
-		dto.Error(c, 400, "请选择要上传的文件")
+		dto.Error(c, 400, "file is required")
 		return
 	}
 
@@ -85,7 +85,7 @@ func GetFile(c *gin.Context) {
 	fileService := services.NewFileService(db.DB())
 	file, err := fileService.GetFile(fileID, tokenID)
 	if err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
@@ -116,13 +116,13 @@ func DownloadFile(c *gin.Context) {
 	fileService := services.NewFileService(db.DB())
 	file, err := fileService.GetFile(fileID, tokenID)
 	if err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
 	safePath, err := services.ResolveSecureStoragePath(file.StorageURL)
 	if err != nil {
-		dto.Error(c, 403, "文件路径不合法")
+		dto.Error(c, 403, "invalid file path")
 		return
 	}
 	c.FileAttachment(safePath, file.FileName)
@@ -151,11 +151,11 @@ func DeleteFile(c *gin.Context) {
 
 	fileService := services.NewFileService(db.DB())
 	if err := fileService.DeleteFile(fileID, tokenID); err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 
-	dto.Success(c, "文件删除成功")
+	dto.Success(c, gin.H{"message": "file deleted"})
 }
 
 // ListRecordFiles
@@ -181,7 +181,7 @@ func ListRecordFiles(c *gin.Context) {
 	fileService := services.NewFileService(db.DB())
 	files, err := fileService.ListRecordFiles(recordID, tokenID)
 	if err != nil {
-		dto.Error(c, 403, err.Error())
+		handleServiceError(c, err)
 		return
 	}
 

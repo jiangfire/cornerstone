@@ -10,7 +10,7 @@ import (
 
 var logger *zap.Logger
 
-// Logger 返回全局 logger 实例
+// Logger returns the global logger instance
 func Logger() *zap.Logger {
 	if logger == nil {
 		panic("zap logger not initialized")
@@ -18,18 +18,18 @@ func Logger() *zap.Logger {
 	return logger
 }
 
-// GetLogger 兼容函数, 返回 logger 实例
+// GetLogger compatibility function, returns the logger instance
 func GetLogger() *zap.Logger {
 	return Logger()
 }
 
-// InitLogger 初始化日志系统。
+// InitLogger initializes the logging system.
 //
-// 设计取舍 (2026-05 P3-6):
-//   - 容器化部署的标准做法是结构化日志走 stdout, 由编排层 (docker/k8s/journald) 接管轮转与聚合;
-//     应用自身写文件 + lumberjack 轮转会与外部 sidecar 重复, 还要求挂卷可写。
-//   - 因此这里只输出一份 JSON 到 stdout, 不再分文件、不再分级旁路 (error 仍可由采集端过滤 level=error)。
-//   - LoggerConfig 上保留 Level 字段, 其余字段已从配置层移除。
+// Design tradeoffs (2026-05 P3-6):
+//   - The standard practice for containerized deployments is structured logs to stdout, with the orchestration layer (docker/k8s/journald) handling rotation and aggregation;
+//     Application file writes + lumberjack rotation would duplicate external sidecar functionality and require writable volumes.
+//   - Therefore only output one JSON stream to stdout, no separate files, no level bypass (errors can still be filtered by collector with level=error).
+//   - Level field is retained on LoggerConfig, other fields have been removed from the config layer.
 func InitLogger(cfg config.LoggerConfig) error {
 	level, err := zapcore.ParseLevel(cfg.Level)
 	if err != nil {
@@ -67,49 +67,49 @@ func InitLogger(cfg config.LoggerConfig) error {
 	return nil
 }
 
-// Sync 同步日志缓冲区
+// Sync flushes the log buffer
 func Sync() {
 	if logger != nil {
 		_ = logger.Sync()
 	}
 }
 
-// Info 记录 info 级别日志
+// Info logs an info-level message
 func Info(msg string, fields ...zap.Field) {
 	Logger().Info(msg, fields...)
 }
 
-// Error 记录 error 级别日志
+// Error logs an error-level message
 func Error(msg string, fields ...zap.Field) {
 	Logger().Error(msg, fields...)
 }
 
-// Warn 记录 warn 级别日志
+// Warn logs a warn-level message
 func Warn(msg string, fields ...zap.Field) {
 	Logger().Warn(msg, fields...)
 }
 
-// Debug 记录 debug 级别日志
+// Debug logs a debug-level message
 func Debug(msg string, fields ...zap.Field) {
 	Logger().Debug(msg, fields...)
 }
 
-// Fatal 记录 fatal 级别日志并退出
+// Fatal logs a fatal-level message and exits
 func Fatal(msg string, fields ...zap.Field) {
 	Logger().Fatal(msg, fields...)
 }
 
-// Infof 格式化 info 日志
+// Infof formats and logs an info message
 func Infof(format string, args ...any) {
 	Logger().Sugar().Infof(format, args...)
 }
 
-// Errorf 格式化 error 日志
+// Errorf formats and logs an error message
 func Errorf(format string, args ...any) {
 	Logger().Sugar().Errorf(format, args...)
 }
 
-// Fatalf 格式化 fatal 日志并退出
+// Fatalf formats and logs a fatal message and exits
 func Fatalf(format string, args ...any) {
 	Logger().Sugar().Fatalf(format, args...)
 }

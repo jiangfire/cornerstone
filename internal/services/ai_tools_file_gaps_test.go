@@ -338,7 +338,7 @@ func TestGap_UploadFile_FileTooLarge(t *testing.T) {
 		},
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "文件大小超过限制")
+	assert.Contains(t, err.Error(), "file size exceeds limit")
 }
 
 func TestGap_UploadFile_EmptyFilename(t *testing.T) {
@@ -358,7 +358,7 @@ func TestGap_UploadFile_EmptyFilename(t *testing.T) {
 		},
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "文件名不能为空")
+	assert.Contains(t, err.Error(), "file name is required")
 }
 
 func TestGap_UploadFile_IllegalFilename(t *testing.T) {
@@ -378,7 +378,7 @@ func TestGap_UploadFile_IllegalFilename(t *testing.T) {
 		},
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "非法的文件名")
+	assert.Contains(t, err.Error(), "illegal file name")
 }
 
 func TestGap_UploadFile_UnsupportedFileType(t *testing.T) {
@@ -398,7 +398,7 @@ func TestGap_UploadFile_UnsupportedFileType(t *testing.T) {
 		},
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "不支持的文件类型")
+	assert.Contains(t, err.Error(), "unsupported file type")
 }
 
 func TestGap_UploadFile_FieldNotFileType(t *testing.T) {
@@ -427,7 +427,7 @@ func TestGap_UploadFile_FieldNotFileType(t *testing.T) {
 		},
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "仅 file 类型字段支持绑定上传文件")
+	assert.Contains(t, err.Error(), "only file type fields support file uploads")
 }
 
 func TestGap_UploadFile_FieldTableMismatch(t *testing.T) {
@@ -456,7 +456,7 @@ func TestGap_UploadFile_FieldTableMismatch(t *testing.T) {
 		},
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "字段不属于当前记录所在表")
+	assert.Contains(t, err.Error(), "field does not belong to the record's table")
 }
 
 func TestGap_UploadFile_FieldSizeExceeded(t *testing.T) {
@@ -486,7 +486,7 @@ func TestGap_UploadFile_FieldSizeExceeded(t *testing.T) {
 		},
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "文件大小超过字段限制")
+	assert.Contains(t, err.Error(), "file size exceeds field limit")
 }
 
 func TestGap_UploadFile_FieldTypeNotAllowed(t *testing.T) {
@@ -516,7 +516,7 @@ func TestGap_UploadFile_FieldTypeNotAllowed(t *testing.T) {
 		},
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "文件类型不符合字段限制")
+	assert.Contains(t, err.Error(), "file type does not match field restrictions")
 }
 
 func TestGap_ListRecordFiles_Success(t *testing.T) {

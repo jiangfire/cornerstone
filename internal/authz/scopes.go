@@ -12,7 +12,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// jsonToken 用于 Authorizer 的 JSON 序列化/反序列化
+// jsonToken is used for Authorizer JSON serialization/deserialization
 type jsonToken struct {
 	Token  models.Token `json:"token"`
 	Scopes ScopeConfig  `json:"scopes"`
@@ -72,10 +72,10 @@ func (a *Authorizer) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// authorizerCache 缓存按 tokenID 构建好的权限上下文。
+// authorizerCache caches permission contexts keyed by token ID.
 var authorizerCache = cache.NewString[*Authorizer]("authorizer", 5*time.Minute)
 
-// tokenByIDCache / tokenByValueCache 缓存 Token 记录，分别服务于权限构建和认证入口。
+// tokenByIDCache / tokenByValueCache cache Token records for permission building and authentication.
 var tokenByIDCache = cache.NewString[cachedToken]("token-by-id", 5*time.Minute)
 var tokenByValueCache = cache.NewString[cachedToken]("token-by-value", 5*time.Minute)
 
@@ -104,13 +104,13 @@ type ScopeConfig struct {
 
 func NewAuthorizer(db *gorm.DB, tokenID string) (*Authorizer, error) {
 	if db == nil {
-		return nil, errors.New("数据库未初始化")
+		return nil, errors.New("database not initialized")
 	}
 
-	// 尝试从缓存读取
+	// Try cache first
 	if a, ok := authorizerCache.Get(tokenID); ok {
-		// 缓存中的 Authorizer 需要指向当前的 db（连接可能变化，如测试时）
-		// 所以只缓存 token 和 scopes，db 仍然用传入的
+		// Cached Authorizer needs current db (connection may change, e.g. in tests)
+		// So only cache token and scopes; use the passed-in db
 		return &Authorizer{db: db, token: a.token, scopes: a.scopes}, nil
 	}
 
@@ -145,9 +145,9 @@ func findTokenByID(db *gorm.DB, tokenID string) (*models.Token, error) {
 	var token models.Token
 	if err := db.Where("id = ?", tokenID).First(&token).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("token 不存在")
+			return nil, errors.New("token not found")
 		}
-		return nil, fmt.Errorf("查询 Token 失败: %w", err)
+		return nil, fmt.Errorf("failed to query token: %w", err)
 	}
 
 	cacheTokenRecord(token)
@@ -156,7 +156,7 @@ func findTokenByID(db *gorm.DB, tokenID string) (*models.Token, error) {
 
 func FindTokenByValue(db *gorm.DB, tokenValue string) (*models.Token, error) {
 	if db == nil {
-		return nil, errors.New("数据库未初始化")
+		return nil, errors.New("database not initialized")
 	}
 	if token, ok := tokenByValueCache.Get(tokenValue); ok {
 		cached := tokenFromCache(token)
@@ -183,7 +183,7 @@ func parseScopes(raw string) (ScopeConfig, error) {
 
 	var scopes ScopeConfig
 	if err := json.Unmarshal([]byte(raw), &scopes); err != nil {
-		return ScopeConfig{}, fmt.Errorf("解析 Token Scopes 失败: %w", err)
+		return ScopeConfig{}, fmt.Errorf("failed to parse token scopes: %w", err)
 	}
 	if scopes.Databases == nil {
 		scopes.Databases = map[string]string{}
@@ -202,7 +202,7 @@ func (a *Authorizer) RequireMaster() error {
 	if a.IsMaster() {
 		return nil
 	}
-	return errors.New("此操作需要 Master Token")
+	return errors.New("master token required for this operation")
 }
 
 func roleLevel(role string) int {
@@ -281,7 +281,7 @@ func (a *Authorizer) CanAccessField(fieldID, action string) bool {
 	return a.CanAccessTable(field.TableID, action)
 }
 
-// CanAccessFields 批量检查字段权限，只查一次数据库获取字段信息。
+// CanAccessFields batch-checks field permissions with a single DB query.
 func (a *Authorizer) CanAccessFields(fieldIDs []string, action string) map[string]bool {
 	results := make(map[string]bool, len(fieldIDs))
 	if len(fieldIDs) == 0 {
@@ -294,7 +294,7 @@ func (a *Authorizer) CanAccessFields(fieldIDs []string, action string) map[strin
 		return results
 	}
 
-	// 一次性查询所有字段定义
+	// Query all field definitions at once
 	var fields []models.Field
 	if err := a.db.Where("id IN ? AND deleted_at IS NULL", fieldIDs).Find(&fields).Error; err != nil {
 		for _, id := range fieldIDs {
@@ -310,7 +310,7 @@ func (a *Authorizer) CanAccessFields(fieldIDs []string, action string) map[strin
 		tableIDSet[f.TableID] = struct{}{}
 	}
 
-	// 批量缓存表权限，避免对每个字段重复查询
+	// Batch-cache table permissions to avoid repeated queries per field
 	tablePerms := make(map[string]bool, len(tableIDSet))
 	for tableID := range tableIDSet {
 		tablePerms[tableID] = a.CanAccessTable(tableID, action)
@@ -442,7 +442,7 @@ func (a *Authorizer) AccessibleRecordIDs() ([]string, error) {
 	return ids, nil
 }
 
-// InvalidateTokenCache 失效指定 Token 的缓存。
+// InvalidateTokenCache invalidates the cache for the given token.
 func InvalidateTokenCache(tokenID string) {
 	if authorizer, ok := authorizerCache.Get(tokenID); ok {
 		tokenByValueCache.Delete(authorizer.token.Token)
@@ -454,7 +454,7 @@ func InvalidateTokenCache(tokenID string) {
 	tokenByIDCache.Delete(tokenID)
 }
 
-// ClearTokenCache 清空所有 Token 缓存。
+// ClearTokenCache clears all token caches.
 func ClearTokenCache() {
 	authorizerCache.Clear()
 	tokenByIDCache.Clear()

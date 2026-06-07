@@ -186,7 +186,7 @@ func TestServer_HandleRequest_ToolsCall_GetTableSchema(t *testing.T) {
 		Method:  "tools/call",
 		Params: json.RawMessage(`{
 			"name": "get_table_schema",
-			"arguments": {"table": "databases"}
+			"arguments": {"query_table_name": "databases"}
 		}`),
 	})
 
@@ -207,7 +207,7 @@ func TestServer_HandleRequest_ToolsCall_GetTableSchema_Disallowed(t *testing.T) 
 		Method:  "tools/call",
 		Params: json.RawMessage(`{
 			"name": "get_table_schema",
-			"arguments": {"table": "nonexistent_table_xyz"}
+			"arguments": {"query_table_name": "nonexistent_table_xyz"}
 		}`),
 	})
 
@@ -419,4 +419,27 @@ func TestServer_HandleRequest_ToolsCall_GenerateTestData(t *testing.T) {
 	result := resp.Result.(*ToolCallResult)
 	assert.False(t, result.IsError)
 	assert.Contains(t, result.Content[0].Text, "3")
+}
+
+func TestServer_HandleRequest_ToolsCall_GetTableSchema_LegacyParam(t *testing.T) {
+	srv, db := setupServerTest(t)
+
+	require.NoError(t, db.Create(&models.Database{Name: "TestDB"}).Error)
+
+	resp := srv.HandleRequest(context.Background(), Request{
+		JSONRPC: "2.0",
+		ID:      json.RawMessage(`1`),
+		Method:  "tools/call",
+		Params: json.RawMessage(`{
+			"name": "get_table_schema",
+			"arguments": {"table": "databases"}
+		}`),
+	})
+
+	require.NotNil(t, resp)
+	assert.Nil(t, resp.Error)
+
+	result := resp.Result.(*ToolCallResult)
+	assert.False(t, result.IsError)
+	assert.Contains(t, result.Content[0].Text, "databases")
 }

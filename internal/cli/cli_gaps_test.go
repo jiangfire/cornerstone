@@ -168,5 +168,5 @@ func TestLoadMigrationConfigFromCommand_InvalidSourceType(t *testing.T) {
 	require.NoError(t, cmd.Flags().Set("source-dsn", "some-dsn"))
 	_, _, err := loadMigrationConfigFromCommand(cmd)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "不支持")
+	assert.Contains(t, err.Error(), "not supported")
 }

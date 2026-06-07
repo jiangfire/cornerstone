@@ -25,13 +25,13 @@ func parseStringListValue(value interface{}) ([]string, error) {
 		for _, item := range values {
 			str, ok := item.(string)
 			if !ok {
-				return nil, errors.New("列表项必须是字符串")
+				return nil, errors.New("list items must be strings")
 			}
 			items = append(items, str)
 		}
 		return items, nil
 	default:
-		return nil, errors.New("期望字符串数组类型")
+		return nil, errors.New("expected string array type")
 	}
 }
 
@@ -56,7 +56,7 @@ func parseAttachmentValue(value interface{}) ([]string, error) {
 		for _, item := range values {
 			str, ok := item.(string)
 			if !ok {
-				return nil, errors.New("附件值必须是文件ID或文件ID数组")
+				return nil, errors.New("attachment value must be a file ID or array of file IDs")
 			}
 			trimmed := strings.TrimSpace(str)
 			if trimmed != "" {
@@ -65,35 +65,35 @@ func parseAttachmentValue(value interface{}) ([]string, error) {
 		}
 		return items, nil
 	default:
-		return nil, errors.New("附件值必须是文件ID或文件ID数组")
+		return nil, errors.New("attachment value must be a file ID or array of file IDs")
 	}
 }
 
-// RecordService 数据记录服务
+// RecordService manages record operations
 type RecordService struct {
 	db *gorm.DB
 }
 
-// NewRecordService 创建记录服务实例
+// NewRecordService creates a new RecordService instance
 func NewRecordService(db *gorm.DB) *RecordService {
 	return &RecordService{
 		db: db,
 	}
 }
 
-// CreateRecordRequest 创建记录请求
+// CreateRecordRequest is the request to create a record
 type CreateRecordRequest struct {
 	TableID string                 `json:"table_id" binding:"required"`
 	Data    map[string]interface{} `json:"data" binding:"required"`
 }
 
-// UpdateRecordRequest 更新记录请求
+// UpdateRecordRequest is the request to update a record
 type UpdateRecordRequest struct {
 	Data    map[string]interface{} `json:"data" binding:"required"`
-	Version int                    `json:"version"` // 乐观锁版本号
+	Version int                    `json:"version"` // optimistic lock version
 }
 
-// RecordResponse 记录响应
+// RecordResponse is the record API response
 type RecordResponse struct {
 	ID        string      `json:"id"`
 	TableID   string      `json:"table_id"`
@@ -103,33 +103,33 @@ type RecordResponse struct {
 	UpdatedAt string      `json:"updated_at"`
 }
 
-// QueryRequest 查询请求
+// QueryRequest is the query request
 type QueryRequest struct {
 	TableID string `form:"table_id" binding:"required"`
 	Limit   int    `form:"limit" binding:"min=1,max=100"`
 	Offset  int    `form:"offset" binding:"min=0"`
-	Filter  string `form:"filter"` // 支持 JSON 过滤或关键字搜索
+	Filter  string `form:"filter"` // Supports JSON filter or keyword search
 }
 
-// QueryResponse 查询响应
+// QueryResponse is the query response
 type QueryResponse struct {
 	Records []RecordResponse `json:"records"`
 	Total   int64            `json:"total"`
 	HasMore bool             `json:"has_more"`
 }
 
-// checkTableAccess 检查表是否存在
+// checkTableAccess verifies table exists and user has access
 func (s *RecordService) checkTableAccess(tableID, userID string, requiredRoles []string) error {
 	var table models.Table
 	err := s.db.Where("id = ? AND deleted_at IS NULL", tableID).First(&table).Error
 	if err != nil {
-		return errors.New("表不存在")
+		return errors.New("table not found")
 	}
 
 	var db models.Database
 	err = s.db.Where("id = ? AND deleted_at IS NULL", table.DatabaseID).First(&db).Error
 	if err != nil {
-		return errors.New("数据库不存在")
+		return errors.New("database not found")
 	}
 
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
@@ -138,42 +138,42 @@ func (s *RecordService) checkTableAccess(tableID, userID string, requiredRoles [
 	}
 	action := requiredActionForRoles(requiredRoles)
 	if !authorizer.CanAccessTable(tableID, action) {
-		return errors.New("无权访问该表")
+		return errors.New("permission denied: cannot access this table")
 	}
 
 	return nil
 }
 
-// validateRecordData 验证记录数据
+// validateRecordData validates record data against field definitions
 func (s *RecordService) validateRecordData(tableID string, data map[string]interface{}, currentRecordID, userID string) error {
-	// 获取表的所有字段定义（走缓存）
+	// Get all field definitions for the table (cached)
 	fields, err := s.getTableFields(tableID)
 	if err != nil {
-		return fmt.Errorf("获取字段定义失败: %w", err)
+		return fmt.Errorf("failed to get field definitions: %w", err)
 	}
 
-	// 验证每个字段
+	// Validate each field
 	for _, field := range fields {
-		// 支持通过字段ID或字段名查找数据
+		// Support lookup by field ID or field name
 		value, existsByID := data[field.ID]
 		valueByName, existsByName := data[field.Name]
 
-		// 如果通过ID和名称都找不到，但字段是必填的，则报错
+		// If not found by ID or name but field is required, report error
 		if field.Required && !existsByID && !existsByName {
-			return fmt.Errorf("字段 '%s' 是必填的", field.Name)
+			return fmt.Errorf("field '%s' is required", field.Name)
 		}
 
-		// 如果字段不存在，跳过验证
+		// If field not present, skip validation
 		if !existsByID && !existsByName {
 			continue
 		}
 
-		// 优先使用通过名称找到的值（如果存在）
+		// Prefer value found by name (if exists)
 		if existsByName {
 			value = valueByName
 		}
 
-		// 对于可选字段，如果值为空或nil，则跳过验证
+		// For optional fields, skip validation if value is empty or nil
 		if !field.Required && (value == nil || value == "") {
 			continue
 		}
@@ -182,14 +182,14 @@ func (s *RecordService) validateRecordData(tableID string, data map[string]inter
 
 		if isAttachmentFieldType(field.Type) {
 			if err := s.validateAttachmentFieldValue(field, config, value, currentRecordID, userID); err != nil {
-				return fmt.Errorf("字段 '%s' 验证失败: %w", field.Name, err)
+				return fmt.Errorf("field '%s' validation failed: %w", field.Name, err)
 			}
 			continue
 		}
 
-		// 根据字段类型验证数据
+		// Validate data based on field type
 		if err := s.validateFieldValueWithConfig(field, config, value); err != nil {
-			return fmt.Errorf("字段 '%s' 验证失败: %w", field.Name, err)
+			return fmt.Errorf("field '%s' validation failed: %w", field.Name, err)
 		}
 	}
 
@@ -203,13 +203,13 @@ func (s *RecordService) validateAttachmentFieldValue(field models.Field, config 
 	}
 
 	if !config.Multiple && len(fileIDs) > 1 {
-		return errors.New("该附件字段只允许上传单个文件")
+		return errors.New("this attachment field only allows a single file")
 	}
 
 	seen := make(map[string]struct{}, len(fileIDs))
 	for _, fileID := range fileIDs {
 		if _, exists := seen[fileID]; exists {
-			return fmt.Errorf("附件ID重复: %s", fileID)
+			return fmt.Errorf("duplicate attachment ID: %s", fileID)
 		}
 		seen[fileID] = struct{}{}
 
@@ -218,20 +218,20 @@ func (s *RecordService) validateAttachmentFieldValue(field models.Field, config 
 			return err
 		}
 		if file.FieldID != field.ID {
-			return errors.New("附件不属于当前字段")
+			return errors.New("attachment does not belong to this field")
 		}
 		if currentRecordID == "" {
 			if file.RecordID != "" {
-				return errors.New("创建记录时只能引用未绑定记录的附件")
+				return errors.New("can only reference unbound attachments when creating a record")
 			}
 		} else if file.RecordID != "" && file.RecordID != currentRecordID {
-			return errors.New("附件已绑定到其他记录")
+			return errors.New("attachment is already bound to another record")
 		}
 		if config.MaxFileSizeMB > 0 && file.FileSize > int64(config.MaxFileSizeMB)*1024*1024 {
-			return fmt.Errorf("附件大小超过字段限制（最大%dMB）", config.MaxFileSizeMB)
+			return fmt.Errorf("attachment exceeds field size limit (max %dMB)", config.MaxFileSizeMB)
 		}
 		if !fileMatchesAllowedTypes(file.FileName, file.FileType, config.AllowedTypes) {
-			return errors.New("附件类型不符合字段限制")
+			return errors.New("attachment type does not match field restrictions")
 		}
 	}
 
@@ -254,7 +254,7 @@ func (s *RecordService) syncAttachmentBindings(tx *gorm.DB, recordID string, fie
 
 		fileIDs, err := attachmentFieldIDsFromData(field, data)
 		if err != nil {
-			return fmt.Errorf("同步附件字段 %s 失败: %w", field.Name, err)
+			return fmt.Errorf("failed to sync attachments for field %s: %w", field.Name, err)
 		}
 
 		referenced := make(map[string]struct{}, len(fileIDs))
@@ -264,7 +264,7 @@ func (s *RecordService) syncAttachmentBindings(tx *gorm.DB, recordID string, fie
 
 		var existingFiles []models.File
 		if err := tx.Where("record_id = ? AND field_id = ?", recordID, field.ID).Find(&existingFiles).Error; err != nil {
-			return fmt.Errorf("查询附件绑定失败: %w", err)
+			return fmt.Errorf("failed to query attachment bindings: %w", err)
 		}
 
 		for _, existingFile := range existingFiles {
@@ -272,7 +272,7 @@ func (s *RecordService) syncAttachmentBindings(tx *gorm.DB, recordID string, fie
 				continue
 			}
 			if err := tx.Model(&models.File{}).Where("id = ?", existingFile.ID).Update("record_id", "").Error; err != nil {
-				return fmt.Errorf("解除附件绑定失败: %w", err)
+				return fmt.Errorf("failed to unbind attachment: %w", err)
 			}
 		}
 
@@ -286,20 +286,20 @@ func (s *RecordService) syncAttachmentBindings(tx *gorm.DB, recordID string, fie
 				"record_id": recordID,
 				"field_id":  field.ID,
 			}).Error; err != nil {
-			return fmt.Errorf("绑定附件失败: %w", err)
+			return fmt.Errorf("failed to bind attachment: %w", err)
 		}
 	}
 
 	return nil
 }
 
-// validateFieldValue 验证字段值（兼容 wrapper，内部会重新解析配置）
+// validateFieldValue validates a field value (compatibility wrapper, re-parses config internally)
 func (s *RecordService) validateFieldValue(field models.Field, value interface{}) error {
 	config := parseStoredFieldConfig(field.Options)
 	return s.validateFieldValueWithConfig(field, config, value)
 }
 
-// validateFieldValueWithConfig 使用预解析配置验证字段值，避免重复 Unmarshal
+// validateFieldValueWithConfig validates a field value with pre-parsed config, avoiding repeated Unmarshal
 func (s *RecordService) validateFieldValueWithConfig(field models.Field, config FieldConfig, value interface{}) error {
 	// Handle nil values - these should be handled by the caller, but we'll be defensive
 	if value == nil {
@@ -309,27 +309,27 @@ func (s *RecordService) validateFieldValueWithConfig(field models.Field, config 
 	switch normalizeFieldType(field.Type) {
 	case "string", "text":
 		if _, ok := value.(string); !ok {
-			return errors.New("期望字符串类型")
+			return errors.New("expected string type")
 		}
 
 		strValue := value.(string)
 
-		// 如果是空字符串，跳过后续验证（长度和正则）
+		// Skip further validation for empty strings (length and regex)
 		if strValue == "" {
 			return nil
 		}
 
-		// 使用预解析配置
+		// Use pre-parsed config
 		if config.MaxLength != nil && len(strValue) > *config.MaxLength {
-			return fmt.Errorf("长度不能超过 %d 个字符", *config.MaxLength)
+			return fmt.Errorf("length must not exceed %d characters", *config.MaxLength)
 		}
 		if config.Validation != "" {
 			matched, err := regexp.MatchString(config.Validation, strValue)
 			if err != nil {
-				return fmt.Errorf("正则表达式无效: %w", err)
+				return fmt.Errorf("invalid regex: %w", err)
 			}
 			if !matched {
-				return fmt.Errorf("格式不匹配，要求: %s", config.Validation)
+				return fmt.Errorf("format mismatch, expected: %s", config.Validation)
 			}
 		}
 
@@ -338,18 +338,18 @@ func (s *RecordService) validateFieldValueWithConfig(field models.Field, config 
 		case float64, float32, int, int32, int64, json.Number:
 			// OK
 		default:
-			return errors.New("期望数字类型")
+			return errors.New("expected number type")
 		}
 
 	case "boolean":
 		if _, ok := value.(bool); !ok {
-			return errors.New("期望布尔类型")
+			return errors.New("expected boolean type")
 		}
 
 	case "date", "datetime":
 		strValue, ok := value.(string)
 		if !ok {
-			return errors.New("期望字符串类型（日期格式）")
+			return errors.New("expected string type (date format)")
 		}
 		var layouts []string
 		if field.Type == "date" {
@@ -365,7 +365,7 @@ func (s *RecordService) validateFieldValueWithConfig(field models.Field, config 
 			}
 		}
 		if !parsed {
-			return fmt.Errorf("无效的日期格式: %s", strValue)
+			return fmt.Errorf("invalid date format: %s", strValue)
 		}
 
 	case "list":
@@ -377,12 +377,12 @@ func (s *RecordService) validateFieldValueWithConfig(field models.Field, config 
 		if strValue, ok := value.(string); ok {
 			var dummy interface{}
 			if err := json.Unmarshal([]byte(strValue), &dummy); err != nil {
-				return fmt.Errorf("无效的 JSON 字符串: %w", err)
+				return fmt.Errorf("invalid JSON string: %w", err)
 			}
 			return nil
 		}
 		if _, err := json.Marshal(value); err != nil {
-			return fmt.Errorf("无效的 JSON 值: %w", err)
+			return fmt.Errorf("invalid JSON value: %w", err)
 		}
 		return nil
 	}
@@ -398,7 +398,7 @@ func (s *RecordService) getTableFields(tableID string) ([]models.Field, error) {
 	if err := s.db.Where("table_id = ? AND deleted_at IS NULL", tableID).
 		Order("created_at ASC").
 		Find(&fields).Error; err != nil {
-		return nil, fmt.Errorf("获取字段定义失败: %w", err)
+		return nil, fmt.Errorf("failed to get field definitions: %w", err)
 	}
 	SharedFieldCache.Set(tableID, fields)
 	return fields, nil
@@ -428,7 +428,7 @@ func (s *RecordService) normalizeRecordData(fields []models.Field, data map[stri
 	if len(matchedKeys) != len(data) {
 		for key := range data {
 			if _, ok := matchedKeys[key]; !ok {
-				return nil, fmt.Errorf("字段 '%s' 不存在", key)
+				return nil, fmt.Errorf("field '%s' does not exist", key)
 			}
 		}
 	}
@@ -469,7 +469,7 @@ func (s *RecordService) getFieldAccessMaps(fields []models.Field, userID string)
 func (s *RecordService) ensureWritableFields(data map[string]interface{}, writableFields map[string]models.Field) error {
 	for fieldName := range data {
 		if _, ok := writableFields[fieldName]; !ok {
-			return fmt.Errorf("字段 '%s' 无写入权限", fieldName)
+			return fmt.Errorf("write permission denied for field '%s'", fieldName)
 		}
 	}
 	return nil
@@ -504,12 +504,12 @@ func (s *RecordService) filterReadableData(fields []models.Field, readableFields
 func marshalRecordPayload(payload map[string]interface{}) (models.JSONField, error) {
 	dataJSON, err := json.MarshalString(payload)
 	if err != nil {
-		return "", fmt.Errorf("数据序列化失败: %w", err)
+		return "", fmt.Errorf("data serialization failed: %w", err)
 	}
 	return models.JSONField(dataJSON), nil
 }
 
-// recordFilterClause 是一个可复用的 WHERE 片段,既用于分页查询,也用于 COUNT。
+// recordFilterClause is a reusable WHERE fragment used for both paginated queries and COUNT.
 type recordFilterClause struct {
 	sql         string
 	args        []interface{}
@@ -617,7 +617,7 @@ func recordFieldIndexJSONText(value interface{}) (string, bool, error) {
 	}
 	encoded, err := json.MarshalString(value)
 	if err != nil {
-		return "", false, fmt.Errorf("字段索引序列化失败: %w", err)
+		return "", false, fmt.Errorf("field index serialization failed: %w", err)
 	}
 	if len(encoded) > maxRecordFieldIndexTextLength {
 		return "", false, nil
@@ -684,7 +684,7 @@ func (s *RecordService) syncRecordFieldIndexes(tx *gorm.DB, recordID, tableID st
 	if err := tx.Model(&models.RecordFieldIndex{}).
 		Where("record_id = ? AND deleted_at IS NULL", recordID).
 		Update("deleted_at", time.Now()).Error; err != nil {
-		return fmt.Errorf("清理记录字段索引失败: %w", err)
+		return fmt.Errorf("failed to clear record field indexes: %w", err)
 	}
 
 	rows, err := buildRecordFieldIndexRows(tableID, recordID, fields, data)
@@ -695,7 +695,7 @@ func (s *RecordService) syncRecordFieldIndexes(tx *gorm.DB, recordID, tableID st
 		return nil
 	}
 	if err := tx.Create(&rows).Error; err != nil {
-		return fmt.Errorf("写入记录字段索引失败: %w", err)
+		return fmt.Errorf("failed to write record field indexes: %w", err)
 	}
 	return nil
 }
@@ -853,8 +853,8 @@ func (s *RecordService) countRecords(tableID string, clauses []recordFilterClaus
 	return total, nil
 }
 
-// tryParseStructuredFilter 把 filter 字符串当作 JSON 对象解析。
-// 仅当返回 true 时调用方应走结构化下推路径;否则按关键字处理。
+// tryParseStructuredFilter parses the filter string as a JSON object.
+// Callers should use the structured push-down path only when it returns true; otherwise treat as keyword.
 func tryParseStructuredFilter(filter string) (map[string]interface{}, bool) {
 	filter = strings.TrimSpace(filter)
 	if filter == "" {
@@ -870,14 +870,14 @@ func tryParseStructuredFilter(filter string) (map[string]interface{}, bool) {
 	return structured, true
 }
 
-// buildStructuredFilterClauses 根据可见字段把 JSON 过滤条件翻译为可下推 SQL WHERE 片段。
+// buildStructuredFilterClauses translates JSON filter conditions into push-down SQL WHERE fragments based on visible fields.
 //
-// 返回:
+// Returns:
 //
-//	clauses          : 应用到 GORM 查询的 (sql, args);字段名通过参数化传给驱动,不直接拼入 SQL 串
-//	refsHiddenField  : 任一过滤键引用了隐藏/未知字段 → true,调用方应直接返回空结果(与 in-memory
-//	                  权限感知过滤的可观察行为对齐,避免通过 200 vs 400 做侧信道探测)
-//	err              : value 序列化失败等结构性错误,作为 4xx 抛给客户端
+//	clauses          : (sql, args) applied to GORM query; field names passed via parameterized placeholders, not interpolated into SQL
+//	refsHiddenField  : true if any filter key references a hidden/unknown field; caller should return empty results (aligned with
+//	                  in-memory permission-aware filtering, preventing side-channel detection of hidden field values via 200 vs 400)
+//	err              : structural errors such as value serialization failure, returned as 4xx to the client
 func (s *RecordService) buildStructuredFilterClauses(
 	fields []models.Field,
 	readableFields map[string]models.Field,
@@ -903,15 +903,15 @@ func (s *RecordService) buildStructuredFilterClausesForDB(
 
 		jsonValue, err := json.Marshal(value)
 		if err != nil {
-			return nil, false, fmt.Errorf("过滤值序列化失败: %w", err)
+			return nil, false, fmt.Errorf("filter value serialization failed: %w", err)
 		}
 
 		if dbType == "postgres" {
-			// PG: 构造 {"<field>":<value>} 字面量后整体作为 jsonb 参数传入,
-			// 字段名经过 json.Marshal 转义,既能安全表达 Unicode,也不与 SQL 占位符混。
+			// PG: Build {"<field>":<value>} literal and pass as jsonb parameter,
+			// field name is escaped via json.Marshal for safe Unicode and no conflict with SQL placeholders.
 			filterDoc, err := json.Marshal(map[string]interface{}{fieldName: value})
 			if err != nil {
-				return nil, false, fmt.Errorf("过滤条件序列化失败: %w", err)
+				return nil, false, fmt.Errorf("filter condition serialization failed: %w", err)
 			}
 			clauses = append(clauses, recordFilterClause{
 				sql:  "data @> ?",
@@ -921,7 +921,7 @@ func (s *RecordService) buildStructuredFilterClausesForDB(
 			// SQLite / MySQL: JSON_EXTRACT
 			var scalar interface{}
 			if err := json.Unmarshal(jsonValue, &scalar); err != nil {
-				return nil, false, fmt.Errorf("过滤值格式错误: %w", err)
+				return nil, false, fmt.Errorf("invalid filter value format: %w", err)
 			}
 			if dbType == "mysql" {
 				indexClause, ok, err := mysqlRecordFieldIndexClause(field, scalar)
@@ -996,7 +996,7 @@ func (s *RecordService) matchesRecordFilter(fields []models.Field, readableField
 
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
-		return false, fmt.Errorf("记录过滤失败: %w", err)
+		return false, fmt.Errorf("record filtering failed: %w", err)
 	}
 	return strings.Contains(strings.ToLower(string(payloadJSON)), strings.ToLower(filter)), nil
 }
@@ -1022,9 +1022,9 @@ func (s *RecordService) filterRecordsByReadablePayload(records []models.Record, 
 	return filtered, nil
 }
 
-// CreateRecord 创建记录
+// CreateRecord creates a new record
 func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*models.Record, error) {
-	// 1. 检查表访问权限（owner, admin, editor可以创建记录）
+	// 1. Check table access (owner, admin, editor can create records)
 	if err := s.checkTableAccess(req.TableID, userID, []string{"owner", "admin", "editor"}); err != nil {
 		return nil, err
 	}
@@ -1046,18 +1046,18 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 		return nil, err
 	}
 
-	// 2. 验证数据
+	// 2. Validate data
 	if err := s.validateRecordData(req.TableID, normalizedData, "", userID); err != nil {
 		return nil, err
 	}
 
-	// 3. 序列化数据
+	// 3. Serialize data
 	dataJSON, err := json.MarshalString(normalizedData)
 	if err != nil {
-		return nil, fmt.Errorf("数据序列化失败: %w", err)
+		return nil, fmt.Errorf("data serialization failed: %w", err)
 	}
 
-	// 4. 创建记录并绑定附件
+	// 4. Create record and bind attachments
 	record := models.Record{
 		TableID: req.TableID,
 		Data:    models.JSONField(dataJSON),
@@ -1066,7 +1066,7 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&record).Error; err != nil {
-			return fmt.Errorf("创建记录失败: %w", err)
+			return fmt.Errorf("failed to create record: %w", err)
 		}
 		if err := s.syncAttachmentBindings(tx, record.ID, fields, normalizedData); err != nil {
 			return err
@@ -1088,14 +1088,14 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 	return &record, nil
 }
 
-// maxKeywordScanRecords 为关键字回退路径在内存中检查的最大行数上限。
-// 超过该上限时拒绝查询并提示走 /query 接口,避免一次性把整张表加载到内存。
-// 声明为 var 以便测试中替换,生产代码不应改写。
+// maxKeywordScanRecords is the max row limit for in-memory keyword fallback scanning.
+// Exceeding this limit rejects the query and suggests using the /query endpoint to avoid loading the entire table into memory.
+// Declared as var for test replacement; production code should not modify.
 var maxKeywordScanRecords = 5000
 
-// ListRecords 获取记录列表（支持查询和分页）
+// ListRecords lists records with query and pagination support
 func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResponse, error) {
-	// 1. 检查表访问权限
+	// 1. Check table access
 	if err := s.checkTableAccess(req.TableID, userID, []string{"owner", "admin", "editor", "viewer"}); err != nil {
 		return nil, err
 	}
@@ -1109,7 +1109,7 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 		return nil, err
 	}
 
-	// 2. 设置默认值
+	// 2. Set defaults
 	if req.Limit == 0 {
 		req.Limit = 20
 	}
@@ -1120,41 +1120,41 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 
 	switch filter {
 	case "":
-		// 3a. 无过滤: SQL 分页 + COUNT
+		// 3a. No filter: SQL pagination + COUNT
 		records, err = s.findRecordPage(req, nil)
 		if err != nil {
-			return nil, fmt.Errorf("查询记录失败: %w", err)
+			return nil, fmt.Errorf("failed to query records: %w", err)
 		}
 		total, err = s.countRecords(req.TableID, nil)
 		if err != nil {
-			return nil, fmt.Errorf("统计记录失败: %w", err)
+			return nil, fmt.Errorf("failed to count records: %w", err)
 		}
 
 	default:
 		structured, isStructured := tryParseStructuredFilter(filter)
 		if isStructured {
-			// 3b. 结构化 JSON 过滤: 翻译为参数化 WHERE 子句,下推到 SQL,COUNT 同步下推
+			// 3b. Structured JSON filter: translate to parameterized WHERE, push down to SQL, COUNT in sync
 			clauses, refsHidden, err := s.buildStructuredFilterClauses(fields, readableFields, structured)
 			if err != nil {
 				return nil, err
 			}
 			if refsHidden {
-				// 引用隐藏/未知字段时直接返回空结果,
-				// 避免通过 200 vs 400 做侧信道探测隐藏字段值
+				// When referencing hidden/unknown fields, return empty results,
+				// preventing side-channel detection of hidden field values via 200 vs 400
 				return &QueryResponse{Records: []RecordResponse{}, Total: 0, HasMore: false}, nil
 			}
 
 			records, err = s.findRecordPage(req, clauses)
 			if err != nil {
-				return nil, fmt.Errorf("查询记录失败: %w", err)
+				return nil, fmt.Errorf("failed to query records: %w", err)
 			}
 			total, err = s.countRecords(req.TableID, clauses)
 			if err != nil {
-				return nil, fmt.Errorf("统计记录失败: %w", err)
+				return nil, fmt.Errorf("failed to count records: %w", err)
 			}
 		} else {
-			// 3c. 关键字回退: 先用 SQL LIKE 预筛(限上限+1 行用于检测溢出),
-			// 再做权限感知 in-memory 过滤,确保隐藏字段不能通过模糊匹配泄漏
+			// 3c. Keyword fallback: pre-filter with SQL LIKE (limit +1 for overflow detection),
+			// then do permission-aware in-memory filtering to prevent hidden field leakage via fuzzy matching
 			likePattern := "%" + filter + "%"
 			var likeSQL string
 			if s.db.Name() == "postgres" {
@@ -1166,10 +1166,10 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 				Order("created_at DESC").Limit(maxKeywordScanRecords + 1)
 			var narrowed []models.Record
 			if err := narrowQ.Find(&narrowed).Error; err != nil {
-				return nil, fmt.Errorf("查询记录失败: %w", err)
+				return nil, fmt.Errorf("failed to query records: %w", err)
 			}
 			if len(narrowed) > maxKeywordScanRecords {
-				return nil, fmt.Errorf("关键字过滤匹配过多记录(>%d),请使用更精确的过滤条件或 /query 接口", maxKeywordScanRecords)
+				return nil, fmt.Errorf("keyword filter matched too many records (>%d), use a more specific filter or the /query endpoint", maxKeywordScanRecords)
 			}
 			filtered, err := s.filterRecordsByReadablePayload(narrowed, fields, readableFields, filter)
 			if err != nil {
@@ -1188,7 +1188,7 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 		}
 	}
 
-	// 7. 转换为响应格式
+	// 7. Convert to response format
 	result := make([]RecordResponse, len(records))
 	for i, r := range records {
 		data := s.filterReadableData(fields, readableFields, parseRecordPayload(r.Data))
@@ -1229,7 +1229,7 @@ func stringifyExportValue(value interface{}) string {
 	}
 }
 
-// ExportRecords 导出记录数据
+// ExportRecords exports record data
 func (s *RecordService) ExportRecords(tableID, userID, format, filter string) ([]byte, string, string, error) {
 	if err := s.checkTableAccess(tableID, userID, []string{"owner", "admin", "editor", "viewer"}); err != nil {
 		return nil, "", "", err
@@ -1254,7 +1254,7 @@ func (s *RecordService) ExportRecords(tableID, userID, format, filter string) ([
 	query := s.db.Where("table_id = ? AND deleted_at IS NULL", tableID).Order("created_at DESC")
 	var records []models.Record
 	if err := query.Find(&records).Error; err != nil {
-		return nil, "", "", fmt.Errorf("读取记录失败: %w", err)
+		return nil, "", "", fmt.Errorf("failed to read records: %w", err)
 	}
 	records, err = s.filterRecordsByReadablePayload(records, fields, readableFields, filter)
 	if err != nil {
@@ -1280,7 +1280,7 @@ func (s *RecordService) ExportRecords(tableID, userID, format, filter string) ([
 
 		data, err := json.MarshalIndent(exportRows, "", "  ")
 		if err != nil {
-			return nil, "", "", fmt.Errorf("导出JSON失败: %w", err)
+			return nil, "", "", fmt.Errorf("failed to export JSON: %w", err)
 		}
 
 		filename := fmt.Sprintf("records_%s_%s.json", tableID, time.Now().Format("20060102150405"))
@@ -1296,7 +1296,7 @@ func (s *RecordService) ExportRecords(tableID, userID, format, filter string) ([
 		}
 		header = append(header, "version", "created_at", "updated_at")
 		if err := writer.Write(header); err != nil {
-			return nil, "", "", fmt.Errorf("写入CSV表头失败: %w", err)
+			return nil, "", "", fmt.Errorf("failed to write CSV header: %w", err)
 		}
 
 		for _, record := range records {
@@ -1315,33 +1315,33 @@ func (s *RecordService) ExportRecords(tableID, userID, format, filter string) ([
 			)
 
 			if err := writer.Write(row); err != nil {
-				return nil, "", "", fmt.Errorf("写入CSV数据失败: %w", err)
+				return nil, "", "", fmt.Errorf("failed to write CSV data: %w", err)
 			}
 		}
 
 		writer.Flush()
 		if err := writer.Error(); err != nil {
-			return nil, "", "", fmt.Errorf("生成CSV失败: %w", err)
+			return nil, "", "", fmt.Errorf("failed to generate CSV: %w", err)
 		}
 
 		filename := fmt.Sprintf("records_%s_%s.csv", tableID, time.Now().Format("20060102150405"))
 		return buf.Bytes(), "text/csv; charset=utf-8", filename, nil
 
 	default:
-		return nil, "", "", errors.New("不支持的导出格式，仅支持 csv/json")
+		return nil, "", "", errors.New("unsupported export format, only csv/json are supported")
 	}
 }
 
-// GetRecord 获取单个记录
+// GetRecord gets a single record
 func (s *RecordService) GetRecord(recordID, userID string) (*RecordResponse, error) {
-	// 1. 获取记录
+	// 1. Get record
 	var record models.Record
 	err := s.db.Where("id = ? AND deleted_at IS NULL", recordID).First(&record).Error
 	if err != nil {
-		return nil, fmt.Errorf("记录不存在: %w", err)
+		return nil, fmt.Errorf("record not found: %w", err)
 	}
 
-	// 2. 检查表访问权限
+	// 2. Check table access
 	if err := s.checkTableAccess(record.TableID, userID, []string{"owner", "admin", "editor", "viewer"}); err != nil {
 		return nil, err
 	}
@@ -1355,7 +1355,7 @@ func (s *RecordService) GetRecord(recordID, userID string) (*RecordResponse, err
 		return nil, err
 	}
 
-	// 3. 解析数据
+	// 3. Parse data
 	data := s.filterReadableData(fields, readableFields, parseRecordPayload(record.Data))
 
 	return &RecordResponse{
@@ -1368,23 +1368,23 @@ func (s *RecordService) GetRecord(recordID, userID string) (*RecordResponse, err
 	}, nil
 }
 
-// UpdateRecord 更新记录（乐观锁）
+// UpdateRecord updates a record (optimistic locking)
 func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, userID string) (*models.Record, error) {
-	// 1. 获取记录
+	// 1. Get record
 	var record models.Record
 	err := s.db.Where("id = ? AND deleted_at IS NULL", recordID).First(&record).Error
 	if err != nil {
-		return nil, fmt.Errorf("记录不存在: %w", err)
+		return nil, fmt.Errorf("record not found: %w", err)
 	}
 
-	// 2. 检查表访问权限
+	// 2. Check table access
 	if err := s.checkTableAccess(record.TableID, userID, []string{"owner", "admin", "editor"}); err != nil {
 		return nil, err
 	}
 
-	// 3. 乐观锁检查
+	// 3. Optimistic lock check
 	if req.Version > 0 && record.Version != req.Version {
-		return nil, fmt.Errorf("记录已被其他用户修改，当前版本：%d，请求版本：%d", record.Version, req.Version)
+		return nil, fmt.Errorf("record was modified by another user (current version: %d, requested version: %d)", record.Version, req.Version)
 	}
 
 	fields, err := s.getTableFields(record.TableID)
@@ -1409,18 +1409,18 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 		currentData[key] = value
 	}
 
-	// 4. 验证数据
+	// 4. Validate data
 	if err := s.validateRecordData(record.TableID, currentData, record.ID, userID); err != nil {
 		return nil, err
 	}
 
-	// 5. 序列化数据
+	// 5. Serialize data
 	dataJSON, err := json.MarshalString(currentData)
 	if err != nil {
-		return nil, fmt.Errorf("数据序列化失败: %w", err)
+		return nil, fmt.Errorf("data serialization failed: %w", err)
 	}
 
-	// 6. 原子更新，避免并发覆盖写
+	// 6. Atomic update to prevent concurrent overwrites
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
 		updateQuery := tx.Model(&models.Record{}).
 			Where("id = ? AND deleted_at IS NULL", recordID)
@@ -1433,10 +1433,10 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 			"version": gorm.Expr("version + 1"),
 		})
 		if updateResult.Error != nil {
-			return fmt.Errorf("更新记录失败: %w", updateResult.Error)
+			return fmt.Errorf("failed to update record: %w", updateResult.Error)
 		}
 		if updateResult.RowsAffected == 0 {
-			return errors.New("记录已被其他用户修改，请刷新后重试")
+			return errors.New("record was modified by another user, please refresh and retry")
 		}
 
 		if err := s.syncAttachmentBindings(tx, recordID, fields, currentData); err != nil {
@@ -1447,7 +1447,7 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 		}
 
 		if err := tx.Where("id = ?", recordID).First(&record).Error; err != nil {
-			return fmt.Errorf("读取更新后记录失败: %w", err)
+			return fmt.Errorf("failed to read updated record: %w", err)
 		}
 
 		return nil
@@ -1464,21 +1464,21 @@ func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, u
 	return &record, nil
 }
 
-// DeleteRecord 删除记录（软删除）
+// DeleteRecord soft-deletes a record
 func (s *RecordService) DeleteRecord(recordID, userID string) error {
-	// 1. 获取记录
+	// 1. Get record
 	var record models.Record
 	err := s.db.Where("id = ? AND deleted_at IS NULL", recordID).First(&record).Error
 	if err != nil {
-		return fmt.Errorf("记录不存在: %w", err)
+		return fmt.Errorf("record not found: %w", err)
 	}
 
-	// 2. 检查表访问权限
+	// 2. Check table access
 	if err := s.checkTableAccess(record.TableID, userID, []string{"owner", "admin", "editor"}); err != nil {
 		return err
 	}
 
-	// 3. 软删除记录
+	// 3. Soft-delete record
 	now := time.Now()
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
 		result := tx.Model(&models.Record{}).
@@ -1489,15 +1489,15 @@ func (s *RecordService) DeleteRecord(recordID, userID string) error {
 				"version":    gorm.Expr("version + 1"),
 			})
 		if result.Error != nil {
-			return fmt.Errorf("删除记录失败: %w", result.Error)
+			return fmt.Errorf("failed to delete record: %w", result.Error)
 		}
 		if result.RowsAffected == 0 {
-			return fmt.Errorf("记录不存在: %w", gorm.ErrRecordNotFound)
+			return fmt.Errorf("record not found: %w", gorm.ErrRecordNotFound)
 		}
 		if err := tx.Model(&models.RecordFieldIndex{}).
 			Where("record_id = ? AND deleted_at IS NULL", recordID).
 			Update("deleted_at", now).Error; err != nil {
-			return fmt.Errorf("删除记录字段索引失败: %w", err)
+			return fmt.Errorf("failed to delete record field indexes: %w", err)
 		}
 		return nil
 	}); err != nil {
@@ -1518,9 +1518,9 @@ func (s *RecordService) DeleteRecord(recordID, userID string) error {
 	return nil
 }
 
-// BatchCreateRecords 批量创建记录
+// BatchCreateRecords creates multiple records at once
 func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID string, count int) ([]*models.Record, error) {
-	// 1. 检查表访问权限
+	// 1. Check table access
 	if err := s.checkTableAccess(req.TableID, userID, []string{"owner", "admin", "editor"}); err != nil {
 		return nil, err
 	}
@@ -1551,24 +1551,24 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 			return nil, err
 		}
 		if len(fileIDs) > 0 {
-			return nil, errors.New("批量创建暂不支持 file 字段")
+			return nil, errors.New("batch creation does not support file fields")
 		}
 	}
 
-	// 2. 验证数据
+	// 2. Validate data
 	if err := s.validateRecordData(req.TableID, normalizedData, "", userID); err != nil {
 		return nil, err
 	}
 
-	// 3. 序列化数据
+	// 3. Serialize data
 	dataJSON, err := json.MarshalString(normalizedData)
 	if err != nil {
-		return nil, fmt.Errorf("数据序列化失败: %w", err)
+		return nil, fmt.Errorf("data serialization failed: %w", err)
 	}
 
 	const batchSize = 100
 
-	// 4. 单事务批量创建，保证原子性；分批仅为了控制单条 INSERT 大小
+	// 4. Batch-create in a single transaction for atomicity; batching controls per-INSERT size
 	records := make([]*models.Record, 0, count)
 	if err := s.db.Transaction(func(tx *gorm.DB) error {
 		for i := 0; i < count; i += batchSize {
@@ -1585,7 +1585,7 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 				})
 			}
 			if err := tx.Create(&batch).Error; err != nil {
-				return fmt.Errorf("批量创建失败: %w", err)
+				return fmt.Errorf("batch creation failed: %w", err)
 			}
 			indexRows := make([]models.RecordFieldIndex, 0, len(batch)*len(fields))
 			for j := range batch {
@@ -1598,7 +1598,7 @@ func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID strin
 			}
 			if len(indexRows) > 0 {
 				if err := tx.Create(&indexRows).Error; err != nil {
-					return fmt.Errorf("写入记录字段索引失败: %w", err)
+					return fmt.Errorf("failed to write record field indexes: %w", err)
 				}
 			}
 		}

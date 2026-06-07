@@ -17,26 +17,29 @@ import (
 func ensureDB() error {
 	cfg, err := config.Load()
 	if err != nil {
-		return fmt.Errorf("加载配置失败: %w", err)
+		return fmt.Errorf("failed to load config: %w", err)
 	}
 	if err := applog.InitLogger(cfg.Logger); err != nil {
-		return fmt.Errorf("初始化日志失败: %w", err)
+		return fmt.Errorf("failed to init logger: %w", err)
 	}
 	if err := retryOperation(func() error {
 		return appdb.InitDB(cfg.Database)
 	}, 3, time.Second); err != nil {
-		return fmt.Errorf("初始化数据库失败: %w", err)
+		return fmt.Errorf("failed to init database: %w", err)
 	}
 	if err := appdb.Migrate(); err != nil {
-		return fmt.Errorf("迁移失败: %w", err)
+		return fmt.Errorf("migration failed: %w", err)
 	}
 	return nil
 }
 
 func getMasterTokenID() (string, error) {
+	if tokenOverride != "" {
+		return tokenOverride, nil
+	}
 	masterToken := os.Getenv("MASTER_TOKEN")
 	if masterToken == "" {
-		return "", fmt.Errorf("请设置 MASTER_TOKEN 环境变量")
+		return "", fmt.Errorf("set MASTER_TOKEN env var or use --token flag")
 	}
 	return masterToken, nil
 }
@@ -52,13 +55,13 @@ func printJSON(v interface{}) error {
 
 var dbCmd = &cobra.Command{
 	Use:   "db",
-	Short: "数据库管理",
-	Long:  `管理 Cornerstone 数据库资源。支持 list、create、get、update、delete 子命令。`,
+	Short: "database management",
+	Long:  `Manage Cornerstone database resources. Supports list, create, get, update, delete subcommands.`,
 }
 
 var dbListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "列出所有数据库",
+	Short: "list all databases",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
 			return err
@@ -80,7 +83,7 @@ var dbListCmd = &cobra.Command{
 
 var dbCreateCmd = &cobra.Command{
 	Use:   "create [name]",
-	Short: "创建数据库",
+	Short: "create a database",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -107,7 +110,7 @@ var dbCreateCmd = &cobra.Command{
 
 var dbGetCmd = &cobra.Command{
 	Use:   "get [id]",
-	Short: "获取数据库详情",
+	Short: "get database details",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -130,7 +133,7 @@ var dbGetCmd = &cobra.Command{
 
 var dbUpdateCmd = &cobra.Command{
 	Use:   "update [id]",
-	Short: "更新数据库",
+	Short: "update a database",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -158,7 +161,7 @@ var dbUpdateCmd = &cobra.Command{
 
 var dbDeleteCmd = &cobra.Command{
 	Use:   "delete [id]",
-	Short: "删除数据库",
+	Short: "delete a database",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -174,7 +177,10 @@ var dbDeleteCmd = &cobra.Command{
 		if err := svc.DeleteDatabase(args[0], token); err != nil {
 			return err
 		}
-		fmt.Println("数据库已删除")
+		if jsonOutput {
+			return printJSON(map[string]interface{}{"id": args[0], "deleted": true})
+		}
+		fmt.Println("database deleted")
 		return nil
 	},
 }
@@ -187,7 +193,7 @@ func init() {
 	dbCmd.AddCommand(dbUpdateCmd)
 	dbCmd.AddCommand(dbDeleteCmd)
 
-	dbCreateCmd.Flags().StringP("description", "d", "", "数据库描述")
-	dbUpdateCmd.Flags().StringP("name", "n", "", "新名称")
-	dbUpdateCmd.Flags().StringP("description", "d", "", "新描述")
+	dbCreateCmd.Flags().StringP("description", "d", "", "database description")
+	dbUpdateCmd.Flags().StringP("name", "n", "", "new name")
+	dbUpdateCmd.Flags().StringP("description", "d", "", "new description")
 }

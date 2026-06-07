@@ -14,13 +14,13 @@ import (
 
 var migrationCmd = &cobra.Command{
 	Use:   "migration",
-	Short: "外部数据库迁移",
-	Long:  "将外部关系型数据库结构和数据迁移到 Cornerstone。",
+	Short: "external database migration",
+	Long:  "Migrate external relational database schema and data to Cornerstone.",
 }
 
 var migrationRunCmd = &cobra.Command{
 	Use:   "run",
-	Short: "执行迁移",
+	Short: "run migration",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, runnerOpts, err := loadMigrationConfigFromCommand(cmd)
 		if err != nil {
@@ -62,7 +62,7 @@ var migrationRunCmd = &cobra.Command{
 
 var migrationPreviewCmd = &cobra.Command{
 	Use:   "preview",
-	Short: "预览迁移计划",
+	Short: "preview migration plan",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		cfg, runnerOpts, err := loadMigrationConfigFromCommand(cmd)
 		if err != nil {
@@ -82,7 +82,7 @@ var migrationPreviewCmd = &cobra.Command{
 
 var migrationTemplateCmd = &cobra.Command{
 	Use:   "template",
-	Short: "输出配置模板",
+	Short: "output config template",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		output, _ := cmd.Flags().GetString("output")
 		if strings.TrimSpace(output) == "" {
@@ -95,12 +95,12 @@ var migrationTemplateCmd = &cobra.Command{
 
 var migrationConfigCmd = &cobra.Command{
 	Use:   "config",
-	Short: "管理迁移配置",
+	Short: "manage migration config",
 }
 
 var migrationConfigCreateCmd = &cobra.Command{
 	Use:   "create",
-	Short: "创建配置模板文件",
+	Short: "create config template file",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		output, _ := cmd.Flags().GetString("output")
 		if strings.TrimSpace(output) == "" {
@@ -112,11 +112,11 @@ var migrationConfigCreateCmd = &cobra.Command{
 
 var migrationConfigValidateCmd = &cobra.Command{
 	Use:   "validate",
-	Short: "校验配置文件",
+	Short: "validate config file",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		path, _ := cmd.Flags().GetString("config")
 		if strings.TrimSpace(path) == "" {
-			return fmt.Errorf("请通过 --config 指定配置文件")
+			return fmt.Errorf("please specify config file with --config")
 		}
 		cfg, err := mig.LoadConfig(path)
 		if err != nil {
@@ -134,7 +134,7 @@ var migrationConfigValidateCmd = &cobra.Command{
 
 var migrationConfigListCmd = &cobra.Command{
 	Use:   "list",
-	Short: "列出当前目录下的迁移配置文件",
+	Short: "list migration config files in current directory",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		matches := make([]string, 0)
 		for _, pattern := range []string{"migration*.yaml", "migration*.yml"} {
@@ -161,31 +161,31 @@ func init() {
 	registerMigrationFlags(migrationRunCmd)
 	registerMigrationFlags(migrationPreviewCmd)
 
-	migrationTemplateCmd.Flags().StringP("output", "o", "", "输出到指定文件")
-	migrationConfigCreateCmd.Flags().StringP("output", "o", "migration.yaml", "输出配置文件路径")
-	migrationConfigValidateCmd.Flags().StringP("config", "c", "", "迁移配置文件路径")
+	migrationTemplateCmd.Flags().StringP("output", "o", "", "output to specified file")
+	migrationConfigCreateCmd.Flags().StringP("output", "o", "migration.yaml", "output config file path")
+	migrationConfigValidateCmd.Flags().StringP("config", "c", "", "migration config file path")
 }
 
 func registerMigrationFlags(cmd *cobra.Command) {
-	cmd.Flags().StringP("config", "c", "", "迁移配置文件路径")
-	cmd.Flags().String("source-type", "", "源数据库类型：mysql|postgres|sqlite")
-	cmd.Flags().String("source-dsn", "", "源数据库连接 DSN")
-	cmd.Flags().String("target-db", "", "目标 Cornerstone Database 名称")
-	cmd.Flags().String("include-tables", "", "要迁移的表，逗号分隔")
-	cmd.Flags().String("exclude-tables", "", "要排除的表，逗号分隔")
-	cmd.Flags().Bool("with-data", true, "迁移数据")
-	cmd.Flags().Bool("skip-data", false, "仅迁移结构")
-	cmd.Flags().Int("batch-size", 500, "批量读取大小")
-	cmd.Flags().Bool("dry-run", false, "空跑模式，仅输出计划")
-	cmd.Flags().String("type-map-override", "", "自定义类型映射 JSON 文件")
-	cmd.Flags().String("resume", "", "从指定迁移任务 ID 恢复")
-	cmd.Flags().Bool("validate", true, "迁移后校验")
-	cmd.Flags().Bool("continue-on-error", false, "单表错误后继续其他表")
-	cmd.Flags().String("pagination-strategy", "", "分页策略：cursor|offset")
-	cmd.Flags().String("cursor-column", "", "指定游标列")
-	cmd.Flags().Int("checkpoint-interval", 100, "每处理 N 条记录持久化一次位点")
-	cmd.Flags().String("rollback-on-failure", "", "失败回滚策略：table|none")
-	cmd.Flags().Int("max-concurrent-tables", 1, "同时迁移的表数")
+	cmd.Flags().StringP("config", "c", "", "migration config file path")
+	cmd.Flags().String("source-type", "", "source database type: mysql|postgres|sqlite")
+	cmd.Flags().String("source-dsn", "", "source database connection DSN")
+	cmd.Flags().String("target-db", "", "target Cornerstone database name")
+	cmd.Flags().String("include-tables", "", "tables to migrate, comma-separated")
+	cmd.Flags().String("exclude-tables", "", "tables to exclude, comma-separated")
+	cmd.Flags().Bool("with-data", true, "migrate data")
+	cmd.Flags().Bool("skip-data", false, "schema only")
+	cmd.Flags().Int("batch-size", 500, "batch read size")
+	cmd.Flags().Bool("dry-run", false, "dry-run mode, output plan only")
+	cmd.Flags().String("type-map-override", "", "custom type mapping JSON file")
+	cmd.Flags().String("resume", "", "resume from migration task ID")
+	cmd.Flags().Bool("validate", true, "validate after migration")
+	cmd.Flags().Bool("continue-on-error", false, "continue with other tables on single table error")
+	cmd.Flags().String("pagination-strategy", "", "pagination strategy: cursor|offset")
+	cmd.Flags().String("cursor-column", "", "cursor column")
+	cmd.Flags().Int("checkpoint-interval", 100, "checkpoint every N records")
+	cmd.Flags().String("rollback-on-failure", "", "rollback strategy on failure: table|none")
+	cmd.Flags().Int("max-concurrent-tables", 1, "max concurrent tables")
 }
 
 func loadMigrationConfigFromCommand(cmd *cobra.Command) (mig.Config, mig.RunnerOptions, error) {
@@ -227,10 +227,10 @@ func loadMigrationConfigFromCommand(cmd *cobra.Command) (mig.Config, mig.RunnerO
 	overridePath, _ := cmd.Flags().GetString("type-map-override")
 
 	if strings.TrimSpace(sourceType) == "" || strings.TrimSpace(sourceDSN) == "" {
-		return mig.Config{}, runnerOpts, fmt.Errorf("未提供 --config 时，必须指定 --source-type 和 --source-dsn")
+		return mig.Config{}, runnerOpts, fmt.Errorf("--source-type and --source-dsn are required when --config is not provided")
 	}
 	if withData && skipData {
-		return mig.Config{}, runnerOpts, fmt.Errorf("--with-data 与 --skip-data 不能同时为 true")
+		return mig.Config{}, runnerOpts, fmt.Errorf("--with-data and --skip-data cannot both be true")
 	}
 
 	cfg.Source.Type = sourceType

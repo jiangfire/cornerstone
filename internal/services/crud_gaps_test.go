@@ -165,7 +165,7 @@ func TestUpdateField_InvalidName(t *testing.T) {
 		Type: "string",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "字段名称验证失败")
+	assert.Contains(t, err.Error(), "field name validation failed")
 }
 
 // ============================================================
@@ -183,7 +183,7 @@ func TestUpdateField_InvalidType(t *testing.T) {
 		Type: "notatype",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "字段类型验证失败")
+	assert.Contains(t, err.Error(), "field type validation failed")
 }
 
 // ============================================================
@@ -233,7 +233,7 @@ func TestUpdateTable_NoAccess(t *testing.T) {
 		Name: "new_name",
 	}, viewer.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "无权修改该表")
+	assert.Contains(t, err.Error(), "permission denied: cannot modify this table")
 }
 
 // ============================================================
@@ -277,7 +277,7 @@ func TestValidateAttachmentFieldValue_MultipleNotAllowed(t *testing.T) {
 		"user1",
 	)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "单个文件")
+	assert.Contains(t, err.Error(), "this attachment field only allows a single file")
 }
 
 // ============================================================
@@ -299,7 +299,7 @@ func TestValidateAttachmentFieldValue_DuplicateFileID(t *testing.T) {
 		"user1",
 	)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "附件ID重复")
+	assert.Contains(t, err.Error(), "duplicate attachment ID")
 }
 
 // ============================================================
@@ -343,7 +343,7 @@ func TestValidateAttachmentFieldValue_WrongField(t *testing.T) {
 		"user1",
 	)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "不属于当前字段")
+	assert.Contains(t, err.Error(), "attachment does not belong to this field")
 }
 
 // ============================================================
@@ -369,7 +369,7 @@ func TestValidateAttachmentFieldValue_BoundToOtherRecord(t *testing.T) {
 		"user1",
 	)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "已绑定到其他记录")
+	assert.Contains(t, err.Error(), "attachment is already bound to another record")
 }
 
 // ============================================================
@@ -487,7 +487,7 @@ func TestValidateFieldDescription_TooLong(t *testing.T) {
 func TestValidateFieldConfig_MaxFileSizeMB_Negative(t *testing.T) {
 	err := validateFieldConfig(FieldConfig{MaxFileSizeMB: -5})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "附件大小限制不能小于0")
+	assert.Contains(t, err.Error(), "max file size must not be negative")
 }
 
 func TestValidateFieldConfig_MaxFileSizeMB_Zero(t *testing.T) {
@@ -527,7 +527,7 @@ func TestValidateAttachmentFieldValue_FileSizeExceedsLimit(t *testing.T) {
 		"user1",
 	)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "超过字段限制")
+	assert.Contains(t, err.Error(), "attachment exceeds field size limit")
 }
 
 // ============================================================
@@ -557,7 +557,7 @@ func TestValidateAttachmentFieldValue_FileTypeNotAllowed(t *testing.T) {
 		"user1",
 	)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "类型不符合")
+	assert.Contains(t, err.Error(), "attachment type does not match field restrictions")
 }
 
 // ============================================================
@@ -583,7 +583,7 @@ func TestValidateAttachmentFieldValue_CreateWithBoundFile(t *testing.T) {
 		"user1",
 	)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "未绑定记录")
+	assert.Contains(t, err.Error(), "can only reference unbound attachments when creating a record")
 }
 
 // ============================================================

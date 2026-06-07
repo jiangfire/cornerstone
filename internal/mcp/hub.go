@@ -6,21 +6,21 @@ import (
 	"github.com/google/uuid"
 )
 
-// Notification 表示服务端主动推送的 JSON-RPC/MCP notification。
+// Notification represents a server-initiated JSON-RPC/MCP notification.
 type Notification struct {
 	JSONRPC string      `json:"jsonrpc"`
 	Method  string      `json:"method"`
 	Params  interface{} `json:"params,omitempty"`
 }
 
-// SSEMessage 表示单条 SSE 消息。
+// SSEMessage represents a single SSE message.
 type SSEMessage struct {
 	ID    string
 	Event string
 	Data  interface{}
 }
 
-// ReplayStatus 描述 Last-Event-ID 的重放结果。
+// ReplayStatus describes the replay result for Last-Event-ID.
 type ReplayStatus string
 
 const (
@@ -30,7 +30,7 @@ const (
 	ReplayMissed       ReplayStatus = "missed"
 )
 
-// Notifier 为需要下发 MCP 主动通知的组件提供抽象。
+// Notifier provides an abstraction for components that need to send MCP proactive notifications.
 type Notifier interface {
 	PublishToUser(userID, method string, params interface{}) int
 }
@@ -40,19 +40,19 @@ type userSSEState struct {
 	history []SSEMessage
 }
 
-// SSEHub 维护基于用户维度的 SSE 订阅者。
+// SSEHub maintains SSE subscribers on a per-user basis.
 type SSEHub struct {
 	mu           sync.RWMutex
 	users        map[string]*userSSEState
 	historyLimit int
 }
 
-// NewSSEHub 创建一个新的 SSEHub。
+// NewSSEHub creates a new SSEHub.
 func NewSSEHub() *SSEHub {
 	return NewSSEHubWithHistory(128)
 }
 
-// NewSSEHubWithHistory 创建带历史事件缓冲的 SSEHub。
+// NewSSEHubWithHistory creates an SSEHub with a history event buffer.
 func NewSSEHubWithHistory(historyLimit int) *SSEHub {
 	if historyLimit <= 0 {
 		historyLimit = 128
@@ -63,7 +63,7 @@ func NewSSEHubWithHistory(historyLimit int) *SSEHub {
 	}
 }
 
-// Register 为指定用户注册一个 SSE 订阅流，并按 Last-Event-ID 返回可重放事件。
+// Register registers an SSE subscription stream for the specified user and returns replayable events based on Last-Event-ID.
 func (h *SSEHub) Register(userID, lastEventID string) (string, <-chan SSEMessage, []SSEMessage, ReplayStatus, func()) {
 	streamID := uuid.NewString()
 	ch := make(chan SSEMessage, 8)
@@ -98,13 +98,13 @@ func (h *SSEHub) Register(userID, lastEventID string) (string, <-chan SSEMessage
 	return streamID, ch, replay, replayStatus, cleanup
 }
 
-// PublishToUser 向指定用户的所有 SSE 订阅流下发 notification。
+// PublishToUser dispatches a notification to all SSE subscription streams of the specified user.
 func (h *SSEHub) PublishToUser(userID, method string, params interface{}) int {
 	_, delivered := h.PublishNotificationToUser(userID, method, params)
 	return delivered
 }
 
-// PublishNotificationToUser 向指定用户发布 notification，并返回生成的 SSE 消息。
+// PublishNotificationToUser publishes a notification to the specified user and returns the generated SSE message.
 func (h *SSEHub) PublishNotificationToUser(userID, method string, params interface{}) (SSEMessage, int) {
 	message := SSEMessage{
 		ID:    uuid.NewString(),
@@ -131,7 +131,7 @@ func (h *SSEHub) PublishNotificationToUser(userID, method string, params interfa
 		case ch <- message:
 			delivered++
 		default:
-			// 慢消费者不阻塞主流程，直接丢弃该条通知。
+			// Slow consumers must not block the main flow; drop the notification.
 		}
 	}
 

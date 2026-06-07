@@ -30,7 +30,7 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	db := pkgdb.DB()
 	require.NoError(t, db.AutoMigrate(&models.Token{}, &models.Database{}, &models.Table{}, &models.Field{}, &models.Record{}, &models.RecordFieldIndex{}, &models.File{}))
 
-	// 清理函数：硬删除所有测试数据
+	// Cleanup function: hard-delete all test data
 	t.Cleanup(func() {
 		db.Unscoped().Where("1 = 1").Delete(&models.File{})
 		db.Unscoped().Where("1 = 1").Delete(&models.RecordFieldIndex{})

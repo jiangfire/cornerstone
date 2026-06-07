@@ -73,7 +73,7 @@ func TestCreateRecord_TableNotExist(t *testing.T) {
 		Data:    map[string]any{"name": "test"},
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "表不存在")
+	assert.Contains(t, err.Error(), "table not found")
 }
 
 func TestCreateRecord_UnknownField(t *testing.T) {
@@ -93,7 +93,7 @@ func TestCreateRecord_UnknownField(t *testing.T) {
 		Data:    map[string]any{"nonexistent_field": "value"},
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "不存在")
+	assert.Contains(t, err.Error(), "does not exist")
 }
 
 func TestCreateRecord_RequiredFieldMissing(t *testing.T) {
@@ -113,7 +113,7 @@ func TestCreateRecord_RequiredFieldMissing(t *testing.T) {
 		Data:    map[string]any{},
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "必填")
+	assert.Contains(t, err.Error(), "is required")
 }
 
 func TestCreateRecord_FieldByID(t *testing.T) {
@@ -223,7 +223,7 @@ func TestUpdateRecord_OptimisticLock(t *testing.T) {
 		Version: 999,
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "版本")
+	assert.Contains(t, err.Error(), "version")
 }
 
 func TestUpdateRecord_MergePartial(t *testing.T) {
@@ -493,7 +493,7 @@ func TestDeleteRecord_NotFound(t *testing.T) {
 
 	err := s.DeleteRecord("rec_nonexistent", "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "记录不存在")
+	assert.Contains(t, err.Error(), "record not found")
 }
 
 func TestExportRecords_CSV(t *testing.T) {
@@ -561,7 +561,7 @@ func TestExportRecords_UnsupportedFormat(t *testing.T) {
 
 	_, _, _, err := s.ExportRecords(tbl.ID, "user1", "xml", "")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "不支持的导出格式")
+	assert.Contains(t, err.Error(), "unsupported export format")
 }
 
 func TestExportRecords_WithFilter(t *testing.T) {
@@ -633,7 +633,7 @@ func TestBatchCreateRecords_TableNotExist(t *testing.T) {
 		Data:    map[string]any{"name": "x"},
 	}, "user1", 5)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "表不存在")
+	assert.Contains(t, err.Error(), "table not found")
 }
 
 func TestValidateFieldValue_BooleanType(t *testing.T) {
@@ -730,7 +730,7 @@ func TestNormalizeRecordData_UnknownKey(t *testing.T) {
 	fields := []models.Field{{Name: "a", Type: "string"}}
 	_, err := s.normalizeRecordData(fields, map[string]any{"b": "val"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "不存在")
+	assert.Contains(t, err.Error(), "does not exist")
 }
 
 func TestNormalizeRecordData_KnownKeys(t *testing.T) {
@@ -885,7 +885,7 @@ func TestListRecords_KeywordFilter_ExceedsLimit(t *testing.T) {
 		TableID: tbl.ID, Limit: 10, Filter: "test",
 	}, "user1")
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "关键字过滤匹配过多记录")
+	assert.Contains(t, err.Error(), "keyword filter matched too many records")
 }
 
 func marshalConfig(t *testing.T, config FieldConfig) string {
@@ -896,13 +896,13 @@ func marshalConfig(t *testing.T, config FieldConfig) string {
 }
 
 // ============================================================
-// 从 record_gaps_test.go 合并：附件解析边界
+// Merged from record_gaps_test.go: attachment parsing boundaries
 // ============================================================
 
 func TestParseAttachmentValue_InterfaceSliceNonString(t *testing.T) {
 	_, err := parseAttachmentValue([]interface{}{"ok", 123})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "附件值必须是文件ID")
+	assert.Contains(t, err.Error(), "attachment value must be a file ID")
 }
 
 func TestParseAttachmentValue_StringSliceEmptyTrimming(t *testing.T) {
@@ -930,7 +930,7 @@ func TestParseAttachmentValue_StringSliceAllEmpty(t *testing.T) {
 }
 
 // ============================================================
-// 从 record_gaps_test.go 合并：表访问权限检查
+// Merged from record_gaps_test.go: table access permission checks
 // ============================================================
 
 func TestCheckTableAccess_NonMasterTokenDenied(t *testing.T) {
@@ -949,7 +949,7 @@ func TestCheckTableAccess_NonMasterTokenDenied(t *testing.T) {
 
 	err := s.checkTableAccess(tbl.ID, viewer.ID, []string{"owner", "admin", "editor"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "无权访问该表")
+	assert.Contains(t, err.Error(), "permission denied: cannot access this table")
 }
 
 func TestCheckTableAccess_ViewerAllowedForRead(t *testing.T) {
@@ -989,11 +989,11 @@ func TestCheckTableAccess_DeletedDatabase(t *testing.T) {
 
 	err := s.checkTableAccess(tbl.ID, "user1", []string{"owner", "admin"})
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "数据库不存在")
+	assert.Contains(t, err.Error(), "database not found")
 }
 
 // ============================================================
-// 从 record_gaps_test.go 合并：创建记录权限与附件边界
+// Merged from record_gaps_test.go: create record permission and attachment boundaries
 // ============================================================
 
 func TestCreateRecord_NonMasterDeniedWritePermission(t *testing.T) {
@@ -1015,7 +1015,7 @@ func TestCreateRecord_NonMasterDeniedWritePermission(t *testing.T) {
 		Data:    map[string]interface{}{"name": "test"},
 	}, viewer.ID)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "无权访问该表")
+	assert.Contains(t, err.Error(), "permission denied: cannot access this table")
 }
 
 func TestCreateRecord_AttachmentFieldWithInvalidValue(t *testing.T) {
@@ -1066,7 +1066,7 @@ func TestCreateRecord_AttachmentFieldEmptyOK(t *testing.T) {
 }
 
 // ============================================================
-// 从 record_gaps_test.go 合并：更新记录边界
+// Merged from record_gaps_test.go: update record boundaries
 // ============================================================
 
 func TestUpdateRecord_OptimisticLockSuccess(t *testing.T) {
@@ -1129,11 +1129,11 @@ func TestUpdateRecord_NonWritableField(t *testing.T) {
 		Data: map[string]interface{}{"name": "hacked"},
 	}, viewer.ID)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "无权访问该表")
+	assert.Contains(t, err.Error(), "permission denied: cannot access this table")
 }
 
 // ============================================================
-// 从 record_gaps_test.go 合并：列表查询边界
+// Merged from record_gaps_test.go: list query boundaries
 // ============================================================
 
 func TestListRecords_KeywordFilterOffsetBeyondResults(t *testing.T) {
@@ -1170,7 +1170,7 @@ func TestListRecords_KeywordFilterOffsetBeyondResults(t *testing.T) {
 }
 
 // ============================================================
-// 从 record_gaps_test.go 合并：删除记录权限
+// Merged from record_gaps_test.go: delete record permissions
 // ============================================================
 
 func TestDeleteRecord_PermissionDenied(t *testing.T) {
@@ -1196,11 +1196,11 @@ func TestDeleteRecord_PermissionDenied(t *testing.T) {
 
 	err := s.DeleteRecord(record.ID, viewer.ID)
 	require.Error(t, err)
-	assert.Contains(t, err.Error(), "无权访问该表")
+	assert.Contains(t, err.Error(), "permission denied: cannot access this table")
 }
 
 // ============================================================
-// 从 record_gaps_test.go 合并：导出空记录边界
+// Merged from record_gaps_test.go: export empty record boundaries
 // ============================================================
 
 func TestExportRecords_NoRecords(t *testing.T) {

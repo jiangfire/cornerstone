@@ -11,13 +11,13 @@ import (
 
 var fieldCmd = &cobra.Command{
 	Use:   "field",
-	Short: "字段管理",
-	Long:  `管理 Cornerstone 字段资源。支持 list、create、get、update、delete 子命令。`,
+	Short: "field management",
+	Long:  `Manage Cornerstone field resources. Supports list, create, get, update, delete subcommands.`,
 }
 
 var fieldListCmd = &cobra.Command{
 	Use:   "list [table-id]",
-	Short: "列出表下的所有字段",
+	Short: "list all fields in a table",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -40,8 +40,8 @@ var fieldListCmd = &cobra.Command{
 
 var fieldCreateCmd = &cobra.Command{
 	Use:   "create [table-id] [name] [type]",
-	Short: "在表中创建字段",
-	Long: `在表中创建字段。支持的字段类型：
+	Short: "create a field in a table",
+	Long: `Create a field in a table. Supported types:
   string, text, number, boolean, date, datetime, file, json, list`,
 	Args: cobra.ExactArgs(3),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -75,7 +75,7 @@ var fieldCreateCmd = &cobra.Command{
 
 var fieldGetCmd = &cobra.Command{
 	Use:   "get [id]",
-	Short: "获取字段详情",
+	Short: "get field details",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -98,7 +98,7 @@ var fieldGetCmd = &cobra.Command{
 
 var fieldUpdateCmd = &cobra.Command{
 	Use:   "update [id]",
-	Short: "更新字段",
+	Short: "update a field",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -132,7 +132,7 @@ var fieldUpdateCmd = &cobra.Command{
 
 var fieldDeleteCmd = &cobra.Command{
 	Use:   "delete [id]",
-	Short: "删除字段",
+	Short: "delete a field",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if err := ensureDB(); err != nil {
@@ -148,7 +148,10 @@ var fieldDeleteCmd = &cobra.Command{
 		if err := svc.DeleteField(args[0], token); err != nil {
 			return err
 		}
-		fmt.Println("字段已删除")
+		if jsonOutput {
+			return printJSON(map[string]interface{}{"id": args[0], "deleted": true})
+		}
+		fmt.Println("field deleted")
 		return nil
 	},
 }
@@ -161,13 +164,13 @@ func init() {
 	fieldCmd.AddCommand(fieldUpdateCmd)
 	fieldCmd.AddCommand(fieldDeleteCmd)
 
-	fieldCreateCmd.Flags().StringP("description", "d", "", "字段描述")
-	fieldCreateCmd.Flags().BoolP("required", "r", false, "是否必填")
-	fieldCreateCmd.Flags().StringP("options", "o", "", "选项（逗号分隔）")
+	fieldCreateCmd.Flags().StringP("description", "d", "", "field description")
+	fieldCreateCmd.Flags().BoolP("required", "r", false, "mark field as required")
+	fieldCreateCmd.Flags().StringP("options", "o", "", "options (comma-separated)")
 
-	fieldUpdateCmd.Flags().StringP("name", "n", "", "新名称")
-	fieldUpdateCmd.Flags().StringP("type", "t", "", "新类型")
-	fieldUpdateCmd.Flags().StringP("description", "d", "", "新描述")
-	fieldUpdateCmd.Flags().BoolP("required", "r", false, "是否必填")
-	fieldUpdateCmd.Flags().StringP("options", "o", "", "选项（逗号分隔）")
+	fieldUpdateCmd.Flags().StringP("name", "n", "", "new name")
+	fieldUpdateCmd.Flags().StringP("type", "t", "", "new type")
+	fieldUpdateCmd.Flags().StringP("description", "d", "", "new description")
+	fieldUpdateCmd.Flags().BoolP("required", "r", false, "mark field as required")
+	fieldUpdateCmd.Flags().StringP("options", "o", "", "options (comma-separated)")
 }

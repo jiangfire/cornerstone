@@ -64,14 +64,14 @@ func (s *TableService) getActiveTable(tableID string) (*models.Table, error) {
 func validateTableName(name string) error {
 	name = strings.TrimSpace(name)
 	if len(name) < 2 || len(name) > 255 {
-		return errors.New("表名称长度必须在2-255个字符之间")
+		return errors.New("table name must be between 2 and 255 characters")
 	}
 	matched, _ := regexp.MatchString(`^[\p{L}\p{N}_]+$`, name)
 	if !matched {
-		return errors.New("表名称只能包含字母、数字和下划线")
+		return errors.New("table name can only contain letters, numbers and underscores")
 	}
 	if matched, _ := regexp.MatchString(`^[0-9]`, name); matched {
-		return errors.New("表名称不能以数字开头")
+		return errors.New("table name must not start with a digit")
 	}
 	return nil
 }
@@ -96,28 +96,28 @@ func (s *TableService) CreateTable(req CreateTableRequest, userID string) (*mode
 		return nil, err
 	}
 	if !authorizer.CanAccessDatabase(req.DatabaseID, authz.ActionManage) {
-		return nil, errors.New("无权在该数据库中创建表")
+		return nil, errors.New("permission denied: cannot create tables in this database")
 	}
 
 	req.Name, req.Description = sanitizeTableInput(req.Name, req.Description)
 
 	if err := validateTableName(req.Name); err != nil {
-		return nil, fmt.Errorf("表名称验证失败: %w", err)
+		return nil, fmt.Errorf("table name validation failed: %w", err)
 	}
 
 	var existingDB models.Database
 	err = s.db.Where("id = ? AND deleted_at IS NULL", req.DatabaseID).First(&existingDB).Error
 	if err != nil {
-		return nil, errors.New("数据库不存在")
+		return nil, errors.New("database not found")
 	}
 
 	var existingTable models.Table
 	err = s.db.Where("database_id = ? AND name = ? AND deleted_at IS NULL", req.DatabaseID, req.Name).First(&existingTable).Error
 	if err == nil {
-		return nil, errors.New("该数据库中已存在同名表")
+		return nil, errors.New("a table with this name already exists in the database")
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("数据库查询失败: %w", err)
+		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 
 	table := models.Table{
@@ -127,7 +127,7 @@ func (s *TableService) CreateTable(req CreateTableRequest, userID string) (*mode
 	}
 
 	if err := s.db.Create(&table).Error; err != nil {
-		return nil, fmt.Errorf("创建表失败: %w", err)
+		return nil, fmt.Errorf("failed to create table: %w", err)
 	}
 
 	return &table, nil
@@ -139,13 +139,13 @@ func (s *TableService) ListTables(dbID, userID string) ([]TableResponse, error) 
 		return nil, err
 	}
 	if !authorizer.CanAccessDatabase(dbID, authz.ActionRead) {
-		return nil, errors.New("无权访问该数据库的表")
+		return nil, errors.New("permission denied: cannot access tables in this database")
 	}
 
 	var tables []models.Table
 	err = s.db.Where("database_id = ? AND deleted_at IS NULL", dbID).Order("created_at ASC").Find(&tables).Error
 	if err != nil {
-		return nil, fmt.Errorf("数据库查询失败: %w", err)
+		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 
 	result := make([]TableResponse, len(tables))
@@ -169,12 +169,12 @@ func (s *TableService) GetTable(tableID, userID string) (*TableResponse, error) 
 		return nil, err
 	}
 	if !authorizer.CanAccessTable(tableID, authz.ActionRead) {
-		return nil, errors.New("无权访问该表")
+		return nil, errors.New("permission denied: cannot access this table")
 	}
 
 	table, err := s.getActiveTable(tableID)
 	if err != nil {
-		return nil, fmt.Errorf("表不存在: %w", err)
+		return nil, fmt.Errorf("table not found: %w", err)
 	}
 
 	return &TableResponse{
@@ -193,34 +193,34 @@ func (s *TableService) UpdateTable(tableID string, req UpdateTableRequest, userI
 		return nil, err
 	}
 	if !authorizer.CanAccessTable(tableID, authz.ActionManage) {
-		return nil, errors.New("无权修改该表")
+		return nil, errors.New("permission denied: cannot modify this table")
 	}
 
 	table, err := s.getActiveTable(tableID)
 	if err != nil {
-		return nil, fmt.Errorf("表不存在: %w", err)
+		return nil, fmt.Errorf("table not found: %w", err)
 	}
 
 	req.Name, req.Description = sanitizeTableInput(req.Name, req.Description)
 
 	if err := validateTableName(req.Name); err != nil {
-		return nil, fmt.Errorf("表名称验证失败: %w", err)
+		return nil, fmt.Errorf("table name validation failed: %w", err)
 	}
 
 	var existingTable models.Table
 	err = s.db.Where("database_id = ? AND name = ? AND id != ? AND deleted_at IS NULL", table.DatabaseID, req.Name, tableID).First(&existingTable).Error
 	if err == nil {
-		return nil, errors.New("该数据库中已存在同名表")
+		return nil, errors.New("a table with this name already exists in the database")
 	}
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, fmt.Errorf("数据库查询失败: %w", err)
+		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 
 	table.Name = req.Name
 	table.Description = req.Description
 
 	if err := s.db.Save(table).Error; err != nil {
-		return nil, fmt.Errorf("更新表失败: %w", err)
+		return nil, fmt.Errorf("failed to update table: %w", err)
 	}
 
 	return table, nil
@@ -232,12 +232,12 @@ func (s *TableService) DeleteTable(tableID, userID string) error {
 		return err
 	}
 	if !authorizer.CanAccessTable(tableID, authz.ActionManage) {
-		return errors.New("无权删除该表")
+		return errors.New("permission denied: cannot delete this table")
 	}
 
 	table, err := s.getActiveTable(tableID)
 	if err != nil {
-		return fmt.Errorf("表不存在: %w", err)
+		return fmt.Errorf("table not found: %w", err)
 	}
 
 	now := time.Now()
@@ -249,10 +249,10 @@ func (s *TableService) DeleteTable(tableID, userID string) error {
 			"updated_at": now,
 		})
 	if result.Error != nil {
-		return fmt.Errorf("删除表失败: %w", result.Error)
+		return fmt.Errorf("failed to delete table: %w", result.Error)
 	}
 	if result.RowsAffected == 0 {
-		return fmt.Errorf("表不存在: %w", gorm.ErrRecordNotFound)
+		return fmt.Errorf("table not found: %w", gorm.ErrRecordNotFound)
 	}
 
 	return nil

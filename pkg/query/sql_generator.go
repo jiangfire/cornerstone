@@ -5,13 +5,13 @@ import (
 	"strings"
 )
 
-// SQLGenerator SQL 生成器
+// SQLGenerator generates SQL queries.
 type SQLGenerator struct {
 	dbType  string // "sqlite", "postgres", "mysql"
 	maxRows int64
 }
 
-// NewSQLGenerator 创建 SQL 生成器（兼容旧接口，接收 isSQLite bool）
+// NewSQLGenerator creates a SQL generator (legacy compat, takes isSQLite bool).
 func NewSQLGenerator(isSQLite bool) *SQLGenerator {
 	dbType := "postgres"
 	if isSQLite {
@@ -20,12 +20,12 @@ func NewSQLGenerator(isSQLite bool) *SQLGenerator {
 	return &SQLGenerator{dbType: dbType, maxRows: DefaultLimits.MaxRows}
 }
 
-// NewSQLGeneratorWithDBType 创建带数据库类型的 SQL 生成器
+// NewSQLGeneratorWithDBType creates a SQL generator with the given DB type.
 func NewSQLGeneratorWithDBType(dbType string) *SQLGenerator {
 	return &SQLGenerator{dbType: dbType, maxRows: DefaultLimits.MaxRows}
 }
 
-// NewSQLGeneratorWithConfig 创建带自定义 maxRows 的 SQL 生成器（兼容旧接口）
+// NewSQLGeneratorWithConfig creates a SQL generator with a custom maxRows (legacy compat).
 func NewSQLGeneratorWithConfig(isSQLite bool, maxRows int64) *SQLGenerator {
 	dbType := "postgres"
 	if isSQLite {
@@ -34,13 +34,13 @@ func NewSQLGeneratorWithConfig(isSQLite bool, maxRows int64) *SQLGenerator {
 	return &SQLGenerator{dbType: dbType, maxRows: maxRows}
 }
 
-// Generate 生成 SQL 查询
+// Generate generates the SQL query.
 func (g *SQLGenerator) Generate(req *QueryRequest) (*SQLQuery, error) {
 	if req == nil {
-		return nil, fmt.Errorf("查询请求不能为空")
+		return nil, fmt.Errorf("query request cannot be nil")
 	}
 
-	// 1. 生成主查询
+	// 1. Generate main query
 	mainQuery, err := g.generateSingleQuery(req)
 	if err != nil {
 		return nil, err
@@ -98,58 +98,58 @@ func (g *SQLGenerator) combineQueries(req *QueryRequest, mainQuery *SQLQuery) (*
 	return &SQLQuery{SQL: finalSQL, Params: allParams}, nil
 }
 
-// generateSingleQuery 生成单个查询（不包含 UNION）
+// generateSingleQuery generates a single query (without UNION).
 func (g *SQLGenerator) generateSingleQuery(req *QueryRequest) (*SQLQuery, error) {
 	query := &SQLQuery{
 		Params: make([]interface{}, 0),
 	}
 
-	// 1. 生成 SELECT 子句
+	// 1. Generate SELECT clause
 	selectClause, err := g.generateSelect(req)
 	if err != nil {
 		return nil, err
 	}
 
-	// 2. 生成 FROM 子句
+	// 2. Generate FROM clause
 	fromClause := g.generateFrom(req)
 
-	// 3. 生成 JOIN 子句
+	// 3. Generate JOIN clause
 	joinClause, err := g.generateJoins(req)
 	if err != nil {
 		return nil, err
 	}
 
-	// 4. 生成 WHERE 子句
+	// 4. Generate WHERE clause
 	whereClause, whereParams, err := g.generateWhere(req.Where)
 	if err != nil {
 		return nil, err
 	}
 	query.Params = append(query.Params, whereParams...)
 
-	// 5. 生成 GROUP BY 子句
+	// 5. Generate GROUP BY clause
 	groupByClause, err := g.generateGroupBy(req)
 	if err != nil {
 		return nil, err
 	}
 
-	// 6. 生成 HAVING 子句
+	// 6. Generate HAVING clause
 	havingClause, havingParams, err := g.generateWhere(req.Having)
 	if err != nil {
 		return nil, err
 	}
 	query.Params = append(query.Params, havingParams...)
 
-	// 7. 生成 ORDER BY 子句
+	// 7. Generate ORDER BY clause
 	orderByClause, err := g.generateOrderBy(req)
 	if err != nil {
 		return nil, err
 	}
 
-	// 8. 生成分页子句
+	// 8. Generate pagination clause
 	limitClause, limitParams := g.generateLimit(req)
 	query.Params = append(query.Params, limitParams...)
 
-	// 组装 SQL
+	// Assemble SQL
 	sql := selectClause + fromClause + joinClause
 	if whereClause != "" {
 		sql += " WHERE " + whereClause
@@ -169,10 +169,10 @@ func (g *SQLGenerator) generateSingleQuery(req *QueryRequest) (*SQLQuery, error)
 	return query, nil
 }
 
-// GenerateCount 生成 COUNT 查询
+// GenerateCount generates a COUNT query.
 func (g *SQLGenerator) GenerateCount(req *QueryRequest) (*SQLQuery, error) {
 	if req == nil {
-		return nil, fmt.Errorf("查询请求不能为空")
+		return nil, fmt.Errorf("query request cannot be nil")
 	}
 
 	if g.canUseDirectCount(req) {
@@ -233,15 +233,15 @@ func (g *SQLGenerator) generateDirectCount(req *QueryRequest) (*SQLQuery, error)
 	return query, nil
 }
 
-// generateSelect 生成 SELECT 子句
+// generateSelect generates the SELECT clause.
 func (g *SQLGenerator) generateSelect(req *QueryRequest) (string, error) {
 	var fields []string
 
-	// 处理聚合查询
+	// Handle aggregate queries
 	if len(req.Aggregate) > 0 {
 		fields = make([]string, 0, len(req.Select)+len(req.Aggregate))
 
-		// 添加普通字段
+		// Add regular fields
 		for _, f := range req.Select {
 			expr, err := g.generateFieldExpression(f)
 			if err != nil {
@@ -250,7 +250,7 @@ func (g *SQLGenerator) generateSelect(req *QueryRequest) (string, error) {
 			fields = append(fields, expr)
 		}
 
-		// 添加聚合函数
+		// Add aggregate functions
 		for _, agg := range req.Aggregate {
 			aggSQL, err := g.generateAggregate(agg)
 			if err != nil {
@@ -276,7 +276,7 @@ func (g *SQLGenerator) generateSelect(req *QueryRequest) (string, error) {
 	return "SELECT " + strings.Join(fields, ", "), nil
 }
 
-// generateAggregate 生成聚合函数 SQL
+// generateAggregate generates aggregate function SQL.
 func (g *SQLGenerator) generateAggregate(agg AggregateFunc) (string, error) {
 	funcName := strings.ToUpper(agg.Func)
 	field := agg.Field
@@ -285,11 +285,11 @@ func (g *SQLGenerator) generateAggregate(agg AggregateFunc) (string, error) {
 		return "", fmt.Errorf("aggregate.as %w", err)
 	}
 
-	// 处理特殊聚合函数
+	// Handle special aggregate functions
 	switch funcName {
 	case "COUNT_DISTINCT":
 		if field == "" || field == "*" {
-			return "", fmt.Errorf("count_distinct 需要指定字段")
+			return "", fmt.Errorf("count_distinct requires a field")
 		}
 		fieldExpr, err := g.generateFieldExpression(field)
 		if err != nil {
@@ -299,18 +299,18 @@ func (g *SQLGenerator) generateAggregate(agg AggregateFunc) (string, error) {
 
 	case "STDDEV", "STDDEV_POP", "STDDEV_SAMP":
 		if field == "" || field == "*" {
-			return "", fmt.Errorf("%s 需要指定数值字段", funcName)
+			return "", fmt.Errorf("%s requires a numeric field", funcName)
 		}
 		fieldExpr, err := g.generateFieldExpression(field)
 		if err != nil {
 			return "", fmt.Errorf("aggregate.field %w", err)
 		}
 		if g.dbType == "sqlite" {
-			// SQLite 没有原生 STDDEV，用公式计算
+			// SQLite lacks native STDDEV; compute via formula
 			// stddev = sqrt(avg(x^2) - avg(x)^2)
 			return fmt.Sprintf("SQRT(AVG(%s * %s) - AVG(%s) * AVG(%s)) AS %s", fieldExpr, fieldExpr, fieldExpr, fieldExpr, g.quoteIdentifier(agg.As)), nil
 		}
-		// MySQL 8.0+ 不支持 STDDEV（Oracle 兼容别名），映射为 STDDEV_SAMP
+		// MySQL 8.0+ does not support STDDEV (Oracle compat alias); map to STDDEV_SAMP
 		mysqlFunc := funcName
 		if g.dbType == "mysql" && funcName == "STDDEV" {
 			mysqlFunc = "STDDEV_SAMP"
@@ -319,18 +319,18 @@ func (g *SQLGenerator) generateAggregate(agg AggregateFunc) (string, error) {
 
 	case "VARIANCE", "VAR_POP", "VAR_SAMP":
 		if field == "" || field == "*" {
-			return "", fmt.Errorf("%s 需要指定数值字段", funcName)
+			return "", fmt.Errorf("%s requires a numeric field", funcName)
 		}
 		fieldExpr, err := g.generateFieldExpression(field)
 		if err != nil {
 			return "", fmt.Errorf("aggregate.field %w", err)
 		}
 		if g.dbType == "sqlite" {
-			// SQLite 没有原生 VARIANCE，用公式计算
+			// SQLite lacks native VARIANCE; compute via formula
 			// variance = avg(x^2) - avg(x)^2
 			return fmt.Sprintf("(AVG(%s * %s) - AVG(%s) * AVG(%s)) AS %s", fieldExpr, fieldExpr, fieldExpr, fieldExpr, g.quoteIdentifier(agg.As)), nil
 		}
-		// MySQL 8.0+ 不支持 VARIANCE（Oracle 兼容别名），映射为 VAR_SAMP
+		// MySQL 8.0+ does not support VARIANCE (Oracle compat alias); map to VAR_SAMP
 		mysqlFunc := funcName
 		if g.dbType == "mysql" && funcName == "VARIANCE" {
 			mysqlFunc = "VAR_SAMP"
@@ -338,12 +338,12 @@ func (g *SQLGenerator) generateAggregate(agg AggregateFunc) (string, error) {
 		return fmt.Sprintf("%s(%s) AS %s", mysqlFunc, fieldExpr, g.quoteIdentifier(agg.As)), nil
 
 	default:
-		// 标准聚合函数: COUNT, SUM, AVG, MIN, MAX
+		// Standard aggregate functions: COUNT, SUM, AVG, MIN, MAX
 		if field == "" || field == "*" {
 			return fmt.Sprintf("%s(*) AS %s", funcName, g.quoteIdentifier(agg.As)), nil
 		}
 
-		// 处理 JSON 字段路径
+		// Handle JSON field path
 		fieldExpr, err := g.generateFieldExpression(field)
 		if err != nil {
 			return "", fmt.Errorf("aggregate.field %w", err)
@@ -352,15 +352,16 @@ func (g *SQLGenerator) generateAggregate(agg AggregateFunc) (string, error) {
 	}
 }
 
-// generateFrom 生成 FROM 子句
+// generateFrom generates the FROM clause.
 func (g *SQLGenerator) generateFrom(req *QueryRequest) string {
 	return " FROM " + g.quoteIdentifier(req.From)
 }
 
-// generateJoins 生成 JOIN 子句。
-// 历史实现把 join.On 原样 `fmt.Sprintf` 到 SQL，认证用户可通过
-// `1=1; DROP TABLE users; --` 等载荷注入；现在改为只用结构化 JoinCondition，
-// 两侧都过 ValidateIdentifier、op 走白名单。详见 docs/REVIEW-FIX-PLAN-2026-05.md P1-3。
+// generateJoins generates JOIN clauses.
+// The legacy implementation concatenated join.On directly via fmt.Sprintf into SQL,
+// allowing authenticated users to inject payloads like `1=1; DROP TABLE users; --`.
+// Now only structured JoinCondition is used, both sides pass ValidateIdentifier,
+// and the operator is whitelisted. See docs/REVIEW-FIX-PLAN-2026-05.md P1-3.
 func (g *SQLGenerator) generateJoins(req *QueryRequest) (string, error) {
 	if len(req.Join) == 0 {
 		return "", nil
@@ -385,7 +386,7 @@ func (g *SQLGenerator) generateJoins(req *QueryRequest) (string, error) {
 		}
 
 		if join.On.IsZero() {
-			return "", fmt.Errorf("invalid_join_condition: join[%d] 缺少 on", i)
+			return "", fmt.Errorf("invalid_join_condition: join[%d] missing on", i)
 		}
 		if err := ValidateIdentifier(join.On.Left); err != nil {
 			return "", fmt.Errorf("join[%d].on.left %w", i, err)
@@ -407,7 +408,7 @@ func (g *SQLGenerator) generateJoins(req *QueryRequest) (string, error) {
 	return strings.Join(joins, ""), nil
 }
 
-// generateWhere 生成 WHERE 子句
+// generateWhere generates the WHERE clause.
 func (g *SQLGenerator) generateWhere(where *WhereClause) (string, []interface{}, error) {
 	if where == nil {
 		return "", nil, nil
@@ -416,7 +417,7 @@ func (g *SQLGenerator) generateWhere(where *WhereClause) (string, []interface{},
 	var conditions []string
 	var params []interface{}
 
-	// 处理 AND 条件
+	// Process AND conditions
 	for _, cond := range where.And {
 		sql, condParams, err := g.generateCondition(cond)
 		if err != nil {
@@ -428,7 +429,7 @@ func (g *SQLGenerator) generateWhere(where *WhereClause) (string, []interface{},
 		}
 	}
 
-	// 处理 OR 条件
+	// Process OR conditions
 	if len(where.Or) > 0 {
 		var orConditions []string
 		var orParams []interface{}
@@ -457,11 +458,11 @@ func (g *SQLGenerator) generateWhere(where *WhereClause) (string, []interface{},
 	return strings.Join(conditions, " AND "), params, nil
 }
 
-// generateCondition 生成单个条件 SQL
+// generateCondition generates SQL for a single condition.
 func (g *SQLGenerator) generateCondition(cond Condition) (string, []interface{}, error) {
 	var params []interface{}
 
-	// 处理嵌套 AND
+	// Handle nested AND
 	if len(cond.And) > 0 {
 		var nestedConditions []string
 		for _, nested := range cond.And {
@@ -475,7 +476,7 @@ func (g *SQLGenerator) generateCondition(cond Condition) (string, []interface{},
 		return "(" + strings.Join(nestedConditions, " AND ") + ")", params, nil
 	}
 
-	// 处理嵌套 OR
+	// Handle nested OR
 	if len(cond.Or) > 0 {
 		var nestedConditions []string
 		for _, nested := range cond.Or {
@@ -489,19 +490,19 @@ func (g *SQLGenerator) generateCondition(cond Condition) (string, []interface{},
 		return "(" + strings.Join(nestedConditions, " OR ") + ")", params, nil
 	}
 
-	// 处理字段表达式
+	// Handle field expression
 	fieldExpr, err := g.generateFieldExpression(cond.Field)
 	if err != nil {
 		return "", nil, err
 	}
 
-	// 根据操作符生成 SQL
+	// Generate SQL based on operator
 	op := cond.Op
 	if op == "" {
 		op = "eq"
 	}
 
-	// 处理 NOT
+	// Handle NOT
 	notPrefix := ""
 	if cond.Not {
 		notPrefix = "NOT "
@@ -523,7 +524,7 @@ func (g *SQLGenerator) generateCondition(cond Condition) (string, []interface{},
 	case "like":
 		value := cond.Value
 		if str, ok := value.(string); ok {
-			// 自动添加 % 通配符
+			// Auto-add % wildcard
 			if !strings.Contains(str, "%") {
 				value = "%" + str + "%"
 			}
@@ -532,10 +533,10 @@ func (g *SQLGenerator) generateCondition(cond Condition) (string, []interface{},
 	case "in":
 		values, ok := cond.Value.([]interface{})
 		if !ok {
-			return "", nil, fmt.Errorf("'in' 操作符需要数组值")
+			return "", nil, fmt.Errorf("'in' operator requires an array value")
 		}
 		if len(values) == 0 {
-			return "", nil, fmt.Errorf("'in' 操作符数组不能为空")
+			return "", nil, fmt.Errorf("'in' operator array cannot be empty")
 		}
 		placeholders := make([]string, len(values))
 		for i := range values {
@@ -546,7 +547,7 @@ func (g *SQLGenerator) generateCondition(cond Condition) (string, []interface{},
 	case "between":
 		values, ok := cond.Value.([]interface{})
 		if !ok || len(values) != 2 {
-			return "", nil, fmt.Errorf("'between' 操作符需要包含两个值的数组")
+			return "", nil, fmt.Errorf("'between' operator requires an array with two values")
 		}
 		return notPrefix + fieldExpr + " BETWEEN ? AND ?", []interface{}{values[0], values[1]}, nil
 	case "is_null":
@@ -555,26 +556,27 @@ func (g *SQLGenerator) generateCondition(cond Condition) (string, []interface{},
 		}
 		return fieldExpr + " IS " + notPrefix + "NULL", nil, nil
 	default:
-		return "", nil, fmt.Errorf("未知的操作符: %s", op)
+		return "", nil, fmt.Errorf("unknown operator: %s", op)
 	}
 }
 
-// generateFieldExpression 生成字段表达式。
+// generateFieldExpression generates a field expression.
 //
-// 历史实现把 `data->>name` 与 `JSON_EXTRACT(data, '$.name')` 中的字段名/路径直接拼进 SQL，
-// 引号字符可直接破出字面量；现在每个段都过 ValidateIdentifier / ValidateJSONPathSegment，
-// 详见 docs/REVIEW-FIX-PLAN-2026-05.md P1-4。
+// The legacy implementation concatenated field names/paths from `data->>name` and
+// `JSON_EXTRACT(data, '$.name')` directly into SQL, allowing quote characters to
+// break out of literals. Now every segment passes ValidateIdentifier / ValidateJSONPathSegment.
+// See docs/REVIEW-FIX-PLAN-2026-05.md P1-4.
 func (g *SQLGenerator) generateFieldExpression(field string) (string, error) {
 	field = strings.TrimSpace(field)
 	if field == "" {
-		return "", fmt.Errorf("字段名不能为空")
+		return "", fmt.Errorf("field name cannot be empty")
 	}
 
-	// Postgres 形式 `data->>name` 或 `data->name`：等价于 data 列上的 JSON 路径
+	// Postgres-style `data->>name` or `data->name`: equivalent to JSON path on the data column
 	if strings.Contains(field, "->") {
 		parts := strings.SplitN(field, "->", 2)
 		if len(parts) != 2 {
-			return "", fmt.Errorf("非法字段名 %q：JSON 引用格式错误", field)
+			return "", fmt.Errorf("invalid field name %q: JSON reference format error", field)
 		}
 		base := strings.TrimSpace(parts[0])
 		path := strings.TrimSpace(parts[1])
@@ -589,7 +591,7 @@ func (g *SQLGenerator) generateFieldExpression(field string) (string, error) {
 		return g.generateJSONFieldExpression(base, path)
 	}
 
-	// 处理带表别名的字段
+	// Handle fields with table alias
 	if strings.Contains(field, ".") {
 		if err := ValidateIdentifier(field); err != nil {
 			return "", err
@@ -620,9 +622,9 @@ func (g *SQLGenerator) generateFieldExpression(field string) (string, error) {
 	return g.quoteIdentifier(field), nil
 }
 
-// generateJSONFieldExpression 生成 JSON 字段表达式。
-// 调用者必须保证 jsonField 与 path 已经过 ValidateIdentifier / ValidateJSONPath；
-// 此处仍重复校验一次作为防御性深度防御（in-depth defense）。
+// generateJSONFieldExpression generates a JSON field expression.
+// The caller must ensure jsonField and path have already passed ValidateIdentifier / ValidateJSONPath;
+// redundant validation here serves as defense-in-depth.
 func (g *SQLGenerator) generateJSONFieldExpression(jsonField, path string) (string, error) {
 	if err := ValidateIdentifier(jsonField); err != nil {
 		return "", err
@@ -635,7 +637,7 @@ func (g *SQLGenerator) generateJSONFieldExpression(jsonField, path string) (stri
 		// SQLite / MySQL: JSON_EXTRACT(data, '$.status')
 		return fmt.Sprintf("JSON_EXTRACT(%s, '$.%s')", g.quoteQualifiedIdentifier(jsonField), path), nil
 	default:
-		// PostgreSQL: data->>'status' 返回 text
+		// PostgreSQL: data->>'status' returns text
 		return fmt.Sprintf("%s->>'%s'", g.quoteQualifiedIdentifier(jsonField), path), nil
 	}
 }
@@ -644,7 +646,7 @@ func isJSONColumnCandidate(field string) bool {
 	return field == "data" || field == "options" || field == "config" || field == "config_values"
 }
 
-// generateGroupBy 生成 GROUP BY 子句
+// generateGroupBy generates the GROUP BY clause.
 func (g *SQLGenerator) generateGroupBy(req *QueryRequest) (string, error) {
 	if len(req.GroupBy) == 0 {
 		return "", nil
@@ -662,10 +664,10 @@ func (g *SQLGenerator) generateGroupBy(req *QueryRequest) (string, error) {
 	return strings.Join(fields, ", "), nil
 }
 
-// generateOrderBy 生成 ORDER BY 子句
+// generateOrderBy generates the ORDER BY clause.
 func (g *SQLGenerator) generateOrderBy(req *QueryRequest) (string, error) {
 	if len(req.OrderBy) == 0 {
-		// 默认按 created_at 降序
+		// Default sort by created_at descending
 		return "", nil
 	}
 
@@ -685,7 +687,7 @@ func (g *SQLGenerator) generateOrderBy(req *QueryRequest) (string, error) {
 	return strings.Join(orders, ", "), nil
 }
 
-// generateLimit 生成分页子句
+// generateLimit generates the pagination clause.
 func (g *SQLGenerator) generateLimit(req *QueryRequest) (string, []interface{}) {
 	if req.Size < 0 {
 		return "", nil
@@ -706,12 +708,12 @@ func (g *SQLGenerator) generateLimit(req *QueryRequest) (string, []interface{}) 
 	return " LIMIT ? OFFSET ?", []interface{}{req.Size, offset}
 }
 
-// quoteIdentifier 引用标识符
+// quoteIdentifier quotes an identifier.
 func (g *SQLGenerator) quoteIdentifier(name string) string {
 	if name == "*" {
 		return name
 	}
-	// MySQL 使用反引号，PostgreSQL/SQLite 使用双引号
+	// MySQL uses backticks, PostgreSQL/SQLite use double quotes
 	if g.dbType == "mysql" {
 		return "`" + strings.ReplaceAll(name, "`", "``") + "`"
 	}
@@ -727,7 +729,7 @@ func (g *SQLGenerator) quoteQualifiedIdentifier(name string) string {
 	return strings.Join(quoted, ".")
 }
 
-// SQLQuery 生成的 SQL 查询
+// SQLQuery is a generated SQL query.
 type SQLQuery struct {
 	SQL    string
 	Params []interface{}

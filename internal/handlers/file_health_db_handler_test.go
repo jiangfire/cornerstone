@@ -219,7 +219,7 @@ func TestDBHandler_GetDatabase_NotFound(t *testing.T) {
 
 	rec := doJSON(t, router, "GET", "/api/v1/databases/db_nonexistent", master.Token, nil)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -276,7 +276,7 @@ func TestFile_Upload_MissingFile(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var resp map[string]interface{}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	assert.Contains(t, resp["message"], "请选择要上传的文件")
+	assert.Contains(t, resp["message"], "file is required")
 }
 
 func TestFile_Upload_MissingRecordAndFieldID(t *testing.T) {
@@ -287,7 +287,7 @@ func TestFile_Upload_MissingRecordAndFieldID(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var resp map[string]interface{}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	assert.Contains(t, resp["message"], "记录ID或字段ID不能为空")
+	assert.Contains(t, resp["message"], "record ID or field ID is required")
 }
 
 func TestFile_GetFile_Success(t *testing.T) {
@@ -342,7 +342,7 @@ func TestFile_DeleteFile_Success(t *testing.T) {
 	req2.Header.Set("Authorization", "Bearer "+master.Token)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, req2)
-	assert.Equal(t, http.StatusForbidden, w2.Code)
+	assert.Equal(t, http.StatusNotFound, w2.Code)
 }
 
 func TestFile_ListRecordFiles_Success(t *testing.T) {
@@ -375,5 +375,5 @@ func TestFile_Upload_OversizedFile(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, w.Code)
 	var resp map[string]interface{}
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-	assert.Contains(t, resp["message"], "文件大小超过限制")
+	assert.Contains(t, resp["message"], "file size exceeds limit")
 }

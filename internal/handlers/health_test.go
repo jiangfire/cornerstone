@@ -75,8 +75,8 @@ func TestReadyReturns503WhenDatabasePingFails(t *testing.T) {
 	setupHealthHandlerTestDB(t)
 	SetVersion("test-version")
 
-	// 主动关闭底层连接池, 让后续的 PingContext 必定失败。
-	// pkgdb.DB() 仍能拿到 *gorm.DB(内部 db 变量未置 nil), 走的就是 Ping 路径而不是 panic。
+	// Close the underlying connection pool so subsequent PingContext calls will definitely fail.
+	// pkgdb.DB() still returns a *gorm.DB (internal db variable is not set to nil), so it takes the Ping path instead of panicking.
 	require.NoError(t, pkgdb.CloseDB())
 
 	r := gin.New()

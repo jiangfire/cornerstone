@@ -52,7 +52,7 @@ func (v *Validator) ValidateRequest(ctx context.Context, req *QueryRequest, user
 
 func (v *Validator) validateRequestWithScope(ctx context.Context, req *QueryRequest, userID string, scope *validatorAccessScope) error {
 	if req == nil {
-		return errors.New("查询请求不能为空")
+		return errors.New("query request cannot be nil")
 	}
 
 	if err := v.checkTableAccessWithScope(ctx, req.From, scope); err != nil {
@@ -206,7 +206,7 @@ func (v *Validator) CheckTableAccess(ctx context.Context, userID string, table s
 
 func (v *Validator) checkTableAccessWithScope(ctx context.Context, table string, scope *validatorAccessScope) error {
 	if !v.allowedTables.IsTableAllowed(table) {
-		return fmt.Errorf("表 '%s' 不在允许访问的列表中", table)
+		return fmt.Errorf("table '%s' is not in the allowed list", table)
 	}
 
 	switch table {
@@ -215,7 +215,7 @@ func (v *Validator) checkTableAccessWithScope(ctx context.Context, table string,
 	case "tokens":
 		authorizer := scope.authorizer
 		if !authorizer.IsMaster() {
-			return errors.New("无权访问 tokens")
+			return errors.New("access to tokens denied")
 		}
 		return nil
 	default:
@@ -229,7 +229,7 @@ func (v *Validator) CheckFieldAccess(ctx context.Context, userID string, table, 
 	}
 
 	if !v.allowedTables.IsFieldAllowed(table, field) {
-		return fmt.Errorf("字段 '%s.%s' 不在允许访问的列表中", table, field)
+		return fmt.Errorf("field '%s.%s' is not in the allowed list", table, field)
 	}
 
 	return nil
@@ -250,10 +250,10 @@ func splitJSONBaseField(field string) (string, bool) {
 func (v *Validator) checkDataAccess(ctx context.Context, scope *validatorAccessScope) error {
 	ids, err := scope.accessibleDatabaseIDs()
 	if err != nil {
-		return fmt.Errorf("检查数据访问权限失败: %w", err)
+		return fmt.Errorf("data access permission check failed: %w", err)
 	}
 	if len(ids) == 0 {
-		return errors.New("没有可用的数据库")
+		return errors.New("no databases available")
 	}
 	return nil
 }
@@ -306,7 +306,7 @@ func (v *Validator) autoFilterByPermissionWithScope(req *QueryRequest, scope *va
 			return err
 		}
 		if len(dbIDs) == 0 {
-			return errors.New("没有可用的数据库")
+			return errors.New("no databases available")
 		}
 		appendInCondition(req.Where, qualifyBaseField(req.From, "id"), dbIDs)
 	case "records":
@@ -315,7 +315,7 @@ func (v *Validator) autoFilterByPermissionWithScope(req *QueryRequest, scope *va
 			return err
 		}
 		if len(tableIDs) == 0 {
-			return errors.New("您没有访问任何表的权限")
+			return errors.New("you do not have access to any tables")
 		}
 		appendInCondition(req.Where, qualifyBaseField(req.From, "table_id"), tableIDs)
 	case "tables":
@@ -324,7 +324,7 @@ func (v *Validator) autoFilterByPermissionWithScope(req *QueryRequest, scope *va
 			return err
 		}
 		if len(dbIDs) == 0 {
-			return errors.New("您没有访问任何数据库的权限")
+			return errors.New("you do not have access to any databases")
 		}
 		appendInCondition(req.Where, qualifyBaseField(req.From, "database_id"), dbIDs)
 	case "fields":
@@ -333,7 +333,7 @@ func (v *Validator) autoFilterByPermissionWithScope(req *QueryRequest, scope *va
 			return err
 		}
 		if len(tableIDs) == 0 {
-			return errors.New("您没有访问任何表的权限")
+			return errors.New("you do not have access to any tables")
 		}
 		appendInCondition(req.Where, qualifyBaseField(req.From, "table_id"), tableIDs)
 	case "files":

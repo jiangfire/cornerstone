@@ -9,18 +9,18 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-// JSONField 是跨数据库兼容的 JSON 字段类型。
-// GORM AutoMigrate 会根据实际数据库选择对应类型：
-// PostgreSQL → JSONB，MySQL → JSON，SQLite → TEXT
-// 定义为 string 的派生类型，用法上与 string 基本相同（显式转换即可）。
+// JSONField is a cross-database compatible JSON field type.
+// GORM AutoMigrate selects the appropriate type based on the actual database:
+// PostgreSQL → JSONB, MySQL → JSON, SQLite → TEXT
+// Defined as a derived type of string, it behaves similarly to string (explicit conversion required).
 type JSONField string
 
-// GormDataType 返回通用数据类型标识。
+// GormDataType returns the generic data type identifier.
 func (JSONField) GormDataType() string {
 	return "text"
 }
 
-// GormDBDataType 返回特定数据库的列类型。
+// GormDBDataType returns the column type for a specific database.
 func (JSONField) GormDBDataType(db *gorm.DB, field *schema.Field) string {
 	switch db.Name() {
 	case "postgres":
@@ -32,7 +32,7 @@ func (JSONField) GormDBDataType(db *gorm.DB, field *schema.Field) string {
 	}
 }
 
-// Token API Token 表 (tok_前缀)
+// Token API Token table (tok_ prefix)
 type Token struct {
 	ID        string     `gorm:"type:varchar(50);primaryKey" json:"id"`
 	Token     string     `gorm:"type:varchar(255);uniqueIndex;not null" json:"-"`
@@ -57,7 +57,7 @@ func (t *Token) BeforeCreate(tx *gorm.DB) (err error) {
 	return nil
 }
 
-// Database 数据库表 (db_前缀)
+// Database database table (db_ prefix)
 type Database struct {
 	ID          string         `gorm:"type:varchar(50);primaryKey" json:"id"`
 	Name        string         `gorm:"type:varchar(255);not null;uniqueIndex:idx_db_name" json:"name"`
@@ -78,7 +78,7 @@ func (d *Database) BeforeCreate(tx *gorm.DB) (err error) {
 	return nil
 }
 
-// Table 表定义 (tbl_前缀)
+// Table table definition (tbl_ prefix)
 type Table struct {
 	ID          string         `gorm:"type:varchar(50);primaryKey" json:"id"`
 	DatabaseID  string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_table_db_name" json:"database_id"`
@@ -101,7 +101,7 @@ func (t *Table) BeforeCreate(tx *gorm.DB) (err error) {
 	return nil
 }
 
-// Field 字段定义 (fld_前缀)
+// Field field definition (fld_ prefix)
 type Field struct {
 	ID          string         `gorm:"type:varchar(50);primaryKey" json:"id"`
 	TableID     string         `gorm:"type:varchar(50);not null;uniqueIndex:uk_field_table_name" json:"table_id"`
@@ -127,7 +127,7 @@ func (f *Field) BeforeCreate(tx *gorm.DB) (err error) {
 	return nil
 }
 
-// Record 数据记录 (rec_前缀)
+// Record data record (rec_ prefix)
 type Record struct {
 	ID        string         `gorm:"type:varchar(50);primaryKey" json:"id"`
 	TableID   string         `gorm:"type:varchar(50);not null" json:"table_id"`
@@ -150,7 +150,7 @@ func (r *Record) BeforeCreate(tx *gorm.DB) (err error) {
 	return nil
 }
 
-// RecordFieldIndex 记录字段派生索引表，用于 MySQL 动态字段等值过滤优化。
+// RecordFieldIndex derived index table for record fields, used to optimize equality filtering on dynamic fields in MySQL.
 type RecordFieldIndex struct {
 	ID          string         `gorm:"type:varchar(50);primaryKey" json:"id"`
 	TableID     string         `gorm:"type:varchar(50);not null" json:"table_id"`
@@ -179,7 +179,7 @@ func (r *RecordFieldIndex) BeforeCreate(tx *gorm.DB) (err error) {
 	return nil
 }
 
-// File 文件附件表
+// File file attachment table
 type File struct {
 	ID         string         `gorm:"type:varchar(50);primaryKey" json:"id"`
 	RecordID   string         `gorm:"type:varchar(50);default:'';index" json:"record_id"`
@@ -204,7 +204,7 @@ func (f *File) BeforeCreate(tx *gorm.DB) (err error) {
 	return nil
 }
 
-// GenerateID 生成带前缀的唯一ID
+// GenerateID generates a unique ID with the given prefix
 func GenerateID(prefix string) string {
 	return prefix + "_" + strings.ReplaceAll(uuid.NewString(), "-", "")
 }

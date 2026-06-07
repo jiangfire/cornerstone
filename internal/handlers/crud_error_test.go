@@ -29,7 +29,7 @@ func TestGetDatabase_ServiceError(t *testing.T) {
 
 	rec := doJSON(t, router, "GET", "/api/v1/databases/nonexistent-id", master.Token, nil)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -40,7 +40,7 @@ func TestUpdateDatabase_ServiceError(t *testing.T) {
 	body := map[string]string{"name": "xx", "description": "yy"}
 	rec := doJSON(t, router, "PUT", "/api/v1/databases/nonexistent-id", master.Token, body)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -50,7 +50,7 @@ func TestDeleteDatabase_ServiceError(t *testing.T) {
 
 	rec := doJSON(t, router, "DELETE", "/api/v1/databases/nonexistent-id", master.Token, nil)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -73,7 +73,7 @@ func TestCreateDatabaseWithTables_BindingError(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
-	assert.Contains(t, resp["message"], "参数错误")
+	assert.Contains(t, resp["message"], "invalid request")
 }
 
 func TestCreateDatabaseWithTables_ServiceError(t *testing.T) {
@@ -102,7 +102,7 @@ func TestListTables_ServiceError(t *testing.T) {
 
 	rec := doJSON(t, router, "GET", "/api/v1/databases/"+dbModel.ID+"/tables", master.Token, nil)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusInternalServerError, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -112,7 +112,7 @@ func TestGetTable_ServiceError(t *testing.T) {
 
 	rec := doJSON(t, router, "GET", "/api/v1/tables/detail/nonexistent-id", master.Token, nil)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -124,7 +124,7 @@ func TestUpdateTable_BindingError(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
-	assert.Contains(t, resp["message"], "参数错误")
+	assert.Contains(t, resp["message"], "invalid request")
 }
 
 func TestUpdateTable_ServiceError(t *testing.T) {
@@ -133,7 +133,7 @@ func TestUpdateTable_ServiceError(t *testing.T) {
 	body := map[string]string{"name": "xx", "description": "yy"}
 	rec := doJSON(t, router, "PUT", "/api/v1/tables/nonexistent-id", master.Token, body)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -143,7 +143,7 @@ func TestDeleteTable_ServiceError(t *testing.T) {
 
 	rec := doJSON(t, router, "DELETE", "/api/v1/tables/nonexistent-id", master.Token, nil)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -164,7 +164,7 @@ func TestListFields_ServiceError(t *testing.T) {
 
 	rec := doJSON(t, router, "GET", "/api/v1/tables/nonexistent-id/fields", master.Token, nil)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -174,7 +174,7 @@ func TestGetField_ServiceError(t *testing.T) {
 
 	rec := doJSON(t, router, "GET", "/api/v1/fields/nonexistent-id", master.Token, nil)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -186,7 +186,7 @@ func TestUpdateField_BindingError(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
-	assert.Contains(t, resp["message"], "参数错误")
+	assert.Contains(t, resp["message"], "invalid request")
 }
 
 func TestUpdateField_ServiceError(t *testing.T) {
@@ -195,7 +195,7 @@ func TestUpdateField_ServiceError(t *testing.T) {
 	body := map[string]interface{}{"name": "x", "type": "string"}
 	rec := doJSON(t, router, "PUT", "/api/v1/fields/nonexistent-id", master.Token, body)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -205,7 +205,7 @@ func TestDeleteField_ServiceError(t *testing.T) {
 
 	rec := doJSON(t, router, "DELETE", "/api/v1/fields/nonexistent-id", master.Token, nil)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -230,7 +230,7 @@ func TestCreateToken_BindingError(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
-	assert.Contains(t, resp["message"], "参数错误")
+	assert.Contains(t, resp["message"], "invalid request")
 }
 
 func TestUpdateToken_BindingError(t *testing.T) {
@@ -242,7 +242,7 @@ func TestUpdateToken_BindingError(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
-	assert.Contains(t, resp["message"], "参数错误")
+	assert.Contains(t, resp["message"], "invalid request")
 }
 
 func TestUpdateToken_ServiceError(t *testing.T) {
@@ -253,7 +253,7 @@ func TestUpdateToken_ServiceError(t *testing.T) {
 	body := map[string]string{"scopes": "read,write"}
 	rec := doJSON(t, router, "PUT", "/api/v1/tokens/nonexistent-id", master.Token, body)
 
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -265,7 +265,7 @@ func TestDeleteToken_ServiceError(t *testing.T) {
 
 	rec := doJSON(t, router, "DELETE", "/api/v1/tokens/nonexistent-id", master.Token, nil)
 
-	assert.Equal(t, http.StatusBadRequest, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }

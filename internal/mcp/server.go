@@ -5,14 +5,14 @@ import (
 	"encoding/json"
 )
 
-// Server 负责处理 MCP JSON-RPC 请求
+// Server handles MCP JSON-RPC requests.
 type Server struct {
 	toolService *ToolService
 	serverName  string
 	version     string
 }
 
-// NewServer 创建 MCP server
+// NewServer creates an MCP server.
 func NewServer(toolService *ToolService, version string) *Server {
 	if version == "" {
 		version = "dev"
@@ -25,7 +25,7 @@ func NewServer(toolService *ToolService, version string) *Server {
 	}
 }
 
-// HandleRequest 处理单个请求；当请求是 notification 时返回 nil
+// HandleRequest processes a single request; returns nil when the request is a notification.
 func (s *Server) HandleRequest(ctx context.Context, req Request) *Response {
 	if req.JSONRPC == "" {
 		req.JSONRPC = jsonRPCVersion

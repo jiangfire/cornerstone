@@ -132,7 +132,7 @@ func TestCreateDatabase_BindingError(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.Equal(t, float64(400), resp["code"])
-	assert.Contains(t, resp["message"], "参数错误")
+	assert.Contains(t, resp["message"], "invalid request")
 }
 
 func TestCreateDatabase_Unauthorized(t *testing.T) {
@@ -179,7 +179,7 @@ func TestGetDatabase_NotFound(t *testing.T) {
 
 	rec := doJSON(t, router, "GET", "/api/v1/databases/nonexistent", master.Token, nil)
 
-	assert.Equal(t, http.StatusForbidden, rec.Code)
+	assert.Equal(t, http.StatusNotFound, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
 }
@@ -209,7 +209,7 @@ func TestUpdateDatabase_BindingError(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
-	assert.Contains(t, resp["message"], "参数错误")
+	assert.Contains(t, resp["message"], "invalid request")
 }
 
 func TestDeleteDatabase_Success(t *testing.T) {
@@ -223,7 +223,7 @@ func TestDeleteDatabase_Success(t *testing.T) {
 	resp := decodeResp(t, rec)
 	data, ok := resp["data"].(map[string]interface{})
 	require.True(t, ok)
-	assert.Contains(t, data["message"], "数据库已删除")
+	assert.Contains(t, data["message"], "database deleted")
 }
 
 func TestCreateDatabaseWithTables_Success(t *testing.T) {
@@ -289,7 +289,7 @@ func TestCreateTable_BindingError(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
-	assert.Contains(t, resp["message"], "参数错误")
+	assert.Contains(t, resp["message"], "invalid request")
 }
 
 func TestListTables_Success(t *testing.T) {
@@ -353,7 +353,7 @@ func TestDeleteTable_Success(t *testing.T) {
 	resp := decodeResp(t, rec)
 	data, ok := resp["data"].(map[string]interface{})
 	require.True(t, ok)
-	assert.Contains(t, data["message"], "表已删除")
+	assert.Contains(t, data["message"], "table deleted")
 }
 
 // ── Field Handlers ──
@@ -389,7 +389,7 @@ func TestCreateField_BindingError(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
-	assert.Contains(t, resp["message"], "参数错误")
+	assert.Contains(t, resp["message"], "invalid request")
 }
 
 func TestListFields_Success(t *testing.T) {
@@ -448,7 +448,7 @@ func TestDeleteField_Success(t *testing.T) {
 	resp := decodeResp(t, rec)
 	data, ok := resp["data"].(map[string]interface{})
 	require.True(t, ok)
-	assert.Contains(t, data["message"], "字段已删除")
+	assert.Contains(t, data["message"], "field deleted")
 }
 
 // ── Token Handlers ──
@@ -633,7 +633,7 @@ func TestDeleteRecord_Success(t *testing.T) {
 	resp := decodeResp(t, rec)
 	data, ok := resp["data"].(map[string]interface{})
 	require.True(t, ok)
-	assert.Contains(t, data["message"], "记录已删除")
+	assert.Contains(t, data["message"], "record deleted")
 }
 
 func TestBatchCreateRecords_Success(t *testing.T) {
@@ -688,7 +688,7 @@ func TestCreateRecord_MissingTableID(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
-	assert.Contains(t, resp["message"], "参数错误")
+	assert.Contains(t, resp["message"], "invalid request")
 }
 
 func TestListRecords_MissingTableID(t *testing.T) {
@@ -698,7 +698,7 @@ func TestListRecords_MissingTableID(t *testing.T) {
 
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
-	assert.Contains(t, resp["message"], "参数错误")
+	assert.Contains(t, resp["message"], "invalid request")
 }
 
 func TestGetField_Success(t *testing.T) {

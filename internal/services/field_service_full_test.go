@@ -75,7 +75,7 @@ func TestCreateField_DuplicateName(t *testing.T) {
 		Type:    "text",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "已存在同名字段")
+	assert.Contains(t, err.Error(), "a field with this name already exists in this table")
 }
 
 // ============================================================
@@ -91,7 +91,7 @@ func TestCreateField_NonexistentTable(t *testing.T) {
 		Type:    "string",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "表不存在")
+	assert.Contains(t, err.Error(), "table not found")
 }
 
 // ============================================================
@@ -109,7 +109,7 @@ func TestCreateField_InvalidType(t *testing.T) {
 			Type:    ft,
 		}, master.ID)
 		assert.Errorf(t, err, "type %q should be rejected", ft)
-		assert.Contains(t, err.Error(), "字段类型验证失败")
+		assert.Contains(t, err.Error(), "field type validation failed")
 	}
 }
 
@@ -126,7 +126,7 @@ func TestCreateField_NameTooLong(t *testing.T) {
 		Type:    "string",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "字段名称验证失败")
+	assert.Contains(t, err.Error(), "field name validation failed")
 }
 
 // ============================================================
@@ -194,7 +194,7 @@ func TestListFields_NonexistentTable(t *testing.T) {
 	fields, err := svc.ListFields("tbl_nonexistent", master.ID)
 	assert.Error(t, err)
 	assert.Nil(t, fields)
-	assert.Contains(t, err.Error(), "表不存在")
+	assert.Contains(t, err.Error(), "table not found")
 }
 
 // ============================================================
@@ -229,7 +229,7 @@ func TestGetField_Nonexistent(t *testing.T) {
 
 	_, err := svc.GetField("fld_nonexistent", master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "字段不存在")
+	assert.Contains(t, err.Error(), "field not found")
 }
 
 // ============================================================
@@ -285,7 +285,7 @@ func TestUpdateField_DuplicateName(t *testing.T) {
 		Type: "string",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "已存在同名字段")
+	assert.Contains(t, err.Error(), "a field with this name already exists in this table")
 }
 
 // ============================================================
@@ -300,7 +300,7 @@ func TestUpdateField_Nonexistent(t *testing.T) {
 		Type: "string",
 	}, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "字段不存在")
+	assert.Contains(t, err.Error(), "field not found")
 }
 
 // ============================================================
@@ -322,7 +322,7 @@ func TestDeleteField_Success(t *testing.T) {
 
 	_, err = svc.GetField(created.ID, master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "字段不存在")
+	assert.Contains(t, err.Error(), "field not found")
 }
 
 func TestDeleteField_DeletedNameSuffix(t *testing.T) {
@@ -355,7 +355,7 @@ func TestDeleteField_Nonexistent(t *testing.T) {
 
 	err := svc.DeleteField("fld_nonexistent", master.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "字段不存在")
+	assert.Contains(t, err.Error(), "field not found")
 }
 
 // ============================================================
@@ -408,7 +408,7 @@ func TestValidateFieldConfig_TooManyOptions(t *testing.T) {
 
 	err := validateFieldConfig(FieldConfig{Options: options})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "选项数量不能超过100个")
+	assert.Contains(t, err.Error(), "number of options must not exceed 100")
 }
 
 // ============================================================
@@ -420,7 +420,7 @@ func TestValidateFieldConfig_OptionTooLong(t *testing.T) {
 		Options: []string{strings.Repeat("a", 256)},
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "选项值长度不能超过255个字符")
+	assert.Contains(t, err.Error(), "option value must not exceed 255 characters")
 }
 
 // ============================================================
@@ -436,7 +436,7 @@ func TestValidateFieldConfig_MinGreaterThanMax(t *testing.T) {
 		Max: &cfgMax,
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "最小值不能大于最大值")
+	assert.Contains(t, err.Error(), "min value must not be greater than max value")
 }
 
 // ============================================================
@@ -450,7 +450,7 @@ func TestValidateFieldConfig_MaxLengthLessThanOne(t *testing.T) {
 		MaxLength: &maxLen,
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "最大长度必须大于0")
+	assert.Contains(t, err.Error(), "max length must be greater than 0")
 }
 
 func TestValidateFieldConfig_NegativeMaxLength(t *testing.T) {
@@ -460,7 +460,7 @@ func TestValidateFieldConfig_NegativeMaxLength(t *testing.T) {
 		MaxLength: &maxLen,
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "最大长度必须大于0")
+	assert.Contains(t, err.Error(), "max length must be greater than 0")
 }
 
 // ============================================================
@@ -472,7 +472,7 @@ func TestValidateFieldConfig_InvalidRegex(t *testing.T) {
 		Validation: "[invalid",
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "无效的正则表达式")
+	assert.Contains(t, err.Error(), "invalid regex pattern")
 }
 
 // ============================================================
@@ -489,7 +489,7 @@ func TestValidateFieldConfig_TooManyAllowedTypes(t *testing.T) {
 		AllowedTypes: types,
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "允许的文件类型数量不能超过50个")
+	assert.Contains(t, err.Error(), "number of allowed file types must not exceed 50")
 }
 
 // ============================================================
@@ -501,7 +501,7 @@ func TestValidateFieldConfig_NegativeMaxFileSize(t *testing.T) {
 		MaxFileSizeMB: -1,
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "附件大小限制不能小于0")
+	assert.Contains(t, err.Error(), "max file size must not be negative")
 }
 
 // ============================================================
@@ -681,7 +681,7 @@ func TestValidateFieldName_Valid(t *testing.T) {
 	}{
 		{"single char", "a"},
 		{"underscore", "my_field"},
-		{"unicode", "字段"},
+		{"unicode", "field"},
 		{"with digits", "field1"},
 	}
 	for _, tt := range tests {
@@ -697,11 +697,11 @@ func TestValidateFieldName_Invalid(t *testing.T) {
 		input  string
 		substr string
 	}{
-		{"empty", "", "1-255"},
-		{"too long", strings.Repeat("x", 256), "1-255"},
-		{"starts with digit", "1field", "不能以数字开头"},
-		{"spaces", "my field", "只能包含字母"},
-		{"special chars", "field!", "只能包含字母"},
+		{"empty", "", "must be between"},
+		{"too long", strings.Repeat("x", 256), "must be between"},
+		{"starts with digit", "1field", "must not start with a digit"},
+		{"spaces", "my field", "can only contain letters, numbers and underscores"},
+		{"special chars", "field!", "can only contain letters, numbers and underscores"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -936,7 +936,7 @@ func TestValidateFieldConfig_AllowedTypeTooLong(t *testing.T) {
 		AllowedTypes: []string{longType},
 	})
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "文件类型规则长度不能超过100个字符")
+	assert.Contains(t, err.Error(), "file type rule must not exceed 100 characters")
 }
 
 // ============================================================

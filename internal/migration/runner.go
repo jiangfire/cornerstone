@@ -65,7 +65,7 @@ func NewRunner(db *gorm.DB, masterToken string, cfg Config, opts RunnerOptions) 
 		sourceFactory = func() (source.Source, error) {
 			src, err := source.NewSource(normalizeLower(cfg.Source.Type))
 			if err != nil {
-				return nil, newMigrationError(ErrCodeUnsupportedSource, "不支持的源数据库类型", err)
+				return nil, newMigrationError(ErrCodeUnsupportedSource, "unsupported source database type", err)
 			}
 			return src, nil
 		}
@@ -135,7 +135,7 @@ func (r *Runner) Run() (*MigrationReport, error) {
 		return nil, err
 	}
 
-	zap.L().Info("开始迁移",
+	zap.L().Info("starting migration",
 		zap.String("migration_id", r.migrationID),
 		zap.String("source_type", r.cfg.Source.Type),
 		zap.String("target_database", plan.TargetDatabase),
@@ -158,7 +158,7 @@ func (r *Runner) Run() (*MigrationReport, error) {
 
 	targetDB, err := r.ensureTargetDatabase()
 	if err != nil {
-		return nil, newMigrationError(ErrCodeTargetCreate, "创建目标数据库失败", err)
+		return nil, newMigrationError(ErrCodeTargetCreate, "failed to create target database", err)
 	}
 
 	results := r.executeTablePlans(targetDB.ID, plan.Tables)
@@ -189,7 +189,7 @@ func (r *Runner) Run() (*MigrationReport, error) {
 	}
 
 	report.FinishedAt = time.Now().UTC()
-	zap.L().Info("迁移完成",
+	zap.L().Info("migration completed",
 		zap.String("migration_id", r.migrationID),
 		zap.String("status", report.Status),
 		zap.Int("tables_success", report.Summary.TablesSuccess),
@@ -250,7 +250,7 @@ func (r *Runner) buildPreviewTablePlan(tableName string, schema *source.TableSch
 		}
 	}
 	if planTable.MigrationStrategy == string(source.StrategyOffset) {
-		planTable.TypeMappingWarnings = append(planTable.TypeMappingWarnings, fmt.Sprintf("%s 表 %q 缺少可用游标列，回退到 OFFSET 分页", ErrCodeOffsetFallbackWarn, tableName))
+		planTable.TypeMappingWarnings = append(planTable.TypeMappingWarnings, fmt.Sprintf("%s table %q has no usable cursor column, falling back to OFFSET pagination", ErrCodeOffsetFallbackWarn, tableName))
 	}
 	return planTable
 }
@@ -303,12 +303,12 @@ func (r *Runner) ensureTargetDatabase() (*models.Database, error) {
 func (r *Runner) runTable(databaseID string, tablePlan PreviewTablePlan) (MigrationTableReport, error) {
 	schema, err := r.src.GetTableSchema("", tablePlan.SourceTable)
 	if err != nil {
-		return MigrationTableReport{Source: tablePlan.SourceTable, Target: tablePlan.TargetTable, Status: TableStatusFailed}, newMigrationError(ErrCodeTableSchema, "读取源表结构失败", err)
+		return MigrationTableReport{Source: tablePlan.SourceTable, Target: tablePlan.TargetTable, Status: TableStatusFailed}, newMigrationError(ErrCodeTableSchema, "failed to read source table schema", err)
 	}
 
 	targetTable, fieldsCreated, err := r.ensureTargetTable(databaseID, tablePlan, schema)
 	if err != nil {
-		return MigrationTableReport{Source: tablePlan.SourceTable, Target: tablePlan.TargetTable, Status: TableStatusFailed}, newMigrationError(ErrCodeTableSchema, "创建目标表结构失败", err)
+		return MigrationTableReport{Source: tablePlan.SourceTable, Target: tablePlan.TargetTable, Status: TableStatusFailed}, newMigrationError(ErrCodeTableSchema, "failed to create target table schema", err)
 	}
 
 	tableState := r.getTableState(tablePlan.SourceTable)
@@ -328,7 +328,7 @@ func (r *Runner) runTable(databaseID string, tablePlan PreviewTablePlan) (Migrat
 			}
 			tableState.Status = TableStatusFailed
 			_ = r.saveTableState(tablePlan.SourceTable, tableState)
-			zap.L().Error("表数据迁移失败",
+			zap.L().Error("table data migration failed",
 				zap.String("migration_id", r.migrationID),
 				zap.String("table", tablePlan.SourceTable),
 				zap.Error(err),
@@ -354,7 +354,7 @@ func (r *Runner) runTable(databaseID string, tablePlan PreviewTablePlan) (Migrat
 		return MigrationTableReport{Source: tablePlan.SourceTable, Target: tablePlan.TargetTable, Status: TableStatusFailed}, err
 	}
 	report.FieldsCreated = fieldsCreated
-	zap.L().Info("表迁移完成",
+	zap.L().Info("table migration completed",
 		zap.String("migration_id", r.migrationID),
 		zap.String("table", tablePlan.SourceTable),
 		zap.Int64("records", report.RecordsInserted),
@@ -423,7 +423,7 @@ func (r *Runner) importTableData(targetTableID, sourceTable string, schema *sour
 			Filter:       r.cfg.Data.Filters[sourceTable],
 		})
 		if err != nil {
-			return newMigrationError(ErrCodeTableData, "读取源表数据失败", err)
+			return newMigrationError(ErrCodeTableData, "failed to read source table data", err)
 		}
 		if len(rows) == 0 {
 			return nil
@@ -435,7 +435,7 @@ func (r *Runner) importTableData(targetTableID, sourceTable string, schema *sour
 			if cursorColumn != "" {
 				exists, err := r.recordExists(targetTableID, cursorColumn, row[cursorColumn])
 				if err != nil {
-					return newMigrationError(ErrCodeTableData, "检查断点续传重复记录失败", err)
+					return newMigrationError(ErrCodeTableData, "failed to check duplicate record for resume", err)
 				}
 				if exists {
 					state.ProcessedCount++
@@ -450,7 +450,7 @@ func (r *Runner) importTableData(targetTableID, sourceTable string, schema *sour
 			payload := r.normalizeRow(schema, row)
 			payloadJSON, err := json.Marshal(payload)
 			if err != nil {
-				return newMigrationError(ErrCodeTableData, "序列化迁移记录失败", err)
+				return newMigrationError(ErrCodeTableData, "failed to serialize migration record", err)
 			}
 			batchPayloads = append(batchPayloads, string(payloadJSON))
 			insertedCount++
@@ -468,7 +468,7 @@ func (r *Runner) importTableData(targetTableID, sourceTable string, schema *sour
 			if err := retryWithBackoff(3, 100*time.Millisecond, func() error {
 				return r.insertRecordBatch(targetTableID, batchPayloads)
 			}); err != nil {
-				return newMigrationError(ErrCodeTableData, "写入目标记录批次失败", err)
+				return newMigrationError(ErrCodeTableData, "failed to write target record batch", err)
 			}
 		}
 
@@ -478,7 +478,7 @@ func (r *Runner) importTableData(targetTableID, sourceTable string, schema *sour
 			}
 		}
 
-		zap.L().Info("批次迁移完成",
+		zap.L().Info("batch migration completed",
 			zap.String("migration_id", r.migrationID),
 			zap.String("table", sourceTable),
 			zap.Int64("processed", state.ProcessedCount),
@@ -646,12 +646,12 @@ func (r *Runner) validateTable(targetTableID string, tablePlan PreviewTablePlan,
 	}
 	if len(targetFields) != len(schema.Columns) {
 		detail.StructureMatch = false
-		detail.Warnings = append(detail.Warnings, "字段数量不一致")
+		detail.Warnings = append(detail.Warnings, "field count mismatch")
 	}
 	for _, field := range targetFields {
 		if _, ok := sourceFieldNames[field.Name]; !ok {
 			detail.StructureMatch = false
-			detail.Warnings = append(detail.Warnings, fmt.Sprintf("目标字段 %q 在源表中不存在", field.Name))
+			detail.Warnings = append(detail.Warnings, fmt.Sprintf("target field %q does not exist in source table", field.Name))
 		}
 	}
 
@@ -665,7 +665,7 @@ func (r *Runner) validateTable(targetTableID string, tablePlan PreviewTablePlan,
 	}
 	if sourceCount != targetCount {
 		detail.RowCountMatch = false
-		detail.Warnings = append(detail.Warnings, fmt.Sprintf("行数不一致: source=%d target=%d", sourceCount, targetCount))
+		detail.Warnings = append(detail.Warnings, fmt.Sprintf("row count mismatch: source=%d target=%d", sourceCount, targetCount))
 	}
 
 	sampleChecked, sampleMismatch, sampleWarnings, err := r.sampleCompare(targetTableID, tablePlan, schema, src)
@@ -704,7 +704,7 @@ func (r *Runner) validateTable(targetTableID string, tablePlan PreviewTablePlan,
 func (r *Runner) sampleCompare(targetTableID string, tablePlan PreviewTablePlan, schema *source.TableSchema, src source.Source) (int, int, []string, error) {
 	cursorColumn := r.resolveCursorColumn(schema)
 	if cursorColumn == "" {
-		return 0, 0, []string{fmt.Sprintf("%s 表 %q 缺少游标列，跳过内容抽样校验", ErrCodeOffsetFallbackWarn, tablePlan.TargetTable)}, nil
+		return 0, 0, []string{fmt.Sprintf("%s table %q has no cursor column, skipping content sample validation", ErrCodeOffsetFallbackWarn, tablePlan.TargetTable)}, nil
 	}
 
 	strategy := r.pickStrategyWithSource(src, tablePlan.SourceTable, schema)
@@ -738,12 +738,12 @@ func (r *Runner) sampleCompare(targetTableID string, tablePlan PreviewTablePlan,
 			}
 			if targetPayload == nil {
 				mismatch++
-				warnings = append(warnings, fmt.Sprintf("缺少目标记录: %s=%v", cursorColumn, row[cursorColumn]))
+				warnings = append(warnings, fmt.Sprintf("missing target record: %s=%v", cursorColumn, row[cursorColumn]))
 			} else {
 				diffField := firstDifferentField(sourcePayload, targetPayload)
 				if diffField != "" {
 					mismatch++
-					warnings = append(warnings, fmt.Sprintf("字段 %q 内容不一致: %s=%v", diffField, cursorColumn, row[cursorColumn]))
+					warnings = append(warnings, fmt.Sprintf("field %q content mismatch: %s=%v", diffField, cursorColumn, row[cursorColumn]))
 				}
 			}
 			checked++
@@ -777,13 +777,13 @@ func (r *Runner) compareColumnStats(targetTableID string, tablePlan PreviewTable
 			sourceSum, sourceCount := sumNumericFieldFromMaps(sourceRows, column.Name)
 			targetSum, targetCount := sumNumericFieldFromMaps(targetRecords, column.Name)
 			if sourceCount != targetCount || math.Abs(sourceSum-targetSum) > 1e-9 {
-				warnings = append(warnings, fmt.Sprintf("数值统计不一致: %s source(sum=%.4f,count=%d) target(sum=%.4f,count=%d)", column.Name, sourceSum, sourceCount, targetSum, targetCount))
+				warnings = append(warnings, fmt.Sprintf("numeric stats mismatch: %s source(sum=%.4f,count=%d) target(sum=%.4f,count=%d)", column.Name, sourceSum, sourceCount, targetSum, targetCount))
 			}
 		case "date", "datetime":
 			sourceMin, sourceMax := minMaxStringFieldFromMaps(sourceRows, column.Name)
 			targetMin, targetMax := minMaxStringFieldFromMaps(targetRecords, column.Name)
 			if sourceMin != targetMin || sourceMax != targetMax {
-				warnings = append(warnings, fmt.Sprintf("日期范围不一致: %s source(%s~%s) target(%s~%s)", column.Name, sourceMin, sourceMax, targetMin, targetMax))
+				warnings = append(warnings, fmt.Sprintf("date range mismatch: %s source(%s~%s) target(%s~%s)", column.Name, sourceMin, sourceMax, targetMin, targetMax))
 			}
 		}
 	}
@@ -1074,7 +1074,7 @@ func (r *Runner) ensureSource() error {
 		return err
 	}
 	if err := src.Connect(r.cfg.BuildSourceDSN()); err != nil {
-		return newMigrationError(ErrCodeSourceConnect, "连接源数据库失败", err)
+		return newMigrationError(ErrCodeSourceConnect, "failed to connect to source database", err)
 	}
 	r.src = src
 	return nil
@@ -1179,7 +1179,7 @@ func retryWithBackoff(attempts int, initialDelay time.Duration, fn func() error)
 			if attempt == attempts {
 				break
 			}
-			zap.L().Warn("批次插入失败，准备重试",
+			zap.L().Warn("batch insert failed, retrying",
 				zap.Int("attempt", attempt),
 				zap.Duration("delay", delay),
 				zap.Error(err),

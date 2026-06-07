@@ -77,7 +77,7 @@ func TestExecutor_EmptyScopeReturnsError(t *testing.T) {
 		Size:   20,
 	}, token.ID)
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "权限验证失败")
+	assert.Contains(t, err.Error(), "no databases available")
 }
 
 func TestExecutor_TableLevelScope(t *testing.T) {

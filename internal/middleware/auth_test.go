@@ -45,7 +45,7 @@ func setupAuthDB(t *testing.T) (*gin.Engine, *models.Token, *models.Token) {
 
 	pkgdb.SetDB(d)
 
-	// 清理函数：硬删除所有测试数据
+	// Cleanup function: hard-delete all test data
 	t.Cleanup(func() {
 		d.Unscoped().Where("1 = 1").Delete(&models.File{})
 		d.Unscoped().Where("1 = 1").Delete(&models.RecordFieldIndex{})
@@ -442,12 +442,12 @@ func TestAllAuthErrorResponses(t *testing.T) {
 		{
 			name:    "missing token",
 			setup:   func() string { return "" },
-			wantMsg: "缺少 API Key",
+			wantMsg: "missing API Key",
 		},
 		{
 			name:    "invalid token",
 			setup:   func() string { return "Bearer totally_invalid_token" },
-			wantMsg: "无效的 API Key",
+			wantMsg: "invalid API Key",
 		},
 	}
 

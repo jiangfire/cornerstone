@@ -9,16 +9,16 @@ import (
 	"github.com/redis/go-redis/v9"
 )
 
-// RedisCache 是 Redis 后端缓存，实现 Cache[string, V] 接口。
-// 值通过 JSON 序列化存储。
+// RedisCache is a Redis-backed cache implementing the Cache[string, V] interface.
+// Values are stored via JSON serialization.
 type RedisCache[V any] struct {
 	client *redis.Client
 	prefix string
 	ttl    time.Duration
 }
 
-// NewRedisCache 创建 Redis 缓存实例。
-// redisURL 格式: redis://user:pass@host:port/db
+// NewRedisCache creates a Redis cache instance.
+// redisURL format: redis://user:pass@host:port/db
 func NewRedisCache[V any](redisURL, prefix string, ttl time.Duration) *RedisCache[V] {
 	opts, err := redis.ParseURL(redisURL)
 	if err != nil {
@@ -39,7 +39,7 @@ func (r *RedisCache[V]) key(key string) string {
 	return fmt.Sprintf("cache:%s:%s", r.prefix, key)
 }
 
-// Get 从 Redis 获取并反序列化值。key 不存在或解码失败返回 (zero, false)。
+// Get retrieves and deserializes a value from Redis. Returns (zero, false) if key does not exist or decode fails.
 func (r *RedisCache[V]) Get(key string) (V, bool) {
 	var zero V
 	if r.client == nil {
@@ -58,7 +58,7 @@ func (r *RedisCache[V]) Get(key string) (V, bool) {
 	return v, true
 }
 
-// Set 序列化并写入 Redis。
+// Set serializes and writes to Redis.
 func (r *RedisCache[V]) Set(key string, value V) {
 	if r.client == nil {
 		return
@@ -72,7 +72,7 @@ func (r *RedisCache[V]) Set(key string, value V) {
 	r.client.Set(context.Background(), r.key(key), data, r.ttl)
 }
 
-// Delete 从 Redis 删除指定 key。
+// Delete removes the specified key from Redis.
 func (r *RedisCache[V]) Delete(key string) {
 	if r.client == nil {
 		return
@@ -80,7 +80,7 @@ func (r *RedisCache[V]) Delete(key string) {
 	r.client.Del(context.Background(), r.key(key))
 }
 
-// Clear 删除当前前缀下的所有缓存条目。
+// Clear removes all cache entries under the current prefix.
 func (r *RedisCache[V]) Clear() {
 	if r.client == nil {
 		return

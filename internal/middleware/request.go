@@ -14,7 +14,7 @@ const (
 	traceIDKey   = "trace_id"
 )
 
-// RequestID 为每个请求注入 request_id/trace_id，便于链路追踪
+// RequestID injects request_id/trace_id for each request for traceability
 func RequestID() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		requestID := strings.TrimSpace(c.GetHeader("X-Request-ID"))
@@ -39,22 +39,22 @@ func RequestID() gin.HandlerFunc {
 	}
 }
 
-// RequestLogger 记录请求日志的中间件
+// RequestLogger is a middleware that logs requests
 func RequestLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 开始时间
+		// Start time
 		start := time.Now()
 
-		// 处理请求
+		// Process request
 		c.Next()
 
-		// 计算耗时
+		// Calculate duration
 		duration := time.Since(start)
 		requestID := GetRequestID(c)
 		traceID := GetTraceID(c)
 
-		// 记录日志
-		zap.L().Info("HTTP请求",
+		// Log the request
+		zap.L().Info("HTTP request",
 			zap.String("request_id", requestID),
 			zap.String("trace_id", traceID),
 			zap.String("method", c.Request.Method),
@@ -67,7 +67,7 @@ func RequestLogger() gin.HandlerFunc {
 	}
 }
 
-// GetRequestID 从上下文获取 request_id
+// GetRequestID gets request_id from context
 func GetRequestID(c *gin.Context) string {
 	if id, exists := c.Get(requestIDKey); exists {
 		if s, ok := id.(string); ok {
@@ -77,7 +77,7 @@ func GetRequestID(c *gin.Context) string {
 	return ""
 }
 
-// GetTraceID 从上下文获取 trace_id
+// GetTraceID gets trace_id from context
 func GetTraceID(c *gin.Context) string {
 	if id, exists := c.Get(traceIDKey); exists {
 		if s, ok := id.(string); ok {
@@ -95,7 +95,7 @@ func parseTraceID(traceparent string) string {
 	return ""
 }
 
-// CORS 跨域处理中间件
+// CORS is a cross-origin middleware
 func CORS() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Header("Access-Control-Allow-Origin", "*")
@@ -103,7 +103,7 @@ func CORS() gin.HandlerFunc {
 		c.Header("Access-Control-Allow-Headers", "Origin, Content-Type, Authorization")
 		c.Header("Access-Control-Allow-Credentials", "false")
 
-		// 处理预检请求
+		// Handle preflight request
 		if c.Request.Method == "OPTIONS" {
 			c.AbortWithStatus(204)
 			return
