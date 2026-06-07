@@ -1,31 +1,33 @@
-# Migration 指南
+[English](Migration.md) | [中文](Migration.zh.md)
 
-## 概述
+# Migration Guide
 
-`cornerstone migration` 用于把外部关系型数据库的表结构和数据迁移到 Cornerstone。
+## Overview
 
-当前映射关系：
+`cornerstone migration` is used to migrate table schemas and data from external relational databases into Cornerstone.
 
-| 源数据库对象 | Cornerstone 对象 |
+Current mapping:
+
+| Source Database Object | Cornerstone Object |
 | --- | --- |
 | Database / Schema | Database |
 | Table | Table |
 | Column | Field |
 | Row | Record |
 
-当前已支持的源数据库：
+Currently supported source databases:
 
 - `sqlite`
 - `mysql`
 - `postgres`
 
-当前 CI 已覆盖：
+Currently covered in CI:
 
-- SQLite 单元与集成测试
-- GitHub Actions 中的 `MySQL 8.4`
-- GitHub Actions 中的 `PostgreSQL 16`
+- SQLite unit and integration tests
+- MySQL 8.4 in GitHub Actions
+- PostgreSQL 16 in GitHub Actions
 
-## 命令总览
+## Command Overview
 
 ```bash
 cornerstone migration run
@@ -36,40 +38,40 @@ cornerstone migration config validate
 cornerstone migration config list
 ```
 
-## 快速开始
+## Quick Start
 
-### 1. 生成配置模板
+### 1. Generate Config Template
 
 ```bash
 cornerstone migration template --output ./migration.yaml
 ```
 
-或者：
+Or:
 
 ```bash
 cornerstone migration config create --output ./migration.yaml
 ```
 
-### 2. 预览迁移计划
+### 2. Preview Migration Plan
 
 ```bash
 cornerstone migration preview --config ./migration.yaml
 ```
 
-这一步只读取源库元数据，不会写入 Cornerstone。建议先看预览输出里的：
+This step only reads source metadata and does not write to Cornerstone. It is recommended to review the following in the preview output:
 
 - `target_database`
 - `tables`
 - `type_mapping_warnings`
 - `migration_strategy`
 
-### 3. 执行迁移
+### 3. Execute Migration
 
 ```bash
 cornerstone migration run --config ./migration.yaml
 ```
 
-执行成功后会输出 JSON 报告，其中包含：
+After successful execution, a JSON report is output containing:
 
 - `migration_id`
 - `status`
@@ -77,17 +79,17 @@ cornerstone migration run --config ./migration.yaml
 - `tables`
 - `validation`
 
-`migration_id` 会用于断点续传。
+`migration_id` is used for resuming from a checkpoint.
 
-## 常见用法
+## Common Usage
 
-### 使用配置文件迁移
+### Migrate with Config File
 
 ```bash
 cornerstone migration run --config ./migration.yaml
 ```
 
-### 单次命令快速迁移
+### Quick One-Off Migration
 
 ```bash
 cornerstone migration run \
@@ -99,7 +101,7 @@ cornerstone migration run \
   --validate
 ```
 
-### 只迁移结构，不迁移数据
+### Migrate Schema Only, Skip Data
 
 ```bash
 cornerstone migration run \
@@ -109,7 +111,7 @@ cornerstone migration run \
   --skip-data
 ```
 
-### 用 `run --dry-run` 做空跑
+### Dry Run with `run --dry-run`
 
 ```bash
 cornerstone migration run \
@@ -118,17 +120,17 @@ cornerstone migration run \
   --dry-run
 ```
 
-这和 `preview` 一样，只输出迁移计划，不执行写入。
+This is the same as `preview`, only outputting the migration plan without executing writes.
 
-### 从断点恢复
+### Resume from Checkpoint
 
 ```bash
 cornerstone migration run --config ./migration.yaml --resume mig_20260531_100000
 ```
 
-## 配置文件
+## Configuration File
 
-示例：
+Example:
 
 ```yaml
 source:
@@ -169,61 +171,61 @@ options:
   rollback_on_failure: table
 ```
 
-### 关键字段说明
+### Key Field Reference
 
-| 字段 | 说明 |
+| Field | Description |
 | --- | --- |
-| `source.type` | 源数据库类型：`sqlite` / `mysql` / `postgres` |
-| `source.dsn` | 源数据库连接串 |
-| `target.database_name` | 目标 Cornerstone Database 名称；为空时自动推导 |
-| `tables.include` | 只迁移这些表；空表示全部 |
-| `tables.exclude` | 排除这些表 |
-| `tables.rename` | 迁移时重命名表 |
-| `data.enabled` | 是否迁移数据；`false` 时只建结构 |
-| `data.batch_size` | 每批读取和写入的记录数 |
-| `data.pagination_strategy` | `cursor` 或 `offset` |
-| `data.cursor_column` | 显式指定游标列；为空时自动推断 |
-| `data.filters` | 按表追加源库过滤条件 |
-| `data.max_concurrent_tables` | 同时迁移的表数 |
-| `mapping.overrides` | 覆盖默认类型映射 |
-| `options.continue_on_error` | 单表失败后是否继续下一个表 |
-| `options.validate_after` | 迁移完成后是否校验 |
-| `options.checkpoint_interval` | 每处理多少条记录写一次状态文件 |
-| `options.rollback_on_failure` | 单表失败时回滚策略：`table` / `none` |
+| `source.type` | Source database type: `sqlite` / `mysql` / `postgres` |
+| `source.dsn` | Source database connection string |
+| `target.database_name` | Target Cornerstone Database name; auto-derived if empty |
+| `tables.include` | Only migrate these tables; empty means all |
+| `tables.exclude` | Exclude these tables |
+| `tables.rename` | Rename tables during migration |
+| `data.enabled` | Whether to migrate data; `false` migrates schema only |
+| `data.batch_size` | Number of records to read and write per batch |
+| `data.pagination_strategy` | `cursor` or `offset` |
+| `data.cursor_column` | Explicitly specify the cursor column; auto-inferred if empty |
+| `data.filters` | Append source database filter conditions per table |
+| `data.max_concurrent_tables` | Number of tables to migrate concurrently |
+| `mapping.overrides` | Override default type mappings |
+| `options.continue_on_error` | Whether to continue with the next table after a single table failure |
+| `options.validate_after` | Whether to validate after migration completes |
+| `options.checkpoint_interval` | Write state file after processing this many records |
+| `options.rollback_on_failure` | Rollback strategy on single table failure: `table` / `none` |
 
-## CLI 参数
+## CLI Parameters
 
-`migration run` 和 `migration preview` 共享这些参数：
+`migration run` and `migration preview` share these parameters:
 
-| 参数 | 说明 |
+| Parameter | Description |
 | --- | --- |
-| `--config`, `-c` | 配置文件路径 |
-| `--source-type` | 源数据库类型 |
-| `--source-dsn` | 源数据库连接 DSN |
-| `--target-db` | 目标 Database 名称 |
-| `--include-tables` | 逗号分隔的表白名单 |
-| `--exclude-tables` | 逗号分隔的表排除名单 |
-| `--with-data` | 迁移数据，默认开启 |
-| `--skip-data` | 只迁移结构 |
-| `--batch-size` | 批大小，默认 `500` |
-| `--dry-run` | 只输出计划，不执行写入 |
-| `--type-map-override` | 额外类型映射 JSON 文件 |
-| `--resume` | 从指定 `migration_id` 恢复 |
-| `--validate` | 迁移后校验，默认开启 |
-| `--continue-on-error` | 单表失败后继续 |
+| `--config`, `-c` | Configuration file path |
+| `--source-type` | Source database type |
+| `--source-dsn` | Source database connection DSN |
+| `--target-db` | Target Database name |
+| `--include-tables` | Comma-separated table allowlist |
+| `--exclude-tables` | Comma-separated table exclusion list |
+| `--with-data` | Migrate data, enabled by default |
+| `--skip-data` | Migrate schema only |
+| `--batch-size` | Batch size, default `500` |
+| `--dry-run` | Only output plan, do not execute writes |
+| `--type-map-override` | Additional type mapping JSON file |
+| `--resume` | Resume from the specified `migration_id` |
+| `--validate` | Validate after migration, enabled by default |
+| `--continue-on-error` | Continue after a single table failure |
 | `--pagination-strategy` | `cursor` / `offset` |
-| `--cursor-column` | 指定游标列 |
-| `--checkpoint-interval` | checkpoint 间隔 |
+| `--cursor-column` | Specify the cursor column |
+| `--checkpoint-interval` | Checkpoint interval |
 | `--rollback-on-failure` | `table` / `none` |
-| `--max-concurrent-tables` | 同时迁移的表数 |
+| `--max-concurrent-tables` | Number of tables to migrate concurrently |
 
-## 类型映射
+## Type Mapping
 
-默认会根据源库类型做自动映射。
+Mapping is automatic based on the source database type.
 
-常见规则：
+Common rules:
 
-| 源类型 | Cornerstone 类型 |
+| Source Type | Cornerstone Type |
 | --- | --- |
 | `varchar`, `char`, `text` | `string` / `text` |
 | `int`, `bigint`, `float`, `double`, `decimal`, `numeric` | `number` |
@@ -232,9 +234,9 @@ options:
 | `datetime`, `timestamp`, `timestamptz` | `datetime` |
 | `json`, `jsonb` | `json` |
 | `array`, `enum`, `set` | `list` |
-| `blob`, `bytea`, 未识别类型 | 默认回退为 `string`，并给 warning |
+| `blob`, `bytea`, unrecognized types | Falls back to `string` by default with a warning |
 
-如果需要覆盖默认行为，可以提供 JSON 文件：
+To override the default behavior, provide a JSON file:
 
 ```json
 {
@@ -244,17 +246,17 @@ options:
 }
 ```
 
-然后执行：
+Then run:
 
 ```bash
 cornerstone migration run --config ./migration.yaml --type-map-override ./type-map.json
 ```
 
-## 迁移输出
+## Migration Output
 
-### 预览输出
+### Preview Output
 
-`preview` 或 `run --dry-run` 输出大致如下：
+The output of `preview` or `run --dry-run` looks like this:
 
 ```json
 {
@@ -277,9 +279,9 @@ cornerstone migration run --config ./migration.yaml --type-map-override ./type-m
 }
 ```
 
-### 执行报告
+### Execution Report
 
-`run` 输出大致如下：
+The output of `run` looks like this:
 
 ```json
 {
@@ -313,72 +315,72 @@ cornerstone migration run --config ./migration.yaml --type-map-override ./type-m
 }
 ```
 
-## 断点续传与状态文件
+## Resumable Migration & State File
 
-迁移状态默认保存在：
+Migration state is saved by default at:
 
 ```text
 ~/.cornerstone/migrations/<migration_id>.state.json
 ```
 
-状态文件包含：
+The state file contains:
 
 - `migration_id`
 - `target_db`
-- 每张表的 `status`
+- `status` for each table
 - `cursor_column`
 - `cursor_value`
 - `processed_count`
 
-当前状态文件只保存**源类型和源库名**，不会保存完整 DSN 或密码。
+The current state file only stores the **source type and source database name**, not the full DSN or password.
 
-如果状态文件损坏，当前处理方式是：
+If the state file is corrupted, the current approach is:
 
-1. 删除损坏的状态文件；
-2. 不带 `--resume` 重新执行；
-3. 或使用新的 `migration_id` 重新发起迁移。
+1. Delete the corrupted state file;
+2. Re-run without `--resume`;
+3. Or initiate a new migration with a new `migration_id`.
 
-## 校验策略
+## Validation Strategy
 
-开启 `validate_after` 后，迁移完成后会执行：
+When `validate_after` is enabled, the following checks are performed after migration:
 
-1. 结构校验
-2. 行数校验
-3. 内容抽样校验
-4. 数值列 / 日期列的统计对比
+1. Schema validation
+2. Row count validation
+3. Content sampling validation
+4. Statistical comparison for numeric / date columns
 
-如果存在差异，最终状态通常会变成：
+If discrepancies exist, the final status typically becomes:
 
 - `completed_with_issues`
-- 或 `validation.status = passed_with_warnings`
+- or `validation.status = passed_with_warnings`
 
-## 安全建议
+## Security Recommendations
 
-1. 迁移前确保 `MASTER_TOKEN` 可用。
-2. 配置文件如果包含密码，建议权限收紧到 `0600`。
-3. MySQL / PostgreSQL 源库建议使用只读账号。
-4. 不要把源库 DSN 直接写入版本库。
+1. Ensure `MASTER_TOKEN` is available before migration.
+2. If the configuration file contains passwords, restrict its permissions to `0600`.
+3. For MySQL / PostgreSQL source databases, use a read-only account.
+4. Do not commit source database DSNs directly into version control.
 
-## 当前边界
+## Current Limitations
 
-这部分是当前实现边界，不是未来规划：
+These are current implementation limitations, not future plans:
 
-1. 只迁移 Database / Table / Field / Record，不迁移索引和约束。
-2. `BLOB` / `BYTEA` 目前不会自动转成 Cornerstone 文件资源，只会回退为字符串并给 warning。
-3. `read_only_hint` 目前不是所有驱动都强制生效：
-   - SQLite 会启用 `PRAGMA query_only = ON`
-   - MySQL / PostgreSQL 仍主要依赖源库账号本身的只读权限
-4. 当前没有 `--skip-resume` 参数；遇到损坏状态文件时，按“删除状态文件后重新执行”处理。
-5. `options.log_level` 当前保留在配置结构中，但还没有单独驱动 migration 日志级别切换。
-6. 预览输出当前不包含“预计耗时”，重点是结构、行数、warning 和分页策略。
+1. Only Database / Table / Field / Record are migrated; indexes and constraints are not migrated.
+2. `BLOB` / `BYTEA` are not automatically converted to Cornerstone file resources; they fall back to string with a warning.
+3. `read_only_hint` is not enforced by all drivers:
+   - SQLite enables `PRAGMA query_only = ON`
+   - MySQL / PostgreSQL still mainly rely on the read-only permissions of the source database account itself
+4. There is currently no `--skip-resume` parameter; when encountering a corrupted state file, follow the "delete state file and re-run" approach.
+5. `options.log_level` is currently retained in the configuration structure, but does not yet independently drive migration log level switching.
+6. Preview output currently does not include "estimated time"; the focus is on structure, row counts, warnings, and pagination strategy.
 
-## 推荐流程
+## Recommended Workflow
 
-建议按这个顺序使用：
+Recommended usage order:
 
-1. `migration template` 生成模板
-2. 编辑 `migration.yaml`
+1. `migration template` generates the template
+2. Edit `migration.yaml`
 3. `migration config validate --config ./migration.yaml`
 4. `migration preview --config ./migration.yaml`
 5. `migration run --config ./migration.yaml`
-6. 如中断，使用 `migration_id` 配合 `--resume` 恢复
+6. If interrupted, resume using `migration_id` with `--resume`

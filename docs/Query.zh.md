@@ -2,13 +2,13 @@
 
 # Query DSL
 
-Describe queries via JSON without writing SQL by hand. Supports filtering, sorting, aggregation, and JOIN.
+通过 JSON 描述查询需求，无需手写 SQL。支持过滤、排序、聚合、JOIN。
 
 ---
 
-## Endpoints
+## 接口
 
-### Unified Query
+### 统一查询
 
 ```bash
 # POST
@@ -17,19 +17,19 @@ curl -X POST http://localhost:8080/api/v1/query \
   -H "Content-Type: application/json" \
   -d '{"from": "records", ...}'
 
-# GET (query params encoded)
+# GET（查询参数编码）
 curl "http://localhost:8080/api/v1/query?q=%7B%22from%22%3A%22records%22%7D" \
   -H "Authorization: Bearer cs_your_token"
 ```
 
-### Simplified Query
+### 简化查询
 
 ```bash
 curl "http://localhost:8080/api/v1/query/simple?table=records&filter=%7B%7D&sort=-created_at&page=1&size=20" \
   -H "Authorization: Bearer cs_your_token"
 ```
 
-### Batch Query
+### 批量查询
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/query/batch \
@@ -38,7 +38,7 @@ curl -X POST http://localhost:8080/api/v1/query/batch \
   -d '{"queries": {"q1": {"from": "records", ...}, "q2": {"from": "tables", ...}}}'
 ```
 
-### Query Explain
+### 查询解释
 
 ```bash
 curl -X POST http://localhost:8080/api/v1/query/explain \
@@ -47,7 +47,7 @@ curl -X POST http://localhost:8080/api/v1/query/explain \
   -d '{"from": "records", ...}'
 ```
 
-### Accessible Table List
+### 可访问表列表
 
 ```bash
 curl http://localhost:8080/api/v1/query/tables \
@@ -56,9 +56,9 @@ curl http://localhost:8080/api/v1/query/tables \
 
 ---
 
-## Query Syntax
+## 查询语法
 
-### Basic Query
+### 基础查询
 
 ```json
 {
@@ -76,7 +76,7 @@ curl http://localhost:8080/api/v1/query/tables \
 }
 ```
 
-### Simplified Syntax
+### 简化语法
 
 ```json
 {
@@ -92,7 +92,7 @@ curl http://localhost:8080/api/v1/query/tables \
 }
 ```
 
-### JOIN Query
+### JOIN 查询
 
 ```json
 {
@@ -116,7 +116,7 @@ curl http://localhost:8080/api/v1/query/tables \
 }
 ```
 
-### Aggregate Query
+### 聚合查询
 
 ```json
 {
@@ -137,40 +137,40 @@ curl http://localhost:8080/api/v1/query/tables \
 
 ---
 
-## Operators
+## 操作符
 
-| Operator | Description | Example |
-|----------|-------------|---------|
-| eq | Equal to | `{"field": "status", "op": "eq", "value": "paid"}` |
-| ne | Not equal to | `{"field": "status", "op": "ne", "value": "deleted"}` |
-| gt | Greater than | `{"field": "total", "op": "gt", "value": 100}` |
-| gte | Greater than or equal to | `{"field": "total", "op": "gte", "value": 100}` |
-| lt | Less than | `{"field": "total", "op": "lt", "value": 500}` |
-| lte | Less than or equal to | `{"field": "total", "op": "lte", "value": 500}` |
-| like | Fuzzy search | `{"field": "name", "op": "like", "value": "zhang"}` |
-| in | IN query | `{"field": "status", "op": "in", "value": ["paid", "shipped"]}` |
-| between | Range query | `{"field": "created_at", "op": "between", "value": ["2024-01-01", "2024-12-31"]}` |
-| is_null | Null check | `{"field": "deleted_at", "op": "is_null", "value": true}` |
-
----
-
-## Query Limits
-
-| Limit | Default | Description |
-|-------|---------|-------------|
-| MaxJoins | 3 | Maximum number of JOIN tables |
-| MaxPageSize | 1000 | Maximum page size |
-| MaxDepth | 5 | Maximum nesting depth for nested queries |
-| MaxRows | 10000 | Maximum number of returned rows |
-| MaxFields | 100 | Maximum number of query fields |
+| 操作符 | 说明 | 示例 |
+|--------|------|------|
+| eq | 等于 | `{"field": "status", "op": "eq", "value": "paid"}` |
+| ne | 不等于 | `{"field": "status", "op": "ne", "value": "deleted"}` |
+| gt | 大于 | `{"field": "total", "op": "gt", "value": 100}` |
+| gte | 大于等于 | `{"field": "total", "op": "gte", "value": 100}` |
+| lt | 小于 | `{"field": "total", "op": "lt", "value": 500}` |
+| lte | 小于等于 | `{"field": "total", "op": "lte", "value": 500}` |
+| like | 模糊查询 | `{"field": "name", "op": "like", "value": "zhang"}` |
+| in | IN 查询 | `{"field": "status", "op": "in", "value": ["paid", "shipped"]}` |
+| between | 范围查询 | `{"field": "created_at", "op": "between", "value": ["2024-01-01", "2024-12-31"]}` |
+| is_null | 为空判断 | `{"field": "deleted_at", "op": "is_null", "value": true}` |
 
 ---
 
-## Advanced Features
+## 查询限制
 
-### HAVING Clause
+| 限制项 | 默认值 | 说明 |
+|--------|--------|------|
+| MaxJoins | 3 | 最多 JOIN 表数 |
+| MaxPageSize | 1000 | 最大分页大小 |
+| MaxDepth | 5 | 嵌套查询最大深度 |
+| MaxRows | 10000 | 最大返回行数 |
+| MaxFields | 100 | 最大查询字段数 |
 
-Filter after aggregation. Syntax is identical to `where`:
+---
+
+## 高级功能
+
+### HAVING 子句
+
+聚合后过滤，语法与 `where` 一致：
 
 ```json
 {
@@ -188,45 +188,45 @@ Filter after aggregation. Syntax is identical to `where`:
 }
 ```
 
-### Aggregate Functions
+### 聚合函数
 
-| Function | Description |
-|----------|-------------|
-| `count` | Count |
-| `count_distinct` | Distinct count |
-| `sum` | Sum |
-| `avg` | Average |
-| `min` | Minimum |
-| `max` | Maximum |
-| `stddev` | Standard deviation |
-| `stddev_pop` | Population standard deviation |
-| `stddev_samp` | Sample standard deviation |
-| `variance` | Variance |
-| `var_pop` | Population variance |
-| `var_samp` | Sample variance |
+| 函数 | 说明 |
+|------|------|
+| `count` | 计数 |
+| `count_distinct` | 去重计数 |
+| `sum` | 求和 |
+| `avg` | 平均值 |
+| `min` | 最小值 |
+| `max` | 最大值 |
+| `stddev` | 标准差 |
+| `stddev_pop` | 总体标准差 |
+| `stddev_samp` | 样本标准差 |
+| `variance` | 方差 |
+| `var_pop` | 总体方差 |
+| `var_samp` | 样本方差 |
 
-### JOIN Types
+### JOIN 类型
 
-Four JOIN types are supported:
+支持四种 JOIN 类型：
 
-| Type | Description |
-|------|-------------|
+| 类型 | 说明 |
+|------|------|
 | `left` | LEFT JOIN |
 | `right` | RIGHT JOIN |
 | `inner` | INNER JOIN |
 | `outer` | FULL OUTER JOIN |
 
-### NOT Condition Negation
+### NOT 条件否定
 
-Any condition can be negated by adding `"not": true`:
+任意条件可添加 `"not": true` 取反：
 
 ```json
 {"field": "status", "op": "eq", "value": "deleted", "not": true}
 ```
 
-### Nested AND/OR Conditions
+### 嵌套 AND/OR 条件
 
-Conditions can be nested and grouped arbitrarily:
+条件可任意嵌套分组：
 
 ```json
 {
@@ -242,7 +242,7 @@ Conditions can be nested and grouped arbitrarily:
 }
 ```
 
-### UNION / INTERSECT Set Operations
+### UNION / INTERSECT 集合查询
 
 ```json
 {
@@ -257,11 +257,11 @@ Conditions can be nested and grouped arbitrarily:
 }
 ```
 
-`intersect` works the same way; just replace the `union` field.
+`intersect` 用法相同，替换 `union` 字段即可。
 
-### JSON Path Field Syntax
+### JSON 路径字段语法
 
-Access values inside JSONB fields. PostgreSQL automatically uses `->>` / `->` syntax, while SQLite automatically converts to `JSON_EXTRACT`:
+访问 JSONB 字段内部值，PostgreSQL 自动使用 `->>` `/`->` 语法，SQLite 自动转为 `JSON_EXTRACT`：
 
 ```json
 {"field": "data->>status", "op": "eq", "value": "paid"}
@@ -269,9 +269,9 @@ Access values inside JSONB fields. PostgreSQL automatically uses `->>` / `->` sy
 
 ---
 
-## Query Validation & Schema Endpoints
+## 查询校验与 Schema 端点
 
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/v1/query/validate` | Validate query DSL + permissions (does not execute) |
-| GET | `/api/v1/query/schema/:table` | Get queryable field schema for a table |
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | `/api/v1/query/validate` | 校验查询 DSL + 权限（不执行） |
+| GET | `/api/v1/query/schema/:table` | 获取可查询表的字段 Schema |
