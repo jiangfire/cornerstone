@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -156,13 +157,15 @@ func runServe(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	r.Any("/api/*path", func(c *gin.Context) {
-		c.Request.URL.Path = "/api/v1" + c.Param("path")
-		r.HandleContext(c)
-	})
-
 	r.NoRoute(func(c *gin.Context) {
-		if len(c.Request.URL.Path) >= 5 && c.Request.URL.Path[:5] == "/api/" {
+		path := c.Request.URL.Path
+		// Redirect /api/* to /api/v1/* for backward compatibility
+		if len(path) >= 5 && path[:5] == "/api/" && !strings.HasPrefix(path, "/api/v1/") {
+			c.Request.URL.Path = "/api/v1" + strings.TrimPrefix(path, "/api")
+			r.HandleContext(c)
+			return
+		}
+		if len(path) >= 5 && path[:5] == "/api/" {
 			c.JSON(http.StatusNotFound, gin.H{
 				"error":   "not found",
 				"message": "The requested API endpoint does not exist",
