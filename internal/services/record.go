@@ -1473,8 +1473,8 @@ func (s *RecordService) DeleteRecord(recordID, userID string) error {
 		return fmt.Errorf("record not found: %w", err)
 	}
 
-	// 2. Check table access
-	if err := s.checkTableAccess(record.TableID, userID, []string{"owner", "admin", "editor"}); err != nil {
+	// 2. Check table access - only owner and admin can delete records
+	if err := s.checkTableAccess(record.TableID, userID, []string{"owner", "admin"}); err != nil {
 		return err
 	}
 

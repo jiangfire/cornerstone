@@ -507,3 +507,32 @@ func TestAuth_MasterEnvNotSet(t *testing.T) {
 
 	assert.Equal(t, http.StatusUnauthorized, w.Code)
 }
+
+// BUG-001: Master Token via env should set token_id to the env value (not empty string)
+// This ensures the service layer can properly use the token_id for authorization
+func TestAuth_MasterTokenEnv_SetsTokenID(t *testing.T) {
+	r, _, _ := setupAuthDB(t)
+	masterVal := "cs_env_master_token_id_test"
+	os.Setenv("MASTER_TOKEN", masterVal)
+	defer os.Unsetenv("MASTER_TOKEN")
+
+	r.Use(Auth())
+	r.GET("/", func(c *gin.Context) {
+		tokenID := GetTokenID(c)
+		isMaster := IsMasterToken(c)
+		c.JSON(http.StatusOK, gin.H{
+			"token_id":  tokenID,
+			"is_master": isMaster,
+		})
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Set("Authorization", "Bearer "+masterVal)
+	r.ServeHTTP(w, req)
+
+	assert.Equal(t, http.StatusOK, w.Code)
+	assert.Contains(t, w.Body.String(), `"is_master":true`)
+	// BUG-001: token_id should be the master token value, not empty string
+	assert.Contains(t, w.Body.String(), `"token_id":"`+masterVal+`"`)
+}

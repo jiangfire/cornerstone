@@ -103,11 +103,34 @@ func Migrate() error {
 	if masterToken == "" {
 		logger.Warn("MASTER_TOKEN environment variable is not set, Master Token authentication will be unavailable")
 	} else {
+		if err := ensureMasterTokenRecord(database, masterToken); err != nil {
+			return fmt.Errorf("failed to ensure master token record: %w", err)
+		}
 		logger.Info("MASTER_TOKEN loaded from environment variable")
 	}
 
 	logger.Info("database migration completed")
 	return nil
+}
+
+func ensureMasterTokenRecord(db *gorm.DB, masterToken string) error {
+	var token models.Token
+	result := db.Where("id = ?", masterToken).First(&token)
+	if result.Error == nil {
+		return nil
+	}
+	if result.Error != gorm.ErrRecordNotFound {
+		return result.Error
+	}
+
+	token = models.Token{
+		ID:       masterToken,
+		Token:    masterToken,
+		Name:     "master",
+		IsMaster: true,
+		Scopes:   "{}",
+	}
+	return db.Create(&token).Error
 }
 
 func createIndexes(db *gorm.DB) error {

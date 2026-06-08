@@ -24,7 +24,7 @@ func Auth() gin.HandlerFunc {
 
 		masterToken := os.Getenv("MASTER_TOKEN")
 		if masterToken != "" && token == masterToken {
-			c.Set("token_id", "")
+			c.Set("token_id", masterToken)
 			c.Set("token_is_master", true)
 			c.Set("token_scopes", "{}")
 			c.Next()

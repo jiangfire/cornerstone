@@ -1199,6 +1199,59 @@ func TestDeleteRecord_PermissionDenied(t *testing.T) {
 	assert.Contains(t, err.Error(), "permission denied: cannot access this table")
 }
 
+// BUG-003: Editor should NOT be able to delete records (only admin/master can)
+func TestDeleteRecord_EditorPermissionDenied(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	dbModel := &models.Database{Name: "delete_editor_perm_db"}
+	require.NoError(t, db.Create(dbModel).Error)
+	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "delete_editor_perm_table"}
+	require.NoError(t, db.Create(tbl).Error)
+	require.NoError(t, db.Create(&models.Field{TableID: tbl.ID, Name: "name", Type: "string"}).Error)
+
+	record := &models.Record{TableID: tbl.ID, Data: `{"name":"protected"}`, Version: 1}
+	require.NoError(t, db.Create(record).Error)
+
+	editor := &models.Token{
+		Name:     "editor_delete",
+		IsMaster: false,
+		Scopes:   fmt.Sprintf(`{"databases":{"%s":"editor"},"tables":{}}`, dbModel.ID),
+	}
+	require.NoError(t, db.Create(editor).Error)
+	authz.ClearTokenCache()
+
+	err := s.DeleteRecord(record.ID, editor.ID)
+	require.Error(t, err, "Editor should NOT be able to delete records")
+	assert.Contains(t, err.Error(), "permission denied")
+}
+
+// BUG-003: Admin SHOULD be able to delete records
+func TestDeleteRecord_AdminPermissionAllowed(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	dbModel := &models.Database{Name: "delete_admin_perm_db"}
+	require.NoError(t, db.Create(dbModel).Error)
+	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "delete_admin_perm_table"}
+	require.NoError(t, db.Create(tbl).Error)
+	require.NoError(t, db.Create(&models.Field{TableID: tbl.ID, Name: "name", Type: "string"}).Error)
+
+	record := &models.Record{TableID: tbl.ID, Data: `{"name":"deletable"}`, Version: 1}
+	require.NoError(t, db.Create(record).Error)
+
+	admin := &models.Token{
+		Name:     "admin_delete",
+		IsMaster: false,
+		Scopes:   fmt.Sprintf(`{"databases":{"%s":"admin"},"tables":{}}`, dbModel.ID),
+	}
+	require.NoError(t, db.Create(admin).Error)
+	authz.ClearTokenCache()
+
+	err := s.DeleteRecord(record.ID, admin.ID)
+	require.NoError(t, err, "Admin SHOULD be able to delete records")
+}
+
 // ============================================================
 // Merged from record_gaps_test.go: export empty record boundaries
 // ============================================================

@@ -198,3 +198,57 @@ func TestBackfillRecordFieldIndexes(t *testing.T) {
 	require.NoError(t, db.Model(&models.RecordFieldIndex{}).Where("record_id = ? AND deleted_at IS NULL", record.ID).Count(&count).Error)
 	assert.Equal(t, int64(3), count)
 }
+
+// BUG-002: Migration should create Master Token record when MASTER_TOKEN is set
+func TestMigrate_CreatesMasterTokenRecord(t *testing.T) {
+	dbType := os.Getenv("DB_TYPE")
+	databaseURL := os.Getenv("DATABASE_URL")
+	if dbType == "" {
+		dbType = "sqlite"
+		databaseURL = ":memory:"
+	}
+
+	masterTokenValue := "cs_test_master_token_migrate"
+	t.Setenv("MASTER_TOKEN", masterTokenValue)
+
+	err := pkgdb.InitDB(config.DatabaseConfig{Type: dbType, URL: databaseURL})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = pkgdb.CloseDB() })
+
+	err = Migrate()
+	require.NoError(t, err)
+
+	var token models.Token
+	err = pkgdb.DB().Where("token = ?", masterTokenValue).First(&token).Error
+	require.NoError(t, err, "Master Token record should exist in database after migration")
+	assert.True(t, token.IsMaster, "Master Token should have IsMaster=true")
+	assert.Equal(t, masterTokenValue, token.ID)
+	assert.Equal(t, "master", token.Name)
+}
+
+// BUG-002: Migration should be idempotent - running twice should not fail
+func TestMigrate_MasterTokenIdempotent(t *testing.T) {
+	dbType := os.Getenv("DB_TYPE")
+	databaseURL := os.Getenv("DATABASE_URL")
+	if dbType == "" {
+		dbType = "sqlite"
+		databaseURL = ":memory:"
+	}
+
+	masterTokenValue := "cs_test_master_token_idempotent"
+	t.Setenv("MASTER_TOKEN", masterTokenValue)
+
+	err := pkgdb.InitDB(config.DatabaseConfig{Type: dbType, URL: databaseURL})
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = pkgdb.CloseDB() })
+
+	err = Migrate()
+	require.NoError(t, err)
+
+	err = Migrate()
+	require.NoError(t, err, "Second migration should not fail")
+
+	var count int64
+	pkgdb.DB().Model(&models.Token{}).Where("token = ?", masterTokenValue).Count(&count)
+	assert.Equal(t, int64(1), count, "Should only have one Master Token record")
+}
