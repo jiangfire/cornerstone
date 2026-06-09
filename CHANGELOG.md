@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.6.3] - 2026-06-09
+
+### Fixed
+
+- **CLI `--json` mode** - Suppressed log output to avoid polluting structured JSON on stdout
+- **MCP `query_data` parameter structure** - Unified with REST API by removing the `query` wrapper layer; Query DSL fields are now passed directly in `arguments`
+- **List field validation messages** - Improved error messages to clearly show the required array format: `e.g. ["admin"] or ["option1", "option2"]`
+
+### Changed
+
+- **Query DSL documentation** - Added clear note about using qualified column names (e.g. `records.id`) in `select` when using JOIN to avoid ambiguous column errors
+- **MCP Setup documentation** - Added complete JSON-RPC request examples for all common operations (initialize, list tools, query data, JOIN queries)
+
 ## [v1.6.0] - 2026-06-07
 
 ### Added

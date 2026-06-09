@@ -7,6 +7,19 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [v1.6.3] - 2026-06-09
+
+### 修复
+
+- **CLI `--json` 模式** - 抑制日志输出，避免污染 stdout 上的结构化 JSON
+- **MCP `query_data` 参数结构** - 与 REST API 统一，移除 `query` 包装层；Query DSL 字段现在直接在 `arguments` 中传递
+- **List 字段验证提示** - 改进错误信息，清晰显示所需的数组格式：`例如 ["admin"] 或 ["option1", "option2"]`
+
+### 变更
+
+- **Query DSL 文档** - 新增关于 JOIN 查询时使用限定列名（如 `records.id`）的说明，避免列名歧义错误
+- **MCP 配置文档** - 新增完整的 JSON-RPC 请求示例，覆盖所有常用操作（初始化、列出工具、查询数据、JOIN 查询）
+
 ## [v1.6.0] - 2026-06-07
 
 ### Added
