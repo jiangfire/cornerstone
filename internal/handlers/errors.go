@@ -20,6 +20,14 @@ func handleServiceError(c *gin.Context, err error) {
 	dto.InternalServerError(c, err.Error())
 }
 
+func handleCreateServiceError(c *gin.Context, err error) {
+	if isPermissionError(err) {
+		dto.Forbidden(c, err.Error())
+		return
+	}
+	dto.BadRequest(c, err.Error())
+}
+
 // isPermissionError checks if error is permission-related
 func isPermissionError(err error) bool {
 	if err == nil {

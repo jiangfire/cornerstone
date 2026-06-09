@@ -44,7 +44,7 @@ func CreateField(c *gin.Context) {
 	fieldService := services.NewFieldService(db.DB())
 	field, err := fieldService.CreateField(req, tokenID)
 	if err != nil {
-		dto.Error(c, 400, err.Error())
+		handleCreateServiceError(c, err)
 		return
 	}
 

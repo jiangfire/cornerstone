@@ -108,25 +108,34 @@ cornerstone serve                    # Start HTTP API + MCP server
 # Data Management
 cornerstone db list
 cornerstone db create <name> [-d description]
-cornerstone db get|update|delete <id>
+cornerstone db get <id>
+cornerstone db update <id> [-n name] [-d description]
+cornerstone db delete <id>
 
 cornerstone table list <db-id>
 cornerstone table create <db-id> <name>
-cornerstone table get|update|delete <id>
+cornerstone table get <id>
+cornerstone table update <id> [-n name] [-d description]
+cornerstone table delete <id>
 
 cornerstone field list <table-id>
 cornerstone field create <table-id> <name> <type> [-r] [-d desc]
-cornerstone field get|update|delete <id>
+cornerstone field get <id>
+cornerstone field update <id> [-n name] [-t type] [-r] [-d desc]
+cornerstone field delete <id>
 
 cornerstone record list <table-id> [-l limit] [-o offset] [-f filter]
 cornerstone record create <table-id> '<json>'
-cornerstone record get|update|delete <id>
+cornerstone record get <id>
+cornerstone record update <id> '<json>' [-v version]
+cornerstone record delete <id>
 cornerstone record batch <table-id> '<json>' <count>
 
 # Token and Permissions
 cornerstone token list
 cornerstone token create <name> [-s scopes] [-e expires]
-cornerstone token update|delete <id>
+cornerstone token update <id> [-s scopes] [-e expires]
+cornerstone token delete <id>
 
 # External Database Migration
 cornerstone migration run [-c config] [--source-type mysql|postgres|sqlite] [--source-dsn ...] [--target-db ...]

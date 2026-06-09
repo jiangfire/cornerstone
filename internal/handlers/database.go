@@ -24,6 +24,7 @@ import (
 // @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseObject}
 // @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - master token required"
 // @Router       /api/v1/databases [post]
 func CreateDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -37,7 +38,7 @@ func CreateDatabase(c *gin.Context) {
 	dbService := services.NewDatabaseService(db.DB())
 	database, err := dbService.CreateDatabase(req, tokenID)
 	if err != nil {
-		dto.Error(c, 400, err.Error())
+		handleCreateServiceError(c, err)
 		return
 	}
 
@@ -207,6 +208,7 @@ func DeleteDatabase(c *gin.Context) {
 // @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseBulkCreateResponse}
 // @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - master token required"
 // @Router       /api/v1/databases/with-tables [post]
 func CreateDatabaseWithTables(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -220,7 +222,7 @@ func CreateDatabaseWithTables(c *gin.Context) {
 	dbService := services.NewDatabaseService(db.DB())
 	result, err := dbService.CreateDatabaseWithTables(req, tokenID)
 	if err != nil {
-		dto.Error(c, 400, err.Error())
+		handleCreateServiceError(c, err)
 		return
 	}
 

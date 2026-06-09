@@ -42,7 +42,7 @@ func InitAIAgent(agent *services.AIAgent) {
 // @Router       /api/v1/ai/chat [post]
 func ChatWithAI(c *gin.Context) {
 	if aiAgent == nil {
-		dto.InternalServerError(c, "AI agent not configured")
+		dto.Error(c, 503, "AI service unavailable: LLM_API_KEY not configured")
 		return
 	}
 

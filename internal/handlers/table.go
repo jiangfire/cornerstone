@@ -38,7 +38,7 @@ func CreateTable(c *gin.Context) {
 	tableService := services.NewTableService(db.DB())
 	table, err := tableService.CreateTable(req, userID)
 	if err != nil {
-		dto.Error(c, 400, err.Error())
+		handleCreateServiceError(c, err)
 		return
 	}
 

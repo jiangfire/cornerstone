@@ -25,7 +25,7 @@ var tokenListCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		masterToken, err := getMasterTokenID()
+		masterToken, err := getRequiredMasterTokenID()
 		if err != nil {
 			return err
 		}
@@ -48,7 +48,7 @@ var tokenCreateCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		if _, err := getMasterTokenID(); err != nil {
+		if _, err := getRequiredMasterTokenID(); err != nil {
 			return err
 		}
 
@@ -96,7 +96,7 @@ var tokenUpdateCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		if _, err := getMasterTokenID(); err != nil {
+		if _, err := getRequiredMasterTokenID(); err != nil {
 			return err
 		}
 
@@ -131,7 +131,7 @@ var tokenDeleteCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		masterToken, err := getMasterTokenID()
+		masterToken, err := getRequiredMasterTokenID()
 		if err != nil {
 			return err
 		}

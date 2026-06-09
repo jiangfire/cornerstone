@@ -25,7 +25,7 @@ var fieldListCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -53,7 +53,7 @@ var fieldCreateCmd = &cobra.Command{
 		desc, _ := cmd.Flags().GetString("description")
 		required, _ := cmd.Flags().GetBool("required")
 		options, _ := cmd.Flags().GetString("options")
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -83,7 +83,7 @@ var fieldGetCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -111,7 +111,7 @@ var fieldUpdateCmd = &cobra.Command{
 		desc, _ := cmd.Flags().GetString("description")
 		required, _ := cmd.Flags().GetBool("required")
 		options, _ := cmd.Flags().GetString("options")
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -140,7 +140,7 @@ var fieldDeleteCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}

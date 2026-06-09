@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	appdb "github.com/jiangfire/cornerstone/internal/db"
+	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/jiangfire/cornerstone/internal/services"
 	"github.com/jiangfire/cornerstone/pkg/db"
 	"github.com/spf13/cobra"
@@ -15,6 +16,45 @@ var recordCmd = &cobra.Command{
 	Use:   "record",
 	Short: "record management",
 	Long:  `Manage Cornerstone record resources. Supports list, create, get, update, delete, batch subcommands.`,
+}
+
+func recordForJSON(record *models.Record) (map[string]interface{}, error) {
+	payload := map[string]interface{}{}
+	if record.Data != "" {
+		if err := json.Unmarshal([]byte(record.Data), &payload); err != nil {
+			return nil, fmt.Errorf("invalid stored record data: %w", err)
+		}
+	}
+
+	return map[string]interface{}{
+		"id":         record.ID,
+		"table_id":   record.TableID,
+		"data":       payload,
+		"version":    record.Version,
+		"created_at": record.CreatedAt,
+		"updated_at": record.UpdatedAt,
+		"deleted_at": record.DeletedAt,
+	}, nil
+}
+
+func printRecordJSON(record *models.Record) error {
+	payload, err := recordForJSON(record)
+	if err != nil {
+		return err
+	}
+	return printJSON(payload)
+}
+
+func printRecordsJSON(records []*models.Record) error {
+	payload := make([]map[string]interface{}, 0, len(records))
+	for _, record := range records {
+		item, err := recordForJSON(record)
+		if err != nil {
+			return err
+		}
+		payload = append(payload, item)
+	}
+	return printJSON(payload)
 }
 
 var recordListCmd = &cobra.Command{
@@ -30,7 +70,7 @@ var recordListCmd = &cobra.Command{
 		limit, _ := cmd.Flags().GetInt("limit")
 		offset, _ := cmd.Flags().GetInt("offset")
 		filter, _ := cmd.Flags().GetString("filter")
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -65,7 +105,7 @@ var recordCreateCmd = &cobra.Command{
 			return fmt.Errorf("invalid JSON data: %w", err)
 		}
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -77,7 +117,7 @@ var recordCreateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printJSON(record)
+		return printRecordJSON(record)
 	},
 }
 
@@ -91,7 +131,7 @@ var recordGetCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -120,7 +160,7 @@ var recordUpdateCmd = &cobra.Command{
 		}
 
 		version, _ := cmd.Flags().GetInt("version")
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -132,7 +172,7 @@ var recordUpdateCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-		return printJSON(record)
+		return printRecordJSON(record)
 	},
 }
 
@@ -146,7 +186,7 @@ var recordDeleteCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -182,7 +222,7 @@ var recordBatchCmd = &cobra.Command{
 			return fmt.Errorf("count must be between 1 and 100")
 		}
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -197,7 +237,7 @@ var recordBatchCmd = &cobra.Command{
 		if !jsonOutput {
 			fmt.Printf("created %d records\n", len(records))
 		}
-		return printJSON(records)
+		return printRecordsJSON(records)
 	},
 }
 

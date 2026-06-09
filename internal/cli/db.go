@@ -2,16 +2,19 @@ package cli
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
+	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/config"
 	appdb "github.com/jiangfire/cornerstone/internal/db"
 	"github.com/jiangfire/cornerstone/internal/services"
 	"github.com/jiangfire/cornerstone/pkg/db"
 	applog "github.com/jiangfire/cornerstone/pkg/log"
 	"github.com/spf13/cobra"
+	"gorm.io/gorm"
 )
 
 func ensureDB() error {
@@ -44,6 +47,73 @@ func getMasterTokenID() (string, error) {
 	return masterToken, nil
 }
 
+func currentDB() (*gorm.DB, error) {
+	if !db.IsInitialized() {
+		return nil, fmt.Errorf("database not initialized")
+	}
+	return db.DB(), nil
+}
+
+func getAuthTokenID() (string, error) {
+	credential, err := getMasterTokenID()
+	if err != nil {
+		return "", err
+	}
+
+	if masterToken := os.Getenv("MASTER_TOKEN"); masterToken != "" && credential == masterToken {
+		return credential, nil
+	}
+
+	conn, err := currentDB()
+	if err != nil {
+		return "", err
+	}
+
+	token, err := authz.FindTokenByValue(conn, credential)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return credential, nil
+		}
+		return "", err
+	}
+
+	if token.ExpiresAt != nil && token.ExpiresAt.Before(time.Now()) {
+		return "", fmt.Errorf("token expired")
+	}
+	return token.ID, nil
+}
+
+func getRequiredMasterTokenID() (string, error) {
+	credential, err := getMasterTokenID()
+	if err != nil {
+		return "", err
+	}
+
+	if masterToken := os.Getenv("MASTER_TOKEN"); masterToken != "" && credential == masterToken {
+		return credential, nil
+	}
+
+	conn, err := currentDB()
+	if err != nil {
+		return "", err
+	}
+
+	token, err := authz.FindTokenByValue(conn, credential)
+	if err != nil {
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", err
+		}
+		return "", fmt.Errorf("master token required")
+	}
+	if token.ExpiresAt != nil && token.ExpiresAt.Before(time.Now()) {
+		return "", fmt.Errorf("token expired")
+	}
+	if !token.IsMaster {
+		return "", fmt.Errorf("master token required")
+	}
+	return token.ID, nil
+}
+
 func printJSON(v interface{}) error {
 	data, err := json.MarshalIndent(v, "", "  ")
 	if err != nil {
@@ -68,7 +138,7 @@ var dbListCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -92,7 +162,7 @@ var dbCreateCmd = &cobra.Command{
 		defer func() { _ = appdb.CloseDB() }()
 
 		desc, _ := cmd.Flags().GetString("description")
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -118,7 +188,7 @@ var dbGetCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -143,7 +213,7 @@ var dbUpdateCmd = &cobra.Command{
 
 		name, _ := cmd.Flags().GetString("name")
 		desc, _ := cmd.Flags().GetString("description")
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -169,7 +239,7 @@ var dbDeleteCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}

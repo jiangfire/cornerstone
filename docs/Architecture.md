@@ -41,7 +41,7 @@ A command-line tool built on [Cobra](https://github.com/spf13/cobra) that provid
 - **Characteristics**: Zero dependencies (except for the database), ideal for script automation
 - **Global flags**:
   - `--json`: Output structured JSON (suitable for pipeline processing)
-  - `--token` / `-t`: Specify authentication token (overrides the `MASTER_TOKEN` environment variable)
+  - `--token` / `-t`: Specify an auth token value (overrides `MASTER_TOKEN`; regular token values are resolved before permission checks)
 - **Semantic exit codes**:
   - `0` - Success
   - `1` - General error

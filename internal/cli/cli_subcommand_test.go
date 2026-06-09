@@ -3,6 +3,7 @@ package cli
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -27,6 +28,96 @@ func TestGetMasterTokenID_Present(t *testing.T) {
 	id, err := getMasterTokenID()
 	assert.NoError(t, err)
 	assert.Equal(t, "tok_abc123", id)
+}
+
+func TestGetAuthTokenID_ResolvesTokenValue(t *testing.T) {
+	setupCLIEnv(t)
+
+	dbSvc := services.NewDatabaseService(pkgdb.DB())
+	createdDB, err := dbSvc.CreateDatabase(services.CreateDBRequest{Name: "tokenvaluedb"}, "cs_test_master_token")
+	require.NoError(t, err)
+
+	tokSvc := services.NewTokenService(pkgdb.DB())
+	client, err := tokSvc.CreateToken(services.CreateTokenRequest{
+		Name:   "viewer",
+		Scopes: `{"databases":{"` + createdDB.ID + `":"viewer"}}`,
+	})
+	require.NoError(t, err)
+
+	oldTokenOverride := tokenOverride
+	tokenOverride = client.Token
+	t.Cleanup(func() { tokenOverride = oldTokenOverride })
+
+	resolved, err := getAuthTokenID()
+	require.NoError(t, err)
+	assert.Equal(t, client.ID, resolved)
+
+	out := captureOutput(t, func() {
+		err := dbListCmd.RunE(dbListCmd, []string{})
+		require.NoError(t, err)
+	})
+	assert.Contains(t, out, "tokenvaluedb")
+}
+
+func TestTokenListCmd_RegularTokenRequiresMaster(t *testing.T) {
+	setupCLIEnv(t)
+
+	tokSvc := services.NewTokenService(pkgdb.DB())
+	client, err := tokSvc.CreateToken(services.CreateTokenRequest{
+		Name:   "regular",
+		Scopes: "{}",
+	})
+	require.NoError(t, err)
+
+	oldTokenOverride := tokenOverride
+	tokenOverride = client.Token
+	t.Cleanup(func() { tokenOverride = oldTokenOverride })
+
+	err = tokenListCmd.RunE(tokenListCmd, []string{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "master token required")
+}
+
+func TestGetAuthTokenID_ReturnsInfraErrorWhenDBUnavailable(t *testing.T) {
+	setupCLIEnv(t)
+
+	oldDB := pkgdb.DB()
+	pkgdb.SetDB(nil)
+	t.Cleanup(func() { pkgdb.SetDB(oldDB) })
+
+	oldTokenOverride := tokenOverride
+	tokenOverride = "regular-token-value"
+	t.Cleanup(func() { tokenOverride = oldTokenOverride })
+
+	t.Setenv("MASTER_TOKEN", "")
+
+	_, err := getAuthTokenID()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "database not initialized")
+}
+
+func TestGetRequiredMasterTokenID_ReturnsInfraErrorWhenDBUnavailable(t *testing.T) {
+	setupCLIEnv(t)
+
+	oldDB := pkgdb.DB()
+	pkgdb.SetDB(nil)
+	t.Cleanup(func() { pkgdb.SetDB(oldDB) })
+
+	oldTokenOverride := tokenOverride
+	tokenOverride = "regular-token-value"
+	t.Cleanup(func() { tokenOverride = oldTokenOverride })
+
+	t.Setenv("MASTER_TOKEN", "")
+
+	_, err := getRequiredMasterTokenID()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "database not initialized")
+}
+
+func TestClassifyExitCode_PermissionAliases(t *testing.T) {
+	assert.Equal(t, ExitPermission, classifyExitCode(errors.New("master token required")))
+	assert.Equal(t, ExitPermission, classifyExitCode(errors.New("token expired")))
+	assert.Equal(t, ExitPermission, classifyExitCode(errors.New("Forbidden")))
 }
 
 func TestEnsureDB_ConfigLoadError(t *testing.T) {
@@ -129,13 +220,9 @@ func setupCLIEnv(t *testing.T) {
 
 	require.NoError(t, ensureDB())
 
-	pkgdb.DB().Create(&models.Token{
-		ID:       "cs_test_master_token",
-		Token:    "cs_test_master_token",
-		Name:     "master",
-		IsMaster: true,
-		Scopes:   "{}",
-	})
+	var master models.Token
+	require.NoError(t, pkgdb.DB().Where("id = ?", "cs_test_master_token").First(&master).Error)
+	require.True(t, master.IsMaster)
 }
 
 func captureOutput(t *testing.T, fn func()) string {

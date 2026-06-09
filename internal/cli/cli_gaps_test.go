@@ -102,6 +102,17 @@ func TestLoadMigrationConfigFromCommand_WithDataSkipDataConflict(t *testing.T) {
 	assert.Contains(t, err.Error(), "skip-data")
 }
 
+func TestLoadMigrationConfigFromCommand_SkipDataOverridesDefaultWithData(t *testing.T) {
+	cmd := newMigrationCmd()
+	require.NoError(t, cmd.Flags().Set("source-type", "sqlite"))
+	require.NoError(t, cmd.Flags().Set("source-dsn", "./source.db"))
+	require.NoError(t, cmd.Flags().Set("skip-data", "true"))
+
+	cfg, _, err := loadMigrationConfigFromCommand(cmd)
+	require.NoError(t, err)
+	assert.False(t, cfg.Data.Enabled)
+}
+
 func TestLoadMigrationConfigFromCommand_FlagsOnly(t *testing.T) {
 	cmd := newMigrationCmd()
 	require.NoError(t, cmd.Flags().Set("source-type", "mysql"))

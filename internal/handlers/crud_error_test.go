@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"testing"
 
+	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,6 +65,21 @@ func TestCreateDatabase_ServiceError(t *testing.T) {
 	assert.Equal(t, http.StatusBadRequest, rec.Code)
 	resp := decodeResp(t, rec)
 	assert.NotEqual(t, float64(0), resp["code"])
+}
+
+func TestCreateDatabase_RegularTokenForbidden(t *testing.T) {
+	router, db, _ := setupCRUDTest(t)
+
+	client := &models.Token{Name: "regular", IsMaster: false, Scopes: "{}"}
+	require.NoError(t, db.Create(client).Error)
+
+	body := map[string]string{"name": "forbidden_db"}
+	rec := doJSON(t, router, "POST", "/api/v1/databases/", client.Token, body)
+
+	assert.Equal(t, http.StatusForbidden, rec.Code)
+	resp := decodeResp(t, rec)
+	assert.Equal(t, float64(http.StatusForbidden), resp["code"])
+	assert.Contains(t, resp["message"], "master token required")
 }
 
 func TestCreateDatabaseWithTables_BindingError(t *testing.T) {

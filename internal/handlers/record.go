@@ -74,7 +74,7 @@ func CreateRecord(c *gin.Context) {
 	recordService := services.NewRecordService(db.DB())
 	record, err := recordService.CreateRecord(req, userID)
 	if err != nil {
-		dto.Error(c, 400, err.Error())
+		handleCreateServiceError(c, err)
 		return
 	}
 
@@ -120,7 +120,7 @@ func ExportRecords(c *gin.Context) {
 	recordService := services.NewRecordService(db.DB())
 	data, contentType, filename, err := recordService.ExportRecords(tableID, userID, format, filter)
 	if err != nil {
-		dto.Error(c, 400, err.Error())
+		handleCreateServiceError(c, err)
 		return
 	}
 
@@ -237,7 +237,7 @@ func UpdateRecord(c *gin.Context) {
 	recordService := services.NewRecordService(db.DB())
 	record, err := recordService.UpdateRecord(recordID, req, userID)
 	if err != nil {
-		dto.Error(c, 400, err.Error())
+		handleCreateServiceError(c, err)
 		return
 	}
 
@@ -320,7 +320,7 @@ func BatchCreateRecords(c *gin.Context) {
 	recordService := services.NewRecordService(db.DB())
 	records, err := recordService.BatchCreateRecords(req, userID, batchCount)
 	if err != nil {
-		dto.Error(c, 400, err.Error())
+		handleCreateServiceError(c, err)
 		return
 	}
 

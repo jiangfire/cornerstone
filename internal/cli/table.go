@@ -25,7 +25,7 @@ var tableListCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -49,7 +49,7 @@ var tableCreateCmd = &cobra.Command{
 		defer func() { _ = appdb.CloseDB() }()
 
 		desc, _ := cmd.Flags().GetString("description")
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -76,7 +76,7 @@ var tableGetCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -101,7 +101,7 @@ var tableUpdateCmd = &cobra.Command{
 
 		name, _ := cmd.Flags().GetString("name")
 		desc, _ := cmd.Flags().GetString("description")
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -127,7 +127,7 @@ var tableDeleteCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}

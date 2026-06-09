@@ -54,7 +54,7 @@ func UploadFile(c *gin.Context) {
 	fileService := services.NewFileService(db.DB())
 	uploadedFile, err := fileService.UploadFile(req, tokenID)
 	if err != nil {
-		dto.Error(c, 400, err.Error())
+		handleCreateServiceError(c, err)
 		return
 	}
 

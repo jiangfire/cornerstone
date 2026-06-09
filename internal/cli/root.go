@@ -76,10 +76,14 @@ func classifyExitCode(err error) int {
 		return cliErr.code
 	}
 
-	msg := err.Error()
+	msg := strings.ToLower(err.Error())
 
 	// Permission denied
-	if strings.Contains(msg, "permission denied") || strings.Contains(msg, "unauthorized") {
+	if strings.Contains(msg, "permission denied") ||
+		strings.Contains(msg, "unauthorized") ||
+		strings.Contains(msg, "forbidden") ||
+		strings.Contains(msg, "master token required") ||
+		strings.Contains(msg, "token expired") {
 		return ExitPermission
 	}
 

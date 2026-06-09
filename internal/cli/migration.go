@@ -44,7 +44,7 @@ var migrationRunCmd = &cobra.Command{
 		}
 		defer func() { _ = appdb.CloseDB() }()
 
-		token, err := getMasterTokenID()
+		token, err := getAuthTokenID()
 		if err != nil {
 			return err
 		}
@@ -229,7 +229,7 @@ func loadMigrationConfigFromCommand(cmd *cobra.Command) (mig.Config, mig.RunnerO
 	if strings.TrimSpace(sourceType) == "" || strings.TrimSpace(sourceDSN) == "" {
 		return mig.Config{}, runnerOpts, fmt.Errorf("--source-type and --source-dsn are required when --config is not provided")
 	}
-	if withData && skipData {
+	if cmd.Flags().Changed("with-data") && withData && skipData {
 		return mig.Config{}, runnerOpts, fmt.Errorf("--with-data and --skip-data cannot both be true")
 	}
 
@@ -238,7 +238,10 @@ func loadMigrationConfigFromCommand(cmd *cobra.Command) (mig.Config, mig.RunnerO
 	cfg.Target.DatabaseName = targetDB
 	cfg.Tables.Include = splitCSV(includeTables)
 	cfg.Tables.Exclude = splitCSV(excludeTables)
-	cfg.Data.Enabled = withData && !skipData
+	cfg.Data.Enabled = withData
+	if skipData {
+		cfg.Data.Enabled = false
+	}
 	cfg.Data.BatchSize = batchSize
 	cfg.Data.CursorColumn = cursorColumn
 	cfg.Data.MaxConcurrentTables = maxConcurrentTables
