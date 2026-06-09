@@ -97,24 +97,26 @@ curl http://localhost:8080/api/v1/query/tables \
 ```json
 {
   "from": "records",
-  "select": ["id", "data"],
+  "select": ["records.id", "records.data"],
   "join": [
     {
       "type": "left",
-      "table": "users",
-      "as": "u",
-      "on": {"left": "records.created_by", "op": "eq", "right": "u.id"},
-      "select": ["u.username", "u.email"]
+      "table": "tables",
+      "as": "t",
+      "on": {"left": "records.table_id", "op": "eq", "right": "t.id"},
+      "select": ["t.name", "t.description"]
     }
   ],
   "where": {
     "and": [
       {"field": "table_id", "value": "tbl_xxx"},
-      {"field": "u.username", "op": "like", "value": "zhang"}
+      {"field": "t.name", "op": "like", "value": "user"}
     ]
   }
 }
 ```
+
+> **JOIN select 字段注意事项**：使用 JOIN 时，`select` 中务必使用**限定字段名**（`表别名.字段名` 或 `表名.字段名`），避免 `ambiguous column name` 错误。例如使用 `records.id` 而非 `id`，使用 `t.name` 而非 `name`。
 
 ### 聚合查询
 

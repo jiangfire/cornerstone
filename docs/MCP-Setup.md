@@ -136,6 +136,108 @@ After connecting, the AI client can call the following tools:
 
 ---
 
+## JSON-RPC Request Examples
+
+All MCP tools are called via JSON-RPC over HTTP POST:
+
+### Initialize
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-03-26",
+    "capabilities": {},
+    "clientInfo": {"name": "my-client", "version": "1.0"}
+  }
+}
+```
+
+### List Tools
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list"
+}
+```
+
+### Call Tool - Create Database
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "create_database",
+    "arguments": {
+      "name": "my_project",
+      "description": "Project database"
+    }
+  }
+}
+```
+
+### Call Tool - Query Data (Query DSL)
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tools/call",
+  "params": {
+    "name": "query_data",
+    "arguments": {
+      "from": "records",
+      "table": "tbl_abc123",
+      "page": 1,
+      "size": 10
+    }
+  }
+}
+```
+
+> **Note**: `query_data` accepts Query DSL fields **directly** in `arguments` (same structure as the REST API `/api/v1/query` endpoint). There is no extra `query` wrapper.
+
+### Call Tool - JOIN Query
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "tools/call",
+  "params": {
+    "name": "query_data",
+    "arguments": {
+      "from": "records",
+      "select": ["records.id", "records.data"],
+      "join": [
+        {
+          "type": "left",
+          "table": "tables",
+          "as": "t",
+          "on": {"left": "records.table_id", "op": "=", "right": "t.id"},
+          "select": ["t.name"]
+        }
+      ],
+      "where": {
+        "and": [{"field": "table_id", "op": "eq", "value": "tbl_abc123"}]
+      },
+      "page": 1,
+      "size": 10
+    }
+  }
+}
+```
+
+> **Tip**: When using JOIN, always use qualified names like `records.id` in `select` to avoid ambiguous column errors.
+
+---
+
 ## SSE Stream Features
 
 ### Keepalive

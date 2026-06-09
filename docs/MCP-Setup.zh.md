@@ -136,6 +136,108 @@ Cornerstone 提供两种传输方式：
 
 ---
 
+## JSON-RPC 请求示例
+
+所有 MCP 工具通过 HTTP POST 上的 JSON-RPC 调用：
+
+### 初始化
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "method": "initialize",
+  "params": {
+    "protocolVersion": "2025-03-26",
+    "capabilities": {},
+    "clientInfo": {"name": "my-client", "version": "1.0"}
+  }
+}
+```
+
+### 列出工具
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 2,
+  "method": "tools/list"
+}
+```
+
+### 调用工具 - 创建数据库
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 3,
+  "method": "tools/call",
+  "params": {
+    "name": "create_database",
+    "arguments": {
+      "name": "my_project",
+      "description": "Project database"
+    }
+  }
+}
+```
+
+### 调用工具 - 查询数据 (Query DSL)
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "method": "tools/call",
+  "params": {
+    "name": "query_data",
+    "arguments": {
+      "from": "records",
+      "table": "tbl_abc123",
+      "page": 1,
+      "size": 10
+    }
+  }
+}
+```
+
+> **注意**：`query_data` 在 `arguments` 中**直接**接收 Query DSL 字段（与 REST API `/api/v1/query` 端点的结构相同），不需要额外的 `query` 包装层。
+
+### 调用工具 - JOIN 查询
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 5,
+  "method": "tools/call",
+  "params": {
+    "name": "query_data",
+    "arguments": {
+      "from": "records",
+      "select": ["records.id", "records.data"],
+      "join": [
+        {
+          "type": "left",
+          "table": "tables",
+          "as": "t",
+          "on": {"left": "records.table_id", "op": "=", "right": "t.id"},
+          "select": ["t.name"]
+        }
+      ],
+      "where": {
+        "and": [{"field": "table_id", "op": "eq", "value": "tbl_abc123"}]
+      },
+      "page": 1,
+      "size": 10
+    }
+  }
+}
+```
+
+> **提示**：使用 JOIN 时，`select` 中务必使用限定名如 `records.id`，避免列名歧义错误。
+
+---
+
 ## SSE 流特性
 
 ### 心跳保活

@@ -22,6 +22,12 @@ func ensureDB() error {
 	if err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
+
+	// When --json is set, suppress log output to avoid polluting structured JSON on stdout.
+	if jsonOutput {
+		cfg.Logger.Level = "fatal"
+	}
+
 	if err := applog.InitLogger(cfg.Logger); err != nil {
 		return fmt.Errorf("failed to init logger: %w", err)
 	}

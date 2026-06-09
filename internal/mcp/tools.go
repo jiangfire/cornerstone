@@ -99,9 +99,10 @@ func (s *ToolService) ListTools() []ToolDefinition {
 			Name: "query_data",
 			Description: `Execute a permission-scoped Cornerstone Query DSL request against allowed tables.
 
-The query body uses the Cornerstone Query DSL with these top-level fields:
+The query body uses the Cornerstone Query DSL with these top-level fields (same as the REST API /api/v1/query endpoint):
 - "from" (required): The table to query. Allowed values: ` + allowedDSLTables + `. Example: "records".
 - "select": Array of field names to return. Omit to return all allowed fields.
+  Note: When using JOIN, use qualified names like "records.id" to avoid ambiguous column errors.
 - "where": Filter conditions. Use {"and": [...]} or {"or": [...]} with condition objects {"field": "<name>", "op": "<operator>", "value": <val>}.
   Supported operators: eq, ne, gt, gte, lt, lte, in, not_in, like, not_like, is_null, is_not_null, between.
   For user record data, use "data.<field_name>" as the field path (e.g. "data.email").
@@ -115,17 +116,14 @@ Example: List records in a user table with pagination:
 {"from": "records", "table": "tbl_abc123", "page": 1, "size": 10}
 
 Example: Query with conditions:
-{"from": "records", "table": "tbl_abc123", "where": {"and": [{"field": "data.status", "op": "eq", "value": "active"}]}, "orderBy": [{"field": "created_at", "direction": "desc"}]}`,
+{"from": "records", "table": "tbl_abc123", "where": {"and": [{"field": "data.status", "op": "eq", "value": "active"}]}, "orderBy": [{"field": "created_at", "direction": "desc"}]}
+
+Example: JOIN query (note the qualified select fields):
+{"from": "records", "select": ["records.id", "records.data"], "join": [{"type": "left", "table": "tables", "as": "t", "on": {"left": "records.table_id", "op": "=", "right": "t.id"}, "select": ["t.name"]}]}`,
 			InputSchema: map[string]interface{}{
-				"type": "object",
-				"properties": map[string]interface{}{
-					"query": map[string]interface{}{
-						"type":                 "object",
-						"description":          "Cornerstone Query DSL request body. See tool description for full syntax reference.",
-						"additionalProperties": true,
-					},
-				},
-				"required": []string{"query"},
+				"type":                 "object",
+				"description":          "Cornerstone Query DSL request body. Pass Query DSL fields directly (same as REST API).",
+				"additionalProperties": true,
 			},
 		},
 
@@ -713,14 +711,12 @@ func errorResult(summary, code, message string) *ToolCallResult {
 // --- Query tools ---
 
 func (s *ToolService) callQueryData(ctx context.Context, args json.RawMessage) (*ToolCallResult, error) {
-	var req struct {
-		Query query.QueryRequest `json:"query"`
-	}
+	var req query.QueryRequest
 	if err := json.Unmarshal(args, &req); err != nil {
 		return nil, fmt.Errorf("invalid query_data arguments: %w", err)
 	}
 
-	result, err := s.queryExecutor.Execute(ctx, &req.Query, s.userID)
+	result, err := s.queryExecutor.Execute(ctx, &req, s.userID)
 	if err != nil {
 		return errorResult("Query execution failed.", "QUERY_ERROR", err.Error()), nil
 	}

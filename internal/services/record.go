@@ -25,13 +25,13 @@ func parseStringListValue(value interface{}) ([]string, error) {
 		for _, item := range values {
 			str, ok := item.(string)
 			if !ok {
-				return nil, errors.New("list items must be strings")
+				return nil, errors.New("list field items must be strings, e.g. [\"admin\"]")
 			}
 			items = append(items, str)
 		}
 		return items, nil
 	default:
-		return nil, errors.New("expected string array type")
+		return nil, errors.New("list field requires an array of strings, e.g. [\"admin\"] or [\"option1\", \"option2\"]")
 	}
 }
 

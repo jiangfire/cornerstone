@@ -143,7 +143,7 @@ func TestServer_HandleRequest_ToolsCall_QueryData(t *testing.T) {
 		Method:  "tools/call",
 		Params: json.RawMessage(`{
 			"name": "query_data",
-			"arguments": {"query": {"from": "databases"}}
+			"arguments": {"from": "databases"}
 		}`),
 	})
 
@@ -164,7 +164,7 @@ func TestServer_HandleRequest_ToolsCall_QueryData_Error(t *testing.T) {
 		Method:  "tools/call",
 		Params: json.RawMessage(`{
 			"name": "query_data",
-			"arguments": {"query": {"from": "nonexistent_table_xyz"}}
+			"arguments": {"from": "nonexistent_table_xyz"}
 		}`),
 	})
 

@@ -97,24 +97,26 @@ curl http://localhost:8080/api/v1/query/tables \
 ```json
 {
   "from": "records",
-  "select": ["id", "data"],
+  "select": ["records.id", "records.data"],
   "join": [
     {
       "type": "left",
-      "table": "users",
-      "as": "u",
-      "on": {"left": "records.created_by", "op": "eq", "right": "u.id"},
-      "select": ["u.username", "u.email"]
+      "table": "tables",
+      "as": "t",
+      "on": {"left": "records.table_id", "op": "eq", "right": "t.id"},
+      "select": ["t.name", "t.description"]
     }
   ],
   "where": {
     "and": [
       {"field": "table_id", "value": "tbl_xxx"},
-      {"field": "u.username", "op": "like", "value": "zhang"}
+      {"field": "t.name", "op": "like", "value": "user"}
     ]
   }
 }
 ```
+
+> **Note on JOIN select fields**: When using JOIN, always use **qualified field names** (`table_alias.field_name` or `table_name.field_name`) in `select` to avoid `ambiguous column name` errors. For example, use `records.id` instead of `id`, and `t.name` instead of `name`.
 
 ### Aggregate Query
 
