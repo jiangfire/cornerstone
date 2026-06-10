@@ -14,6 +14,60 @@ func setupTestDB(t *testing.T) *gorm.DB {
 	return testutil.SetupTestDBWithTokens(t, "user1", "test_user")
 }
 
+func TestDatabaseService_ImportYAML(t *testing.T) {
+	db := setupTestDB(t)
+	svc := NewDatabaseService(db)
+
+	yamlContent := `
+name: "yaml-import-test"
+description: "Imported via YAML"
+tables:
+  - name: "users"
+    description: "User accounts"
+    fields:
+      - name: "title"
+        type: "string"
+        description: "The record title"
+        required: false
+      - name: "status"
+        type: "string"
+        description: "Current status"
+        required: false
+`
+
+	result, err := svc.ImportYAML([]byte(yamlContent), "user1")
+	require.NoError(t, err)
+	require.NotNil(t, result)
+	assert.Equal(t, "yaml-import-test", result.Database.Name)
+	assert.Len(t, result.Tables, 1)
+	assert.Equal(t, "users", result.Tables[0].Name)
+	assert.Len(t, result.Fields, 2)
+}
+
+func TestDatabaseService_ImportYAML_InvalidFormat(t *testing.T) {
+	db := setupTestDB(t)
+	svc := NewDatabaseService(db)
+
+	invalidYAML := `this: [is: broken: yaml`
+
+	_, err := svc.ImportYAML([]byte(invalidYAML), "user1")
+	require.Error(t, err)
+}
+
+func TestDatabaseService_ImportYAML_MissingName(t *testing.T) {
+	db := setupTestDB(t)
+	svc := NewDatabaseService(db)
+
+	missingName := `
+description: "No name field"
+tables:
+  - name: "items"
+`
+
+	_, err := svc.ImportYAML([]byte(missingName), "user1")
+	require.Error(t, err)
+}
+
 func TestDatabaseService_CreateDatabaseWithTables(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)

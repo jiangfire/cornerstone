@@ -189,7 +189,7 @@ func TestGetRecord_DBQueryError(t *testing.T) {
 
 	injectDBQueryError(t, db)
 
-	_, err := svc.GetRecord("any_record_id", "user1")
+	_, err := svc.GetRecord("any_record_id", "user1", "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "injected query error")
 }

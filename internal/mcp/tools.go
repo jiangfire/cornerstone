@@ -1230,7 +1230,7 @@ func (s *ToolService) callGetRecord(args json.RawMessage) (*ToolCallResult, erro
 	}
 
 	recordService := services.NewRecordService(s.db)
-	record, err := recordService.GetRecord(req.RecordID, s.userID)
+	record, err := recordService.GetRecord(req.RecordID, s.userID, "")
 	if err != nil {
 		return errorResult("Record not found.", "NOT_FOUND", err.Error()), nil
 	}

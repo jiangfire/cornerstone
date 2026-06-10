@@ -83,7 +83,7 @@ func TestGetRecord_NonMasterDenied(t *testing.T) {
 	require.NoError(t, db.Create(viewer).Error)
 	authz.ClearTokenCache()
 
-	_, err = s.GetRecord(record.ID, viewer.ID)
+	_, err = s.GetRecord(record.ID, viewer.ID, "")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "permission denied: cannot access this table")
 }

@@ -118,6 +118,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 		{
 			protected.POST("/databases", handlers.CreateDatabase)
 			protected.POST("/databases/with-tables", handlers.CreateDatabaseWithTables)
+			protected.POST("/databases/import/yaml", handlers.ImportDatabaseYAML)
+			protected.GET("/databases/import/template", handlers.GetImportTemplate)
 			protected.GET("/databases", handlers.ListDatabases)
 			protected.GET("/databases/:id", handlers.GetDatabase)
 			protected.PUT("/databases/:id", handlers.UpdateDatabase)

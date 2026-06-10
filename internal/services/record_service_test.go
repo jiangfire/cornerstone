@@ -337,7 +337,7 @@ func TestRecordService_GetRecord_NonexistentRecord(t *testing.T) {
 	db := setupTestDB(t)
 	s := NewRecordService(db)
 
-	_, err := s.GetRecord("rec_nonexistent", "user1")
+	_, err := s.GetRecord("rec_nonexistent", "user1", "")
 	assert.Error(t, err)
 }
 

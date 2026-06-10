@@ -1,6 +1,9 @@
 package handlers
 
 import (
+	"io"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/internal/middleware"
 	"github.com/jiangfire/cornerstone/internal/services"
@@ -233,4 +236,68 @@ func CreateDatabaseWithTables(c *gin.Context) {
 			"field_count": len(result.Fields),
 		},
 	})
+}
+
+// ImportDatabaseYAML imports a database from YAML
+//
+// @Summary      Import database from YAML
+// @Description  Import a database definition from YAML format. Creates the database together with nested tables and fields.
+//
+//	The YAML structure matches the DatabaseBulkCreateRequest JSON schema.
+//	Content-Type must be application/x-yaml or text/yaml.
+//
+// @Tags         databases
+// @Accept       x-yaml
+// @Produce      json
+// @Security     ApiKeyAuth
+// @Param        body  body  string  true  "YAML document"  example:"name: My App"
+// @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseBulkCreateResponse}
+// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid YAML or missing fields"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - master token required"
+// @Router       /api/v1/databases/import/yaml [post]
+func ImportDatabaseYAML(c *gin.Context) {
+	tokenID := middleware.GetTokenID(c)
+
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		dto.Error(c, 400, "failed to read request body: "+err.Error())
+		return
+	}
+
+	dbService := services.NewDatabaseService(db.DB())
+	result, err := dbService.ImportYAML(body, tokenID)
+	if err != nil {
+		handleCreateServiceError(c, err)
+		return
+	}
+
+	dto.Success(c, gin.H{
+		"database": result.Database,
+		"tables":   result.Tables,
+		"fields":   result.Fields,
+		"summary": gin.H{
+			"table_count": len(result.Tables),
+			"field_count": len(result.Fields),
+		},
+	})
+}
+
+// GetImportTemplate returns a YAML template for database import
+//
+// @Summary      Download import template
+// @Description  Returns a commented YAML template with all available options for the import endpoint.
+//
+//	Can be downloaded as a file or used as a reference for creating import documents.
+//
+// @Tags         databases
+// @Produce      x-yaml
+// @Security     ApiKeyAuth
+// @Success      200  {file}  binary  "YAML template file"
+// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Router       /api/v1/databases/import/template [get]
+func GetImportTemplate(c *gin.Context) {
+	template := services.YAMLTemplate()
+	c.Header("Content-Disposition", "attachment; filename=cornerstone-import-template.yaml")
+	c.Data(http.StatusOK, "application/x-yaml", template)
 }

@@ -421,7 +421,7 @@ func TestGetRecord_Success(t *testing.T) {
 		TableID: tbl.ID, Data: map[string]any{"name": "test"},
 	}, "user1")
 
-	found, err := s.GetRecord(created.ID, "user1")
+	found, err := s.GetRecord(created.ID, "user1", "")
 	require.NoError(t, err)
 	assert.Equal(t, created.ID, found.ID)
 
@@ -434,7 +434,7 @@ func TestGetRecord_NotFound(t *testing.T) {
 	db := setupTestDB(t)
 	s := NewRecordService(db)
 
-	_, err := s.GetRecord("rec_nonexistent", "user1")
+	_, err := s.GetRecord("rec_nonexistent", "user1", "")
 	require.Error(t, err)
 }
 
@@ -1281,6 +1281,120 @@ func TestExportRecords_NoRecords(t *testing.T) {
 		}
 	}
 	assert.Equal(t, 1, lines)
+}
+
+func TestListRecords_FieldSelection(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	_, tbl, _ := createTestTableWithFields(t, db, "user1", "FieldSelDB", "items",
+		struct {
+			Name     string
+			Type     string
+			Required bool
+		}{"name", "string", false},
+		struct {
+			Name     string
+			Type     string
+			Required bool
+		}{"status", "string", false},
+	)
+
+	_, err := s.CreateRecord(CreateRecordRequest{
+		TableID: tbl.ID, Data: map[string]any{"name": "test", "status": "active"},
+	}, "user1")
+	require.NoError(t, err)
+
+	result, err := s.ListRecords(QueryRequest{
+		TableID: tbl.ID, Limit: 10, Fields: "name",
+	}, "user1")
+	require.NoError(t, err)
+	require.Len(t, result.Records, 1)
+
+	data := result.Records[0].Data.(map[string]interface{})
+	assert.Equal(t, "test", data["name"])
+	assert.NotContains(t, data, "status")
+}
+
+func TestListRecords_FieldSelectionAllFields(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	_, tbl, _ := createTestTableWithFields(t, db, "user1", "FieldSelAllDB", "items",
+		struct {
+			Name     string
+			Type     string
+			Required bool
+		}{"name", "string", false},
+	)
+
+	_, err := s.CreateRecord(CreateRecordRequest{
+		TableID: tbl.ID, Data: map[string]any{"name": "test"},
+	}, "user1")
+	require.NoError(t, err)
+
+	result, err := s.ListRecords(QueryRequest{
+		TableID: tbl.ID, Limit: 10,
+	}, "user1")
+	require.NoError(t, err)
+	require.Len(t, result.Records, 1)
+
+	data := result.Records[0].Data.(map[string]interface{})
+	assert.Contains(t, data, "name")
+}
+
+func TestGetRecord_FieldSelection(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	_, tbl, _ := createTestTableWithFields(t, db, "user1", "GetFieldSelDB", "items",
+		struct {
+			Name     string
+			Type     string
+			Required bool
+		}{"title", "string", false},
+		struct {
+			Name     string
+			Type     string
+			Required bool
+		}{"score", "number", false},
+	)
+
+	record, err := s.CreateRecord(CreateRecordRequest{
+		TableID: tbl.ID, Data: map[string]any{"title": "hello", "score": 100},
+	}, "user1")
+	require.NoError(t, err)
+
+	got, err := s.GetRecord(record.ID, "user1", "title")
+	require.NoError(t, err)
+
+	data := got.Data.(map[string]interface{})
+	assert.Equal(t, "hello", data["title"])
+	assert.NotContains(t, data, "score")
+}
+
+func TestGetRecord_FieldSelectionAllFields(t *testing.T) {
+	db := setupTestDB(t)
+	s := NewRecordService(db)
+
+	_, tbl, _ := createTestTableWithFields(t, db, "user1", "GetFieldSelAllDB", "items",
+		struct {
+			Name     string
+			Type     string
+			Required bool
+		}{"title", "string", false},
+	)
+
+	record, err := s.CreateRecord(CreateRecordRequest{
+		TableID: tbl.ID, Data: map[string]any{"title": "hello"},
+	}, "user1")
+	require.NoError(t, err)
+
+	got, err := s.GetRecord(record.ID, "user1", "")
+	require.NoError(t, err)
+
+	data := got.Data.(map[string]interface{})
+	assert.Contains(t, data, "title")
 }
 
 func TestExportRecords_NoRecordsJSON(t *testing.T) {

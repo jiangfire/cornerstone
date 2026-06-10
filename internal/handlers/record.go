@@ -143,6 +143,7 @@ func ExportRecords(c *gin.Context) {
 // @Param        limit     query  int     false  "Page size (1-100)"  default(20)
 // @Param        offset    query  int     false  "Offset for pagination"  default(0)
 // @Param        filter    query  string  false  "JSON filter expression"
+// @Param        fields    query  string  false  "Comma-separated field names to include in data"
 // @Success      200  {object}  swagger.APIResponse{data=swagger.RecordListResponse}
 // @Failure      400  {object}  swagger.ErrorResponse  "Validation error - missing table_id"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
@@ -183,6 +184,7 @@ func ListRecords(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Record ID"
+// @Param        fields  query  string  false  "Comma-separated field names to include in data"
 // @Success      200  {object}  swagger.APIResponse{data=swagger.RecordObject}
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this record"
@@ -193,7 +195,8 @@ func GetRecord(c *gin.Context) {
 	recordID := c.Param("id")
 
 	recordService := services.NewRecordService(db.DB())
-	record, err := recordService.GetRecord(recordID, userID)
+	fields := c.Query("fields")
+	record, err := recordService.GetRecord(recordID, userID, fields)
 	if err != nil {
 		handleServiceError(c, err)
 		return

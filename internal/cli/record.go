@@ -136,7 +136,7 @@ var recordGetCmd = &cobra.Command{
 			return err
 		}
 		svc := services.NewRecordService(db.DB())
-		record, err := svc.GetRecord(args[0], token)
+		record, err := svc.GetRecord(args[0], token, "")
 		if err != nil {
 			return err
 		}

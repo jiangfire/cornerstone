@@ -261,6 +261,38 @@ var dbDeleteCmd = &cobra.Command{
 	},
 }
 
+var dbImportCmd = &cobra.Command{
+	Use:   "import --file schema.yaml",
+	Short: "import a database from YAML file",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if err := ensureDB(); err != nil {
+			return err
+		}
+		defer func() { _ = appdb.CloseDB() }()
+
+		filePath, _ := cmd.Flags().GetString("file")
+		if filePath == "" {
+			return fmt.Errorf("--file is required")
+		}
+
+		data, err := os.ReadFile(filePath)
+		if err != nil {
+			return fmt.Errorf("failed to read file: %w", err)
+		}
+
+		token, err := getRequiredMasterTokenID()
+		if err != nil {
+			return err
+		}
+		svc := services.NewDatabaseService(db.DB())
+		result, err := svc.ImportYAML(data, token)
+		if err != nil {
+			return err
+		}
+		return printJSON(result)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(dbCmd)
 	dbCmd.AddCommand(dbListCmd)
@@ -268,8 +300,10 @@ func init() {
 	dbCmd.AddCommand(dbGetCmd)
 	dbCmd.AddCommand(dbUpdateCmd)
 	dbCmd.AddCommand(dbDeleteCmd)
+	dbCmd.AddCommand(dbImportCmd)
 
 	dbCreateCmd.Flags().StringP("description", "d", "", "database description")
 	dbUpdateCmd.Flags().StringP("name", "n", "", "new name")
 	dbUpdateCmd.Flags().StringP("description", "d", "", "new description")
+	dbImportCmd.Flags().StringP("file", "f", "", "path to YAML file")
 }

@@ -107,6 +107,7 @@ type QueryRequest struct {
 	Limit   int    `form:"limit" binding:"min=1,max=100"`
 	Offset  int    `form:"offset" binding:"min=0"`
 	Filter  string `form:"filter"` // Supports JSON filter or keyword search
+	Fields  string `form:"fields"` // Comma-separated field names to return in data
 }
 
 // QueryResponse is the query response
@@ -480,6 +481,35 @@ func parseRecordPayload(raw models.JSONField) map[string]interface{} {
 	}
 	_ = json.UnmarshalString(string(raw), &payload)
 	return payload
+}
+
+func filterDataFields(data map[string]interface{}, fields string) map[string]interface{} {
+	if fields == "" {
+		return data
+	}
+	keep := make(map[string]struct{})
+	for _, f := range splitAndTrim(fields, ",") {
+		keep[f] = struct{}{}
+	}
+	filtered := make(map[string]interface{}, len(keep))
+	for k, v := range data {
+		if _, ok := keep[k]; ok {
+			filtered[k] = v
+		}
+	}
+	return filtered
+}
+
+func splitAndTrim(s, sep string) []string {
+	parts := strings.Split(s, sep)
+	result := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p != "" {
+			result = append(result, p)
+		}
+	}
+	return result
 }
 
 func (s *RecordService) filterReadableData(fields []models.Field, readableFields map[string]models.Field, payload map[string]interface{}) map[string]interface{} {
@@ -1195,6 +1225,7 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 	result := make([]RecordResponse, len(records))
 	for i, r := range records {
 		data := s.filterReadableData(fields, readableFields, parseRecordPayload(r.Data))
+		data = filterDataFields(data, req.Fields)
 
 		result[i] = RecordResponse{
 			ID:      r.ID,
@@ -1330,7 +1361,7 @@ func (s *RecordService) ExportRecords(tableID, userID, format, filter string) ([
 }
 
 // GetRecord gets a single record
-func (s *RecordService) GetRecord(recordID, userID string) (*RecordResponse, error) {
+func (s *RecordService) GetRecord(recordID, userID, fieldFilter string) (*RecordResponse, error) {
 	// 1. Get record
 	var record models.Record
 	err := s.db.Where("id = ? AND deleted_at IS NULL", recordID).First(&record).Error
@@ -1354,6 +1385,7 @@ func (s *RecordService) GetRecord(recordID, userID string) (*RecordResponse, err
 
 	// 3. Parse data
 	data := s.filterReadableData(fields, readableFields, parseRecordPayload(record.Data))
+	data = filterDataFields(data, fieldFilter)
 
 	return &RecordResponse{
 		ID:      record.ID,

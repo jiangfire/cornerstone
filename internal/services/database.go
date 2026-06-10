@@ -9,6 +9,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
+	"gopkg.in/yaml.v3"
 	"gorm.io/gorm"
 )
 
@@ -384,4 +385,36 @@ func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest
 	}
 
 	return result, nil
+}
+
+// YAMLTemplate returns a commented YAML template for database import.
+func YAMLTemplate() []byte {
+	template := `# Cornerstone Database Import Template
+# Fill in the values below and import via POST /api/v1/databases/import/yaml
+name: ""
+description: ""
+tables:
+  - name: ""
+    description: ""
+    fields:
+      - name: ""
+        type: ""       # string, text, number, boolean, date, datetime, file, json, list
+        description: ""
+        required: false
+`
+	return []byte(template)
+}
+
+// ImportYAML parses a YAML document and creates a database with nested tables and fields.
+func (s *DatabaseService) ImportYAML(data []byte, ownerID string) (*CreateDBWithTablesResult, error) {
+	var req CreateDBWithTablesRequest
+	if err := yaml.Unmarshal(data, &req); err != nil {
+		return nil, fmt.Errorf("invalid YAML format: %w", err)
+	}
+
+	if strings.TrimSpace(req.Name) == "" {
+		return nil, errors.New("database name is required")
+	}
+
+	return s.CreateDatabaseWithTables(req, ownerID)
 }
