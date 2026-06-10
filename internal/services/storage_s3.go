@@ -66,6 +66,10 @@ func (p *S3StorageProvider) Download(ctx context.Context, key string) (io.ReadCl
 	if err != nil {
 		return nil, fmt.Errorf("failed to download from S3: %w", err)
 	}
+	if _, err := obj.Stat(); err != nil {
+		obj.Close()
+		return nil, fmt.Errorf("failed to download from S3: %w", err)
+	}
 	return obj, nil
 }
 
