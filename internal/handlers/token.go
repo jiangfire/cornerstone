@@ -37,7 +37,11 @@ func ListTokens(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{"tokens": tokens, "total": len(tokens)})
+	items := make([]dto.TokenObject, len(tokens))
+	for i := range tokens {
+		items[i] = tokenObjectFromResponse(&tokens[i])
+	}
+	dto.Success(c, dto.TokenListData{Tokens: items, Total: len(items)})
 }
 
 // CreateToken creates a token (requires master token)
@@ -78,12 +82,12 @@ func CreateToken(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"id":         token.ID,
-		"name":       token.Name,
-		"scopes":     token.Scopes,
-		"expires_at": token.ExpiresAt,
-		"token":      token.Token,
+	dto.Success(c, dto.TokenCreateData{
+		ID:        token.ID,
+		Name:      token.Name,
+		Scopes:    token.Scopes,
+		ExpiresAt: token.ExpiresAt,
+		Token:     token.Token,
 	})
 }
 
@@ -115,7 +119,7 @@ func DeleteToken(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{"id": targetID})
+	dto.Success(c, dto.TokenDeleteData{ID: targetID})
 }
 
 // UpdateToken updates token permissions (requires master token)
@@ -158,5 +162,15 @@ func UpdateToken(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, token)
+	dto.Success(c, tokenObjectFromResponse(token))
+}
+
+func tokenObjectFromResponse(t *services.TokenResponse) dto.TokenObject {
+	return dto.TokenObject{
+		ID:        t.ID,
+		Name:      t.Name,
+		IsMaster:  t.IsMaster,
+		Scopes:    t.Scopes,
+		ExpiresAt: t.ExpiresAt,
+	}
 }

@@ -27,13 +27,10 @@ func recordForJSON(record *models.Record) (map[string]interface{}, error) {
 	}
 
 	return map[string]interface{}{
-		"id":         record.ID,
-		"table_id":   record.TableID,
-		"data":       payload,
-		"version":    record.Version,
-		"created_at": record.CreatedAt,
-		"updated_at": record.UpdatedAt,
-		"deleted_at": record.DeletedAt,
+		"id":       record.ID,
+		"table_id": record.TableID,
+		"data":     payload,
+		"version":  record.Version,
 	}, nil
 }
 

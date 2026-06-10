@@ -42,12 +42,7 @@ func CreateTable(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"id":          table.ID,
-		"database_id": table.DatabaseID,
-		"name":        table.Name,
-		"description": table.Description,
-	})
+	dto.Success(c, tableObjectFromModel(table))
 }
 
 // ListTables lists tables
@@ -77,10 +72,11 @@ func ListTables(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"tables": tables,
-		"total":  len(tables),
-	})
+	items := make([]dto.TableObject, len(tables))
+	for i := range tables {
+		items[i] = tableObjectFromResponse(&tables[i])
+	}
+	dto.Success(c, dto.TableListData{Tables: items, Total: len(items)})
 }
 
 // GetTable gets table details
@@ -110,7 +106,7 @@ func GetTable(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, table)
+	dto.Success(c, tableObjectFromResponse(table))
 }
 
 // UpdateTable updates a table
@@ -150,11 +146,7 @@ func UpdateTable(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"id":          table.ID,
-		"name":        table.Name,
-		"description": table.Description,
-	})
+	dto.Success(c, tableObjectFromModel(table))
 }
 
 // DeleteTable deletes a table
@@ -184,7 +176,5 @@ func DeleteTable(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"message": "table deleted",
-	})
+	dto.Success(c, dto.MessageData{Message: "table deleted"})
 }

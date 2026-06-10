@@ -332,6 +332,9 @@ func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest
 		if err := tx.Create(&database).Error; err != nil {
 			return fmt.Errorf("failed to create database: %w", err)
 		}
+		if err := tx.First(&database, "id = ?", database.ID).Error; err != nil {
+			return fmt.Errorf("failed to reload database: %w", err)
+		}
 		result.Database = &database
 
 		tableService := NewTableService(tx)

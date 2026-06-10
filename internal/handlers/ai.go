@@ -74,9 +74,9 @@ func ChatWithAI(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"type":    "result",
-		"reply":   reply,
-		"context": req.Context,
+	dto.Success(c, dto.AIChatData{
+		Type:    "result",
+		Reply:   reply,
+		Context: req.Context,
 	})
 }

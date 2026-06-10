@@ -22,6 +22,7 @@ func s3ConfigFromEnv() (S3Config, bool) {
 		Region:    os.Getenv("FILE_STORAGE_S3_REGION"),
 		AccessKey: os.Getenv("FILE_STORAGE_S3_ACCESS_KEY"),
 		SecretKey: os.Getenv("FILE_STORAGE_S3_SECRET_KEY"),
+		Secure:    true,
 	}, true
 }
 
@@ -37,7 +38,7 @@ func TestS3StorageProvider_UploadDownloadDelete(t *testing.T) {
 	content := []byte("hello s3 storage")
 	key := "test/s3-upload-test.txt"
 
-	storageKey, err := provider.Upload(context.Background(), key, bytesReader(content), int64(len(content)))
+	storageKey, err := provider.Upload(context.Background(), key, bytesReader(content), int64(len(content)), "text/plain")
 	require.NoError(t, err)
 	assert.Equal(t, key, storageKey)
 
@@ -68,7 +69,7 @@ func TestS3StorageProvider_PresignedDownload(t *testing.T) {
 	content := []byte("presigned test")
 	key := "test/presigned-test.txt"
 
-	_, err = provider.Upload(context.Background(), key, bytesReader(content), int64(len(content)))
+	_, err = provider.Upload(context.Background(), key, bytesReader(content), int64(len(content)), "text/plain")
 	require.NoError(t, err)
 	defer provider.Delete(context.Background(), key)
 

@@ -16,7 +16,7 @@ func TestLocalStorageProvider_UploadDownloadDelete(t *testing.T) {
 	provider := NewLocalStorageProvider(dir)
 
 	content := []byte("hello storage world")
-	key, err := provider.Upload(context.Background(), "testfile.txt", bytesReader(content), int64(len(content)))
+	key, err := provider.Upload(context.Background(), "testfile.txt", bytesReader(content), int64(len(content)), "text/plain")
 	require.NoError(t, err)
 	assert.NotEmpty(t, key)
 

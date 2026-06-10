@@ -9,7 +9,7 @@ import (
 // StorageProvider abstracts file storage operations.
 // Implementations include local filesystem and S3-compatible object storage.
 type StorageProvider interface {
-	Upload(ctx context.Context, key string, reader io.Reader, size int64) (string, error)
+	Upload(ctx context.Context, key string, reader io.Reader, size int64, contentType string) (string, error)
 	Download(ctx context.Context, key string) (io.ReadCloser, error)
 	Delete(ctx context.Context, key string) error
 	SupportsPresignedDownload() bool

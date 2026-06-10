@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/internal/middleware"
+	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/jiangfire/cornerstone/internal/services"
 	"github.com/jiangfire/cornerstone/pkg/db"
 	"github.com/jiangfire/cornerstone/pkg/dto"
@@ -45,10 +46,10 @@ func CreateDatabase(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"id":          database.ID,
-		"name":        database.Name,
-		"description": database.Description,
+	dto.Success(c, dto.DatabaseObject{
+		ID:          database.ID,
+		Name:        database.Name,
+		Description: database.Description,
 	})
 }
 
@@ -77,10 +78,12 @@ func ListDatabases(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"databases": databases,
-		"total":     len(databases),
-	})
+	items := make([]dto.DatabaseObject, len(databases))
+	for i, d := range databases {
+		items[i] = dto.DatabaseObject{ID: d.ID, Name: d.Name, Description: d.Description}
+	}
+
+	dto.Success(c, dto.DatabaseListData{Databases: items, Total: len(items)})
 }
 
 // GetDatabase
@@ -111,7 +114,11 @@ func GetDatabase(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, database)
+	dto.Success(c, dto.DatabaseObject{
+		ID:          database.ID,
+		Name:        database.Name,
+		Description: database.Description,
+	})
 }
 
 // UpdateDatabase
@@ -151,10 +158,10 @@ func UpdateDatabase(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"id":          database.ID,
-		"name":        database.Name,
-		"description": database.Description,
+	dto.Success(c, dto.DatabaseObject{
+		ID:          database.ID,
+		Name:        database.Name,
+		Description: database.Description,
 	})
 }
 
@@ -185,9 +192,7 @@ func DeleteDatabase(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"message": "database deleted",
-	})
+	dto.Success(c, dto.MessageData{Message: "database deleted"})
 }
 
 // CreateDatabaseWithTables
@@ -227,15 +232,7 @@ func CreateDatabaseWithTables(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"database": result.Database,
-		"tables":   result.Tables,
-		"fields":   result.Fields,
-		"summary": gin.H{
-			"table_count": len(result.Tables),
-			"field_count": len(result.Fields),
-		},
-	})
+	dto.Success(c, buildBulkCreateData(result))
 }
 
 // ImportDatabaseYAML imports a database from YAML
@@ -272,15 +269,7 @@ func ImportDatabaseYAML(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"database": result.Database,
-		"tables":   result.Tables,
-		"fields":   result.Fields,
-		"summary": gin.H{
-			"table_count": len(result.Tables),
-			"field_count": len(result.Fields),
-		},
-	})
+	dto.Success(c, buildBulkCreateData(result))
 }
 
 // GetImportTemplate returns a YAML template for database import
@@ -300,4 +289,96 @@ func GetImportTemplate(c *gin.Context) {
 	template := services.YAMLTemplate()
 	c.Header("Content-Disposition", "attachment; filename=cornerstone-import-template.yaml")
 	c.Data(http.StatusOK, "application/x-yaml", template)
+}
+
+func buildBulkCreateData(result *services.CreateDBWithTablesResult) dto.BulkCreateData {
+	tables := make([]dto.TableObject, 0, len(result.Tables))
+	for _, t := range result.Tables {
+		tables = append(tables, dto.TableObject{
+			ID:          t.ID,
+			DatabaseID:  t.DatabaseID,
+			Name:        t.Name,
+			Description: t.Description,
+		})
+	}
+
+	fields := make([]dto.FieldObject, 0, len(result.Fields))
+	for _, f := range result.Fields {
+		fields = append(fields, dto.FieldObject{
+			ID:          f.ID,
+			TableID:     f.TableID,
+			Name:        f.Name,
+			Type:        f.Type,
+			Description: f.Description,
+			Required:    f.Required,
+			Options:     f.Options,
+		})
+	}
+
+	data := dto.BulkCreateData{
+		Database: dto.DatabaseObject{
+			ID:          result.Database.ID,
+			Name:        result.Database.Name,
+			Description: result.Database.Description,
+		},
+		Tables: tables,
+		Fields: fields,
+	}
+	data.Summary.TableCount = len(result.Tables)
+	data.Summary.FieldCount = len(result.Fields)
+	return data
+}
+
+func tableObjectFromResponse(t *services.TableResponse) dto.TableObject {
+	return dto.TableObject{
+		ID:          t.ID,
+		DatabaseID:  t.DatabaseID,
+		Name:        t.Name,
+		Description: t.Description,
+	}
+}
+
+func tableObjectFromModel(t *models.Table) dto.TableObject {
+	return dto.TableObject{
+		ID:          t.ID,
+		DatabaseID:  t.DatabaseID,
+		Name:        t.Name,
+		Description: t.Description,
+	}
+}
+
+func fieldObjectFromModel(f *models.Field) dto.FieldObject {
+	return dto.FieldObject{
+		ID:          f.ID,
+		TableID:     f.TableID,
+		Name:        f.Name,
+		Type:        f.Type,
+		Description: f.Description,
+		Required:    f.Required,
+		Options:     f.Options,
+	}
+}
+
+func fieldObjectFromResponse(f *services.FieldResponse) dto.FieldObject {
+	return dto.FieldObject{
+		ID:          f.ID,
+		TableID:     f.TableID,
+		Name:        f.Name,
+		Type:        f.Type,
+		Description: f.Description,
+		Required:    f.Required,
+		Options:     f.Options,
+	}
+}
+
+func fileObjectFromModel(f *models.File) dto.FileObject {
+	return dto.FileObject{
+		ID:         f.ID,
+		RecordID:   f.RecordID,
+		FieldID:    f.FieldID,
+		FileName:   f.FileName,
+		FileSize:   f.FileSize,
+		FileType:   f.FileType,
+		StorageURL: f.StorageURL,
+	}
 }

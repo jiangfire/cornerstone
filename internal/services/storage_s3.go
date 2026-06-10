@@ -25,13 +25,14 @@ type S3Config struct {
 	Region    string
 	AccessKey string
 	SecretKey string
+	Secure    bool
 }
 
 // NewS3StorageProvider creates a new S3StorageProvider.
 func NewS3StorageProvider(cfg S3Config) (*S3StorageProvider, error) {
 	client, err := minio.New(cfg.Endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
-		Secure: false,
+		Secure: cfg.Secure,
 		Region: cfg.Region,
 	})
 	if err != nil {
@@ -53,8 +54,10 @@ func NewS3StorageProvider(cfg S3Config) (*S3StorageProvider, error) {
 	}, nil
 }
 
-func (p *S3StorageProvider) Upload(ctx context.Context, key string, reader io.Reader, size int64) (string, error) {
-	_, err := p.client.PutObject(ctx, p.bucket, key, reader, size, minio.PutObjectOptions{})
+func (p *S3StorageProvider) Upload(ctx context.Context, key string, reader io.Reader, size int64, contentType string) (string, error) {
+	_, err := p.client.PutObject(ctx, p.bucket, key, reader, size, minio.PutObjectOptions{
+		ContentType: contentType,
+	})
 	if err != nil {
 		return "", fmt.Errorf("failed to upload to S3: %w", err)
 	}

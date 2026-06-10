@@ -3,7 +3,6 @@ package handlers
 import (
 	"testing"
 
-	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -63,37 +62,30 @@ func TestDecodeRecordData_NestedJSON(t *testing.T) {
 	assert.Equal(t, "Beijing", profile["city"])
 }
 
-func TestRecordResponseWithData_AddsCorruptedFlag(t *testing.T) {
+func TestRecordObjectFromModel_CorruptedData(t *testing.T) {
 	record := &models.Record{ID: "rec_bad", Data: `not json`}
-	resp := recordResponseWithData(record, gin.H{"id": record.ID, "version": 1})
-	assert.Equal(t, true, resp["_corrupted"])
-	assert.Equal(t, "rec_bad", resp["id"])
-	assert.Equal(t, 1, resp["version"])
+	resp := recordObjectFromModel(record, map[string]any{"id": record.ID, "version": 1})
+	assert.Equal(t, "rec_bad", resp.ID)
+	assert.Equal(t, 1, resp.Version)
 }
 
-func TestRecordResponseWithData_NoCorruptedFlagOnSuccess(t *testing.T) {
-	record := &models.Record{ID: "rec_ok", Data: `{"k":"v"}`}
-	resp := recordResponseWithData(record, gin.H{"id": record.ID})
-	_, hasCorrupted := resp["_corrupted"]
-	assert.False(t, hasCorrupted)
-	assert.Equal(t, "rec_ok", resp["id"])
-}
-
-func TestRecordResponseWithData_MergesDataIntoResponse(t *testing.T) {
+func TestRecordObjectFromModel_ValidData(t *testing.T) {
 	record := &models.Record{
 		ID:      "rec_1",
 		TableID: "tbl_1",
 		Data:    `{"name":"alice","score":95.5}`,
 		Version: 3,
 	}
-	resp := recordResponseWithData(record, gin.H{
-		"id":      record.ID,
-		"version": record.Version,
+	resp := recordObjectFromModel(record, map[string]any{
+		"id":       record.ID,
+		"version":  record.Version,
+		"table_id": record.TableID,
 	})
-	assert.Equal(t, "rec_1", resp["id"])
-	assert.Equal(t, 3, resp["version"])
+	assert.Equal(t, "rec_1", resp.ID)
+	assert.Equal(t, 3, resp.Version)
+	assert.Equal(t, "tbl_1", resp.TableID)
 
-	data, ok := resp["data"].(map[string]any)
+	data, ok := resp.Data.(map[string]any)
 	require.True(t, ok)
 	assert.Equal(t, "alice", data["name"])
 	assert.Equal(t, 95.5, data["score"])

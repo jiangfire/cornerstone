@@ -3,7 +3,6 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
-	"maps"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -33,14 +32,24 @@ func decodeRecordData(record *models.Record) (any, bool) {
 	return data, false
 }
 
-func recordResponseWithData(record *models.Record, extra gin.H) gin.H {
+func recordObjectFromModel(record *models.Record, extraFields map[string]any) dto.RecordObject {
 	data, corrupted := decodeRecordData(record)
-	resp := gin.H{"data": data}
-	maps.Copy(resp, extra)
-	if corrupted {
-		resp["_corrupted"] = true
+	obj := dto.RecordObject{
+		Data: data,
 	}
-	return resp
+	if id, ok := extraFields["id"].(string); ok {
+		obj.ID = id
+	}
+	if tableID, ok := extraFields["table_id"].(string); ok {
+		obj.TableID = tableID
+	}
+	if v, ok := extraFields["version"].(int); ok {
+		obj.Version = v
+	}
+	if corrupted {
+		obj.Data = map[string]any{"_corrupted": true, "data": data}
+	}
+	return obj
 }
 
 // CreateRecord creates a record
@@ -78,7 +87,7 @@ func CreateRecord(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, recordResponseWithData(record, gin.H{
+	dto.Success(c, recordObjectFromModel(record, map[string]any{
 		"id":       record.ID,
 		"table_id": record.TableID,
 		"version":  record.Version,
@@ -165,11 +174,7 @@ func ListRecords(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"items":    result.Records,
-		"total":    result.Total,
-		"has_more": result.HasMore,
-	})
+	dto.Success(c, result)
 }
 
 // GetRecord gets a single record
@@ -243,7 +248,7 @@ func UpdateRecord(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, recordResponseWithData(record, gin.H{
+	dto.Success(c, recordObjectFromModel(record, map[string]any{
 		"id":      record.ID,
 		"version": record.Version,
 	}))
@@ -276,9 +281,7 @@ func DeleteRecord(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"message": "record deleted",
-	})
+	dto.Success(c, dto.MessageData{Message: "record deleted"})
 }
 
 // BatchCreateRecords creates records in batch
@@ -325,17 +328,16 @@ func BatchCreateRecords(c *gin.Context) {
 		return
 	}
 
-	// Parse and return data
-	result := make([]interface{}, len(records))
+	result := make([]dto.RecordObject, len(records))
 	for i, record := range records {
-		result[i] = recordResponseWithData(record, gin.H{
+		result[i] = recordObjectFromModel(record, map[string]any{
 			"id":      record.ID,
 			"version": record.Version,
 		})
 	}
 
-	dto.Success(c, gin.H{
-		"records": result,
-		"count":   len(records),
+	dto.Success(c, dto.RecordBatchCreateData{
+		Records: result,
+		Count:   len(records),
 	})
 }

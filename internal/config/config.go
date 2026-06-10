@@ -62,6 +62,7 @@ type FileStorageConfig struct {
 	S3Region    string
 	S3AccessKey string
 	S3SecretKey string
+	S3Secure    bool // default true (use TLS for S3 connections)
 }
 
 func loadEnvFiles() {
@@ -114,6 +115,7 @@ func Load() (*Config, error) {
 			S3Region:    getEnv("FILE_STORAGE_S3_REGION", ""),
 			S3AccessKey: getEnv("FILE_STORAGE_S3_ACCESS_KEY", ""),
 			S3SecretKey: getEnv("FILE_STORAGE_S3_SECRET_KEY", ""),
+			S3Secure:    getEnvAsBool("FILE_STORAGE_S3_SECURE", true),
 		},
 	}
 
@@ -168,6 +170,28 @@ func (c *Config) Validate() error {
 		c.MCP.SSEReplayBuffer = 128
 	}
 
+	switch c.FileStorage.Type {
+	case "s3":
+		if strings.TrimSpace(c.FileStorage.S3Endpoint) == "" {
+			return fmt.Errorf("FILE_STORAGE_S3_ENDPOINT is required when FILE_STORAGE_TYPE=s3")
+		}
+		if strings.TrimSpace(c.FileStorage.S3Bucket) == "" {
+			return fmt.Errorf("FILE_STORAGE_S3_BUCKET is required when FILE_STORAGE_TYPE=s3")
+		}
+		if strings.TrimSpace(c.FileStorage.S3AccessKey) == "" {
+			return fmt.Errorf("FILE_STORAGE_S3_ACCESS_KEY is required when FILE_STORAGE_TYPE=s3")
+		}
+		if strings.TrimSpace(c.FileStorage.S3SecretKey) == "" {
+			return fmt.Errorf("FILE_STORAGE_S3_SECRET_KEY is required when FILE_STORAGE_TYPE=s3")
+		}
+	case "local", "":
+		if strings.TrimSpace(c.FileStorage.LocalDir) == "" {
+			c.FileStorage.LocalDir = "./uploads"
+		}
+	default:
+		return fmt.Errorf("unsupported FILE_STORAGE_TYPE: %q, supported: local, s3", c.FileStorage.Type)
+	}
+
 	return nil
 }
 
@@ -201,6 +225,20 @@ func getEnvAsInt(key string, defaultValue int) int {
 		if err == nil {
 			return result
 		}
+	}
+	return defaultValue
+}
+
+func getEnvAsBool(key string, defaultValue bool) bool {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	switch strings.ToLower(value) {
+	case "true", "1", "yes":
+		return true
+	case "false", "0", "no":
+		return false
 	}
 	return defaultValue
 }

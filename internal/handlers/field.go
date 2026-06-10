@@ -48,14 +48,7 @@ func CreateField(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"id":          field.ID,
-		"table_id":    field.TableID,
-		"name":        field.Name,
-		"type":        field.Type,
-		"description": field.Description,
-		"required":    field.Required,
-	})
+	dto.Success(c, fieldObjectFromModel(field))
 }
 
 // ListFields
@@ -85,10 +78,11 @@ func ListFields(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"items": fields,
-		"total": len(fields),
-	})
+	items := make([]dto.FieldObject, len(fields))
+	for i := range fields {
+		items[i] = fieldObjectFromResponse(&fields[i])
+	}
+	dto.Success(c, dto.FieldListData{Items: items, Total: len(items)})
 }
 
 // GetField
@@ -119,7 +113,7 @@ func GetField(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, field)
+	dto.Success(c, fieldObjectFromResponse(field))
 }
 
 // UpdateField
@@ -161,13 +155,7 @@ func UpdateField(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"id":          field.ID,
-		"name":        field.Name,
-		"type":        field.Type,
-		"description": field.Description,
-		"required":    field.Required,
-	})
+	dto.Success(c, fieldObjectFromModel(field))
 }
 
 // DeleteField
@@ -197,7 +185,5 @@ func DeleteField(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"message": "field deleted",
-	})
+	dto.Success(c, dto.MessageData{Message: "field deleted"})
 }

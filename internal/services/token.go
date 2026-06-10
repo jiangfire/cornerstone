@@ -27,6 +27,25 @@ type CreateTokenRequest struct {
 	ExpiresAt *time.Time `json:"expires_at"`
 }
 
+// TokenResponse is the DTO returned by token operations (no timestamps).
+type TokenResponse struct {
+	ID        string     `json:"id"`
+	Name      string     `json:"name"`
+	IsMaster  bool       `json:"is_master"`
+	Scopes    string     `json:"scopes"`
+	ExpiresAt *time.Time `json:"expires_at,omitempty"`
+}
+
+func tokenToResponse(t *models.Token) TokenResponse {
+	return TokenResponse{
+		ID:        t.ID,
+		Name:      t.Name,
+		IsMaster:  t.IsMaster,
+		Scopes:    t.Scopes,
+		ExpiresAt: t.ExpiresAt,
+	}
+}
+
 // CreateToken creates a new token (requires master token)
 func (s *TokenService) CreateToken(req CreateTokenRequest) (*models.Token, error) {
 	token := &models.Token{
@@ -44,7 +63,7 @@ func (s *TokenService) CreateToken(req CreateTokenRequest) (*models.Token, error
 
 // ListTokens lists tokens
 // Master token sees all; regular tokens see only themselves
-func (s *TokenService) ListTokens(tokenID string, isMaster bool) ([]models.Token, error) {
+func (s *TokenService) ListTokens(tokenID string, isMaster bool) ([]TokenResponse, error) {
 	var tokens []models.Token
 	query := s.db.Where("is_master = ?", false).Order("created_at DESC")
 
@@ -55,7 +74,12 @@ func (s *TokenService) ListTokens(tokenID string, isMaster bool) ([]models.Token
 	if err := query.Find(&tokens).Error; err != nil {
 		return nil, fmt.Errorf("failed to list tokens: %w", err)
 	}
-	return tokens, nil
+
+	result := make([]TokenResponse, len(tokens))
+	for i := range tokens {
+		result[i] = tokenToResponse(&tokens[i])
+	}
+	return result, nil
 }
 
 // DeleteToken deletes a token
@@ -85,7 +109,7 @@ func (s *TokenService) DeleteToken(tokenID string, targetID string, isMaster boo
 }
 
 // UpdateToken updates token permissions (requires master token)
-func (s *TokenService) UpdateToken(targetID string, scopes string, expiresAt *time.Time) (*models.Token, error) {
+func (s *TokenService) UpdateToken(targetID string, scopes string, expiresAt *time.Time) (*TokenResponse, error) {
 	var t models.Token
 	if err := s.db.Where("id = ?", targetID).First(&t).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -111,5 +135,6 @@ func (s *TokenService) UpdateToken(targetID string, scopes string, expiresAt *ti
 		return nil, fmt.Errorf("failed to query updated token: %w", err)
 	}
 	authz.InvalidateTokenCache(targetID)
-	return &t, nil
+	resp := tokenToResponse(&t)
+	return &resp, nil
 }

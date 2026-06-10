@@ -146,9 +146,9 @@ func (h *QueryHandler) QueryExplain(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"sql":    sqlQuery.SQL,
-		"params": sqlQuery.Params,
+	dto.Success(c, dto.QueryExplainData{
+		SQL:    sqlQuery.SQL,
+		Params: sqlQuery.Params,
 	})
 }
 
@@ -270,8 +270,8 @@ func (h *QueryHandler) ListTables(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{
-		"tables": tables,
+	dto.Success(c, dto.QueryTablesData{
+		Tables: tables,
 	})
 }
 
@@ -308,9 +308,9 @@ func (h *QueryHandler) GetTableSchema(c *gin.Context) {
 
 	fields := query.DefaultAllowedTables.GetAllowedFields(table)
 
-	dto.Success(c, gin.H{
-		"table":  table,
-		"fields": fields,
+	dto.Success(c, dto.QuerySchemaData{
+		Table:  table,
+		Fields: fields,
 	})
 }
 

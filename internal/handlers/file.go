@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -16,7 +18,7 @@ import (
 // @Description  Upload a file attachment associated with a record and/or field.
 //
 //	At least one of record_id or field_id is required. The file is stored
-//	locally and metadata is recorded in the database. File size and type
+//	in the configured storage backend (local or S3) and metadata is recorded in the database. File size and type
 //	restrictions may apply based on field configuration.
 //
 // @Tags         files
@@ -60,7 +62,7 @@ func UploadFile(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, uploadedFile)
+	dto.Success(c, fileObjectFromModel(uploadedFile))
 }
 
 // GetFile
@@ -91,7 +93,7 @@ func GetFile(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, file)
+	dto.Success(c, fileObjectFromModel(file))
 }
 
 // DownloadFile
@@ -135,12 +137,19 @@ func DownloadFile(c *gin.Context) {
 		return
 	}
 
-	safePath, err := services.ResolveSecureStoragePath(file.StorageURL)
+	reader, err := storage.Download(c.Request.Context(), file.StorageURL)
 	if err != nil {
-		dto.Error(c, 403, "invalid file path")
+		handleServiceError(c, err)
 		return
 	}
-	c.FileAttachment(safePath, file.FileName)
+	defer reader.Close()
+
+	c.Header("Content-Disposition", "attachment; filename="+file.FileName)
+	c.Header("Content-Type", "application/octet-stream")
+	if file.FileSize > 0 {
+		c.Header("Content-Length", fmt.Sprintf("%d", file.FileSize))
+	}
+	_, _ = io.Copy(c.Writer, reader)
 }
 
 // DeleteFile
@@ -159,7 +168,7 @@ func DownloadFile(c *gin.Context) {
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this file"
 // @Failure      404  {object}  swagger.ErrorResponse  "File not found"
-// @Router       /api/v1/files/{id} [delete]
+// @Router       /api/v1/files/{id}/delete [delete]
 func DeleteFile(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fileID := c.Param("id")
@@ -170,7 +179,7 @@ func DeleteFile(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{"message": "file deleted"})
+	dto.Success(c, dto.MessageData{Message: "file deleted"})
 }
 
 // ListRecordFiles
@@ -200,5 +209,9 @@ func ListRecordFiles(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, gin.H{"items": files})
+	items := make([]dto.FileObject, len(files))
+	for i := range files {
+		items[i] = fileObjectFromModel(&files[i])
+	}
+	dto.Success(c, dto.FileListData{Items: items})
 }

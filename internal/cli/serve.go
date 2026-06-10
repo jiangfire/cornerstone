@@ -269,6 +269,7 @@ func initStorage(cfg *config.Config) {
 			Region:    cfg.FileStorage.S3Region,
 			AccessKey: cfg.FileStorage.S3AccessKey,
 			SecretKey: cfg.FileStorage.S3SecretKey,
+			Secure:    cfg.FileStorage.S3Secure,
 		}
 		provider, err := services.NewS3StorageProvider(s3Cfg)
 		if err != nil {

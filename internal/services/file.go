@@ -245,7 +245,7 @@ func (s *FileService) UploadFile(req UploadFileRequest, userID string) (*models.
 	}
 	defer src.Close()
 
-	storageURL, err := s.storage.Upload(context.Background(), filename, src, req.File.Size)
+	storageURL, err := s.storage.Upload(context.Background(), filename, src, req.File.Size, contentType)
 	if err != nil {
 		return nil, fmt.Errorf("failed to store file: %w", err)
 	}
@@ -263,6 +263,10 @@ func (s *FileService) UploadFile(req UploadFileRequest, userID string) (*models.
 	if err := s.db.Create(&file).Error; err != nil {
 		_ = s.storage.Delete(context.Background(), storageURL)
 		return nil, fmt.Errorf("failed to create file record: %w", err)
+	}
+
+	if err := s.db.First(&file, "id = ?", file.ID).Error; err != nil {
+		return nil, fmt.Errorf("failed to reload file: %w", err)
 	}
 
 	return &file, nil

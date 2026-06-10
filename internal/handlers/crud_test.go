@@ -580,7 +580,7 @@ func TestListRecords_Success(t *testing.T) {
 	resp := decodeResp(t, rec)
 	data, ok := resp["data"].(map[string]interface{})
 	require.True(t, ok)
-	items, ok := data["items"].([]interface{})
+	items, ok := data["records"].([]interface{})
 	require.True(t, ok)
 	assert.Equal(t, 2, len(items))
 }
