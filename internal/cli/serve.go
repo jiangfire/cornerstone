@@ -16,10 +16,15 @@ import (
 	"github.com/jiangfire/cornerstone/internal/handlers"
 	"github.com/jiangfire/cornerstone/internal/middleware"
 	"github.com/jiangfire/cornerstone/internal/services"
+	// Blank import to register swagger docs for gin-swagger UI.
+	_ "github.com/jiangfire/cornerstone/internal/swagger"
 	applog "github.com/jiangfire/cornerstone/pkg/log"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/cobra"
 	"go.uber.org/zap"
+
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // @title           Cornerstone API
@@ -91,6 +96,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 	r.GET("/health", handlers.Health)
 	r.GET("/ready", handlers.Ready)
 	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	r.OPTIONS("/mcp", handlers.HandleMCPOptions)
 	mcpRoute := r.Group("/mcp")

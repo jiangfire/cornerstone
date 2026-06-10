@@ -55,7 +55,6 @@ func CreateField(c *gin.Context) {
 		"type":        field.Type,
 		"description": field.Description,
 		"required":    field.Required,
-		"created_at":  field.CreatedAt,
 	})
 }
 
@@ -168,7 +167,6 @@ func UpdateField(c *gin.Context) {
 		"type":        field.Type,
 		"description": field.Description,
 		"required":    field.Required,
-		"updated_at":  field.UpdatedAt,
 	})
 }
 

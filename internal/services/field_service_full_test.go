@@ -1019,8 +1019,6 @@ func TestGetField_ResponseBodyFormat(t *testing.T) {
 
 	resp, err := svc.GetField(created.ID, master.ID)
 	require.NoError(t, err)
-	assert.NotEmpty(t, resp.CreatedAt)
-	assert.NotEmpty(t, resp.UpdatedAt)
 	assert.Equal(t, table.ID, resp.TableID)
 	assert.False(t, resp.Deprecated)
 }

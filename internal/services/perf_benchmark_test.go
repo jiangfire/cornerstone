@@ -287,12 +287,10 @@ func benchmarkRecordResponseShaping(
 		for _, record := range records {
 			data := service.filterReadableData(fields, readableFields, parseRecordPayload(record.Data))
 			responses = append(responses, RecordResponse{
-				ID:        record.ID,
-				TableID:   record.TableID,
-				Data:      data,
-				Version:   record.Version,
-				CreatedAt: record.CreatedAt.Format(time.RFC3339),
-				UpdatedAt: record.UpdatedAt.Format(time.RFC3339),
+				ID:      record.ID,
+				TableID: record.TableID,
+				Data:    data,
+				Version: record.Version,
 			})
 		}
 		if len(responses) == 0 {

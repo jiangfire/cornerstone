@@ -23,8 +23,8 @@ func ensureDB() error {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// When --json is set, suppress log output to avoid polluting structured JSON on stdout.
-	if jsonOutput {
+	// In CLI mode (non-serve), suppress log output to keep stdout clean for results only.
+	if !jsonOutput {
 		cfg.Logger.Level = "fatal"
 	}
 
@@ -185,7 +185,7 @@ var dbCreateCmd = &cobra.Command{
 }
 
 var dbGetCmd = &cobra.Command{
-	Use:   "get [id]",
+	Use:   "get [id-or-name]",
 	Short: "get database details",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -208,7 +208,7 @@ var dbGetCmd = &cobra.Command{
 }
 
 var dbUpdateCmd = &cobra.Command{
-	Use:   "update [id]",
+	Use:   "update [id-or-name]",
 	Short: "update a database",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -236,7 +236,7 @@ var dbUpdateCmd = &cobra.Command{
 }
 
 var dbDeleteCmd = &cobra.Command{
-	Use:   "delete [id]",
+	Use:   "delete [id-or-name]",
 	Short: "delete a database",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {

@@ -79,10 +79,9 @@ func CreateRecord(c *gin.Context) {
 	}
 
 	dto.Success(c, recordResponseWithData(record, gin.H{
-		"id":         record.ID,
-		"table_id":   record.TableID,
-		"version":    record.Version,
-		"created_at": record.CreatedAt,
+		"id":       record.ID,
+		"table_id": record.TableID,
+		"version":  record.Version,
 	}))
 }
 
@@ -242,9 +241,8 @@ func UpdateRecord(c *gin.Context) {
 	}
 
 	dto.Success(c, recordResponseWithData(record, gin.H{
-		"id":         record.ID,
-		"version":    record.Version,
-		"updated_at": record.UpdatedAt,
+		"id":      record.ID,
+		"version": record.Version,
 	}))
 }
 

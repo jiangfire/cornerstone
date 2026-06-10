@@ -83,7 +83,6 @@ func CreateToken(c *gin.Context) {
 		"name":       token.Name,
 		"scopes":     token.Scopes,
 		"expires_at": token.ExpiresAt,
-		"created_at": token.CreatedAt,
 		"token":      token.Token,
 	})
 }

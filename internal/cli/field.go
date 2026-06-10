@@ -16,7 +16,7 @@ var fieldCmd = &cobra.Command{
 }
 
 var fieldListCmd = &cobra.Command{
-	Use:   "list [table-id]",
+	Use:   "list [table-id-or-name]",
 	Short: "list all fields in a table",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -39,7 +39,7 @@ var fieldListCmd = &cobra.Command{
 }
 
 var fieldCreateCmd = &cobra.Command{
-	Use:   "create [table-id] [name] [type]",
+	Use:   "create [table-id-or-name] [name] [type]",
 	Short: "create a field in a table",
 	Long: `Create a field in a table. Supported types:
   string, text, number, boolean, date, datetime, file, json, list`,

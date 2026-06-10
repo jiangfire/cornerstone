@@ -66,7 +66,6 @@ type FileResponse struct {
 	FileSize   int64  `json:"file_size"`
 	FileType   string `json:"file_type"`
 	StorageURL string `json:"storage_url"`
-	CreatedAt  string `json:"created_at"`
 }
 
 func (s *FileService) getAccessibleRecord(recordID, userID string, requiredRoles []string) (*models.Record, error) {

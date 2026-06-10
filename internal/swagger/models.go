@@ -34,8 +34,6 @@ type DatabaseObject struct {
 	ID          string `json:"id" example:"db_abc123"`
 	Name        string `json:"name" example:"My Database"`
 	Description string `json:"description" example:"A test database"`
-	CreatedAt   string `json:"created_at" example:"2026-01-01 00:00:00"`
-	UpdatedAt   string `json:"updated_at" example:"2026-01-01 00:00:00"`
 }
 
 // DatabaseListResponse is the data payload for GET /api/databases.
@@ -98,8 +96,6 @@ type TableObject struct {
 	DatabaseID  string `json:"database_id" example:"db_abc123"`
 	Name        string `json:"name" example:"orders"`
 	Description string `json:"description" example:"Order records"`
-	CreatedAt   string `json:"created_at" example:"2026-01-01 00:00:00"`
-	UpdatedAt   string `json:"updated_at" example:"2026-01-01 00:00:00"`
 }
 
 // TableListResponse is the data payload for GET /api/databases/{id}/tables.
@@ -155,8 +151,6 @@ type FieldObject struct {
 	Required    bool        `json:"required" example:"true"`
 	Options     string      `json:"options,omitempty" example:"active,inactive"`
 	Config      FieldConfig `json:"config"`
-	CreatedAt   string      `json:"created_at" example:"2026-01-01 00:00:00"`
-	UpdatedAt   string      `json:"updated_at" example:"2026-01-01 00:00:00"`
 }
 
 // FieldListResponse is the data payload for GET /api/tables/{id}/fields.
@@ -181,12 +175,10 @@ type RecordUpdateRequest struct {
 
 // RecordObject represents a single record in responses.
 type RecordObject struct {
-	ID        string                 `json:"id" example:"rec_ghi012"`
-	TableID   string                 `json:"table_id" example:"tbl_xyz789"`
-	Data      map[string]interface{} `json:"data"`
-	Version   int                    `json:"version" example:"1"`
-	CreatedAt string                 `json:"created_at" example:"2026-01-01 00:00:00"`
-	UpdatedAt string                 `json:"updated_at" example:"2026-01-01 00:00:00"`
+	ID      string                 `json:"id" example:"rec_ghi012"`
+	TableID string                 `json:"table_id" example:"tbl_xyz789"`
+	Data    map[string]interface{} `json:"data"`
+	Version int                    `json:"version" example:"1"`
 }
 
 // RecordListResponse is the data payload for GET /api/records.
@@ -224,7 +216,6 @@ type TokenObject struct {
 	IsMaster  bool       `json:"is_master" example:"false"`
 	Scopes    string     `json:"scopes" example:"read,write"`
 	ExpiresAt *time.Time `json:"expires_at,omitempty" example:"2027-01-01T00:00:00Z"`
-	CreatedAt time.Time  `json:"created_at" example:"2026-01-01T00:00:00Z"`
 }
 
 // TokenListResponse is the data payload for GET /api/tokens.
@@ -239,7 +230,6 @@ type TokenCreateResponse struct {
 	Name      string     `json:"name" example:"my-app-token"`
 	Scopes    string     `json:"scopes" example:"read,write"`
 	ExpiresAt *time.Time `json:"expires_at,omitempty" example:"2027-01-01T00:00:00Z"`
-	CreatedAt time.Time  `json:"created_at" example:"2026-01-01T00:00:00Z"`
 	Token     string     `json:"token" example:"cs_a1b2c3d4e5f6..."`
 }
 
@@ -254,8 +244,6 @@ type FileObject struct {
 	FileSize   int64  `json:"file_size" example:"204800"`
 	FileType   string `json:"file_type" example:"application/pdf"`
 	StorageURL string `json:"storage_url" example:"./uploads/file_report.pdf"`
-	CreatedAt  string `json:"created_at" example:"2026-01-01 00:00:00"`
-	UpdatedAt  string `json:"updated_at" example:"2026-01-01 00:00:00"`
 }
 
 // FileListResponse is the data payload for GET /api/records/{id}/files.

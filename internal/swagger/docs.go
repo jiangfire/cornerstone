@@ -191,6 +191,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/swagger.ErrorResponse"
                         }
+                    },
+                    "403": {
+                        "description": "Forbidden - master token required",
+                        "schema": {
+                            "$ref": "#/definitions/swagger.ErrorResponse"
+                        }
                     }
                 }
             }
@@ -251,6 +257,12 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
+                        "schema": {
+                            "$ref": "#/definitions/swagger.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - master token required",
                         "schema": {
                             "$ref": "#/definitions/swagger.ErrorResponse"
                         }
@@ -3126,10 +3138,6 @@ const docTemplate = `{
         "swagger.DatabaseObject": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string",
-                    "example": "2026-01-01 00:00:00"
-                },
                 "description": {
                     "type": "string",
                     "example": "A test database"
@@ -3141,10 +3149,6 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "My Database"
-                },
-                "updated_at": {
-                    "type": "string",
-                    "example": "2026-01-01 00:00:00"
                 }
             }
         },
@@ -3298,10 +3302,6 @@ const docTemplate = `{
                 "config": {
                     "$ref": "#/definitions/swagger.FieldConfig"
                 },
-                "created_at": {
-                    "type": "string",
-                    "example": "2026-01-01 00:00:00"
-                },
                 "description": {
                     "type": "string",
                     "example": "Current status"
@@ -3329,10 +3329,6 @@ const docTemplate = `{
                 "type": {
                     "type": "string",
                     "example": "string"
-                },
-                "updated_at": {
-                    "type": "string",
-                    "example": "2026-01-01 00:00:00"
                 }
             }
         },
@@ -3385,10 +3381,6 @@ const docTemplate = `{
         "swagger.FileObject": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string",
-                    "example": "2026-01-01 00:00:00"
-                },
                 "field_id": {
                     "type": "string",
                     "example": "fld_def456"
@@ -3416,10 +3408,6 @@ const docTemplate = `{
                 "storage_url": {
                     "type": "string",
                     "example": "./uploads/file_report.pdf"
-                },
-                "updated_at": {
-                    "type": "string",
-                    "example": "2026-01-01 00:00:00"
                 }
             }
         },
@@ -3646,10 +3634,6 @@ const docTemplate = `{
         "swagger.RecordObject": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string",
-                    "example": "2026-01-01 00:00:00"
-                },
                 "data": {
                     "type": "object",
                     "additionalProperties": true
@@ -3661,10 +3645,6 @@ const docTemplate = `{
                 "table_id": {
                     "type": "string",
                     "example": "tbl_xyz789"
-                },
-                "updated_at": {
-                    "type": "string",
-                    "example": "2026-01-01 00:00:00"
                 },
                 "version": {
                     "type": "integer",
@@ -3730,10 +3710,6 @@ const docTemplate = `{
         "swagger.TableObject": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string",
-                    "example": "2026-01-01 00:00:00"
-                },
                 "database_id": {
                     "type": "string",
                     "example": "db_abc123"
@@ -3749,10 +3725,6 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "orders"
-                },
-                "updated_at": {
-                    "type": "string",
-                    "example": "2026-01-01 00:00:00"
                 }
             }
         },
@@ -3800,10 +3772,6 @@ const docTemplate = `{
         "swagger.TokenCreateResponse": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string",
-                    "example": "2026-01-01T00:00:00Z"
-                },
                 "expires_at": {
                     "type": "string",
                     "example": "2027-01-01T00:00:00Z"
@@ -3844,10 +3812,6 @@ const docTemplate = `{
         "swagger.TokenObject": {
             "type": "object",
             "properties": {
-                "created_at": {
-                    "type": "string",
-                    "example": "2026-01-01T00:00:00Z"
-                },
                 "expires_at": {
                     "type": "string",
                     "example": "2027-01-01T00:00:00Z"

@@ -23,6 +23,49 @@ func NewFieldService(db *gorm.DB) *FieldService {
 	return &FieldService{db: db}
 }
 
+// ResolveField resolves a field identifier within a table to a field model.
+// tableIdentifier can be a table ID or name.
+// fieldIdentifier can be a field ID or name.
+func (s *FieldService) ResolveField(tableIdentifier, fieldIdentifier string) (*models.Field, error) {
+	// Resolve table first
+	var table models.Table
+	err := s.db.Where("id = ? AND deleted_at IS NULL", tableIdentifier).First(&table).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			// Try resolving via table name in any accessible database
+			err = s.db.Where("name = ? AND deleted_at IS NULL", tableIdentifier).First(&table).Error
+		}
+		if err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, errors.New("table not found")
+			}
+			return nil, fmt.Errorf("table query failed: %w", err)
+		}
+	}
+
+	var field models.Field
+	// Try field ID first
+	err = s.db.Where("id = ? AND deleted_at IS NULL", fieldIdentifier).First(&field).Error
+	if err == nil {
+		if field.TableID != table.ID {
+			return nil, errors.New("field does not belong to the specified table")
+		}
+		return &field, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("field query failed: %w", err)
+	}
+	// Fallback to field name within the table
+	err = s.db.Where("table_id = ? AND name = ? AND deleted_at IS NULL", table.ID, fieldIdentifier).First(&field).Error
+	if err == nil {
+		return &field, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("field not found")
+	}
+	return nil, fmt.Errorf("field query failed: %w", err)
+}
+
 // validateFieldName validates field name format
 func validateFieldName(name string) error {
 	name = strings.TrimSpace(name)
@@ -225,8 +268,6 @@ type FieldResponse struct {
 	Required    bool        `json:"required"`
 	Options     string      `json:"options,omitempty"`
 	Config      FieldConfig `json:"config"`
-	CreatedAt   string      `json:"created_at"`
-	UpdatedAt   string      `json:"updated_at"`
 }
 
 func buildDeletedFieldName(name, fieldID string) string {
@@ -284,6 +325,27 @@ func (s *FieldService) checkTableAccess(tableID, userID string, requiredRoles []
 	return nil
 }
 
+// resolveTable resolves a table identifier to a table model.
+// It first tries to find by ID, then falls back to name lookup.
+func (s *FieldService) resolveTable(identifier string) (*models.Table, error) {
+	var table models.Table
+	err := s.db.Where("id = ? AND deleted_at IS NULL", identifier).First(&table).Error
+	if err == nil {
+		return &table, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("table query failed: %w", err)
+	}
+	err = s.db.Where("name = ? AND deleted_at IS NULL", identifier).First(&table).Error
+	if err == nil {
+		return &table, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("table not found")
+	}
+	return nil, fmt.Errorf("table query failed: %w", err)
+}
+
 func requiredActionForRoles(roles []string) string {
 	switch {
 	case containsRole(roles, "viewer"):
@@ -308,12 +370,19 @@ func containsRole(roles []string, role string) bool {
 
 // CreateField creates a new field
 func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*models.Field, error) {
-	// 1. Check table access (owner, admin, editor can create fields)
+	// 1. Resolve table identifier (supports ID or name)
+	table, err := s.resolveTable(req.TableID)
+	if err != nil {
+		return nil, err
+	}
+	req.TableID = table.ID
+
+	// 2. Check table access (owner, admin, editor can create fields)
 	if err := s.checkTableAccess(req.TableID, userID, []string{"owner", "admin", "editor"}); err != nil {
 		return nil, err
 	}
 
-	// 2. Convert options string to Config if provided
+	// 3. Convert options string to Config if provided
 	if req.Options != "" && supportsFieldOptions(req.Type) {
 		// Convert comma-separated string to string array
 		optionsList := strings.Split(req.Options, ",")
@@ -327,7 +396,7 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 		req.Config.Options = cleanedOptions
 	}
 
-	// 3. Input validation and sanitization
+	// 4. Input validation and sanitization
 	req.Name = sanitizeFieldName(req.Name)
 	req.Description = sanitizeFieldDescription(req.Description)
 	req.Config = sanitizeFieldConfig(req.Config)
@@ -352,9 +421,9 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 		return nil, fmt.Errorf("field config validation failed: %w", err)
 	}
 
-	// 4. Check for duplicate field name
+	// 5. Check for duplicate field name
 	var existingField models.Field
-	err := s.db.Where("table_id = ? AND name = ? AND deleted_at IS NULL", req.TableID, req.Name).First(&existingField).Error
+	err = s.db.Where("table_id = ? AND name = ? AND deleted_at IS NULL", req.TableID, req.Name).First(&existingField).Error
 	if err == nil {
 		return nil, errors.New("a field with this name already exists in this table")
 	}
@@ -362,13 +431,13 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 
-	// 5. Serialize config
+	// 6. Serialize config
 	configJSON, err := json.Marshal(req.Config)
 	if err != nil {
 		return nil, fmt.Errorf("config serialization failed: %w", err)
 	}
 
-	// 6. Create field
+	// 7. Create field
 	field := models.Field{
 		TableID:     req.TableID,
 		Name:        req.Name,
@@ -382,20 +451,31 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 		return nil, fmt.Errorf("failed to create field: %w", err)
 	}
 
+	// Reload to get database-generated timestamps
+	if err := s.db.First(&field, "id = ?", field.ID).Error; err != nil {
+		return nil, fmt.Errorf("failed to reload field: %w", err)
+	}
+
 	InvalidateFieldCache(field.TableID)
 	return &field, nil
 }
 
 // ListFields lists fields for a table
 func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, error) {
-	// 1. Check table access
-	if err := s.checkTableAccess(tableID, userID, []string{"owner", "admin", "editor", "viewer"}); err != nil {
+	// 1. Resolve table identifier (supports ID or name)
+	table, err := s.resolveTable(tableID)
+	if err != nil {
 		return nil, err
 	}
 
-	// 2. Query fields
+	// 2. Check table access
+	if err := s.checkTableAccess(table.ID, userID, []string{"owner", "admin", "editor", "viewer"}); err != nil {
+		return nil, err
+	}
+
+	// 3. Query fields
 	var fields []models.Field
-	err := s.db.Where("table_id = ? AND deleted_at IS NULL", tableID).Order("created_at ASC").Find(&fields).Error
+	err = s.db.Where("table_id = ? AND deleted_at IS NULL", table.ID).Order("created_at ASC").Find(&fields).Error
 	if err != nil {
 		return nil, fmt.Errorf("database query failed: %w", err)
 	}
@@ -436,8 +516,6 @@ func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, erro
 			Required:    f.Required,
 			Options:     strings.Join(config.Options, ", "),
 			Config:      config,
-			CreatedAt:   f.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedAt:   f.UpdatedAt.Format("2006-01-02 15:04:05"),
 		}
 		index++
 	}
@@ -447,7 +525,8 @@ func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, erro
 
 // GetField gets field details
 func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) {
-	// 1. Get field info
+	// 1. Resolve field identifier (supports ID or name)
+	// For name lookup, we need a table context; try ID first via getActiveField
 	field, err := s.getActiveField(fieldID)
 	if err != nil {
 		return nil, fmt.Errorf("field not found: %w", err)
@@ -478,8 +557,6 @@ func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) 
 		Required:    field.Required,
 		Options:     strings.Join(config.Options, ", "),
 		Config:      config,
-		CreatedAt:   field.CreatedAt.Format("2006-01-02 15:04:05"),
-		UpdatedAt:   field.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
 }
 

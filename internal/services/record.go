@@ -95,12 +95,10 @@ type UpdateRecordRequest struct {
 
 // RecordResponse is the record API response
 type RecordResponse struct {
-	ID        string      `json:"id"`
-	TableID   string      `json:"table_id"`
-	Data      interface{} `json:"data"`
-	Version   int         `json:"version"`
-	CreatedAt string      `json:"created_at"`
-	UpdatedAt string      `json:"updated_at"`
+	ID      string      `json:"id"`
+	TableID string      `json:"table_id"`
+	Data    interface{} `json:"data"`
+	Version int         `json:"version"`
 }
 
 // QueryRequest is the query request
@@ -1085,6 +1083,11 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 		return nil, err
 	}
 
+	// Reload to get database-generated timestamps
+	if err := s.db.First(&record, "id = ?", record.ID).Error; err != nil {
+		return nil, fmt.Errorf("failed to reload record: %w", err)
+	}
+
 	return &record, nil
 }
 
@@ -1194,12 +1197,10 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 		data := s.filterReadableData(fields, readableFields, parseRecordPayload(r.Data))
 
 		result[i] = RecordResponse{
-			ID:        r.ID,
-			TableID:   r.TableID,
-			Data:      data,
-			Version:   r.Version,
-			CreatedAt: r.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedAt: r.UpdatedAt.Format("2006-01-02 15:04:05"),
+			ID:      r.ID,
+			TableID: r.TableID,
+			Data:    data,
+			Version: r.Version,
 		}
 	}
 
@@ -1266,11 +1267,9 @@ func (s *RecordService) ExportRecords(tableID, userID, format, filter string) ([
 		exportRows := make([]map[string]interface{}, 0, len(records))
 		for _, record := range records {
 			row := map[string]interface{}{
-				"id":         record.ID,
-				"table_id":   record.TableID,
-				"version":    record.Version,
-				"created_at": record.CreatedAt.Format(time.RFC3339),
-				"updated_at": record.UpdatedAt.Format(time.RFC3339),
+				"id":       record.ID,
+				"table_id": record.TableID,
+				"version":  record.Version,
 			}
 
 			payload := s.filterReadableData(fields, readableFields, parseRecordPayload(record.Data))
@@ -1294,7 +1293,7 @@ func (s *RecordService) ExportRecords(tableID, userID, format, filter string) ([
 		for _, field := range exportFields {
 			header = append(header, field.Name)
 		}
-		header = append(header, "version", "created_at", "updated_at")
+		header = append(header, "version")
 		if err := writer.Write(header); err != nil {
 			return nil, "", "", fmt.Errorf("failed to write CSV header: %w", err)
 		}
@@ -1310,8 +1309,6 @@ func (s *RecordService) ExportRecords(tableID, userID, format, filter string) ([
 
 			row = append(row,
 				fmt.Sprintf("%d", record.Version),
-				record.CreatedAt.Format(time.RFC3339),
-				record.UpdatedAt.Format(time.RFC3339),
 			)
 
 			if err := writer.Write(row); err != nil {
@@ -1359,12 +1356,10 @@ func (s *RecordService) GetRecord(recordID, userID string) (*RecordResponse, err
 	data := s.filterReadableData(fields, readableFields, parseRecordPayload(record.Data))
 
 	return &RecordResponse{
-		ID:        record.ID,
-		TableID:   record.TableID,
-		Data:      data,
-		Version:   record.Version,
-		CreatedAt: record.CreatedAt.Format("2006-01-02 15:04:05"),
-		UpdatedAt: record.UpdatedAt.Format("2006-01-02 15:04:05"),
+		ID:      record.ID,
+		TableID: record.TableID,
+		Data:    data,
+		Version: record.Version,
 	}, nil
 }
 

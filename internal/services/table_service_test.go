@@ -494,8 +494,6 @@ func TestGetTable_ResponseBodyFormat(t *testing.T) {
 
 	resp, err := svc.GetTable(created.ID, master.ID)
 	require.NoError(t, err)
-	assert.NotEmpty(t, resp.CreatedAt)
-	assert.NotEmpty(t, resp.UpdatedAt)
 	assert.Equal(t, created.ID, resp.ID)
 	assert.Equal(t, database.ID, resp.DatabaseID)
 }

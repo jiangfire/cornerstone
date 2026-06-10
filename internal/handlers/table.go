@@ -47,7 +47,6 @@ func CreateTable(c *gin.Context) {
 		"database_id": table.DatabaseID,
 		"name":        table.Name,
 		"description": table.Description,
-		"created_at":  table.CreatedAt,
 	})
 }
 
@@ -155,7 +154,6 @@ func UpdateTable(c *gin.Context) {
 		"id":          table.ID,
 		"name":        table.Name,
 		"description": table.Description,
-		"updated_at":  table.UpdatedAt,
 	})
 }
 

@@ -20,6 +20,40 @@ func NewTableService(db *gorm.DB) *TableService {
 	return &TableService{db: db}
 }
 
+// ResolveTable resolves a table identifier within a database to a table model.
+// databaseIdentifier can be a database ID or name.
+// tableIdentifier can be a table ID or name.
+func (s *TableService) ResolveTable(databaseIdentifier, tableIdentifier string) (*models.Table, error) {
+	// Resolve database first
+	dbService := NewDatabaseService(s.db)
+	database, err := dbService.ResolveDatabase(databaseIdentifier)
+	if err != nil {
+		return nil, err
+	}
+
+	var table models.Table
+	// Try table ID first
+	err = s.db.Where("id = ? AND deleted_at IS NULL", tableIdentifier).First(&table).Error
+	if err == nil {
+		if table.DatabaseID != database.ID {
+			return nil, errors.New("table does not belong to the specified database")
+		}
+		return &table, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("table query failed: %w", err)
+	}
+	// Fallback to table name within the database
+	err = s.db.Where("database_id = ? AND name = ? AND deleted_at IS NULL", database.ID, tableIdentifier).First(&table).Error
+	if err == nil {
+		return &table, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("table not found")
+	}
+	return nil, fmt.Errorf("table query failed: %w", err)
+}
+
 type CreateTableRequest struct {
 	DatabaseID  string `json:"database_id" binding:"required"`
 	Name        string `json:"name" binding:"required,min=2,max=255"`
@@ -36,8 +70,6 @@ type TableResponse struct {
 	DatabaseID  string `json:"database_id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
 }
 
 func buildDeletedTableName(name, tableID string) string {
@@ -59,6 +91,27 @@ func (s *TableService) getActiveTable(tableID string) (*models.Table, error) {
 		return nil, err
 	}
 	return &table, nil
+}
+
+// resolveTable resolves a table identifier to a table model.
+// It first tries to find by ID, then falls back to name lookup.
+func (s *TableService) resolveTable(identifier string) (*models.Table, error) {
+	var table models.Table
+	err := s.db.Where("id = ? AND deleted_at IS NULL", identifier).First(&table).Error
+	if err == nil {
+		return &table, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("table query failed: %w", err)
+	}
+	err = s.db.Where("name = ? AND deleted_at IS NULL", identifier).First(&table).Error
+	if err == nil {
+		return &table, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("table not found")
+	}
+	return nil, fmt.Errorf("table query failed: %w", err)
 }
 
 func validateTableName(name string) error {
@@ -91,6 +144,14 @@ func sanitizeTableInput(name, description string) (string, string) {
 }
 
 func (s *TableService) CreateTable(req CreateTableRequest, userID string) (*models.Table, error) {
+	// Resolve database identifier (supports ID or name)
+	dbService := NewDatabaseService(s.db)
+	database, err := dbService.ResolveDatabase(req.DatabaseID)
+	if err != nil {
+		return nil, err
+	}
+	req.DatabaseID = database.ID
+
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
 	if err != nil {
 		return nil, err
@@ -130,20 +191,32 @@ func (s *TableService) CreateTable(req CreateTableRequest, userID string) (*mode
 		return nil, fmt.Errorf("failed to create table: %w", err)
 	}
 
+	// Reload to get database-generated timestamps
+	if err := s.db.First(&table, "id = ?", table.ID).Error; err != nil {
+		return nil, fmt.Errorf("failed to reload table: %w", err)
+	}
+
 	return &table, nil
 }
 
 func (s *TableService) ListTables(dbID, userID string) ([]TableResponse, error) {
+	// Resolve database identifier (supports ID or name)
+	dbService := NewDatabaseService(s.db)
+	database, err := dbService.ResolveDatabase(dbID)
+	if err != nil {
+		return nil, err
+	}
+
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
 	if err != nil {
 		return nil, err
 	}
-	if !authorizer.CanAccessDatabase(dbID, authz.ActionRead) {
+	if !authorizer.CanAccessDatabase(database.ID, authz.ActionRead) {
 		return nil, errors.New("permission denied: cannot access tables in this database")
 	}
 
 	var tables []models.Table
-	err = s.db.Where("database_id = ? AND deleted_at IS NULL", dbID).Order("created_at ASC").Find(&tables).Error
+	err = s.db.Where("database_id = ? AND deleted_at IS NULL", database.ID).Order("created_at ASC").Find(&tables).Error
 	if err != nil {
 		return nil, fmt.Errorf("database query failed: %w", err)
 	}
@@ -155,8 +228,6 @@ func (s *TableService) ListTables(dbID, userID string) ([]TableResponse, error) 
 			DatabaseID:  t.DatabaseID,
 			Name:        t.Name,
 			Description: t.Description,
-			CreatedAt:   t.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedAt:   t.UpdatedAt.Format("2006-01-02 15:04:05"),
 		}
 	}
 
@@ -164,17 +235,18 @@ func (s *TableService) ListTables(dbID, userID string) ([]TableResponse, error) 
 }
 
 func (s *TableService) GetTable(tableID, userID string) (*TableResponse, error) {
+	// Resolve table identifier (supports ID or name)
+	table, err := s.resolveTable(tableID)
+	if err != nil {
+		return nil, err
+	}
+
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
 	if err != nil {
 		return nil, err
 	}
-	if !authorizer.CanAccessTable(tableID, authz.ActionRead) {
+	if !authorizer.CanAccessTable(table.ID, authz.ActionRead) {
 		return nil, errors.New("permission denied: cannot access this table")
-	}
-
-	table, err := s.getActiveTable(tableID)
-	if err != nil {
-		return nil, fmt.Errorf("table not found: %w", err)
 	}
 
 	return &TableResponse{
@@ -182,23 +254,22 @@ func (s *TableService) GetTable(tableID, userID string) (*TableResponse, error) 
 		DatabaseID:  table.DatabaseID,
 		Name:        table.Name,
 		Description: table.Description,
-		CreatedAt:   table.CreatedAt.Format("2006-01-02 15:04:05"),
-		UpdatedAt:   table.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
 }
 
 func (s *TableService) UpdateTable(tableID string, req UpdateTableRequest, userID string) (*models.Table, error) {
+	// Resolve table identifier (supports ID or name)
+	table, err := s.resolveTable(tableID)
+	if err != nil {
+		return nil, err
+	}
+
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
 	if err != nil {
 		return nil, err
 	}
-	if !authorizer.CanAccessTable(tableID, authz.ActionManage) {
+	if !authorizer.CanAccessTable(table.ID, authz.ActionManage) {
 		return nil, errors.New("permission denied: cannot modify this table")
-	}
-
-	table, err := s.getActiveTable(tableID)
-	if err != nil {
-		return nil, fmt.Errorf("table not found: %w", err)
 	}
 
 	req.Name, req.Description = sanitizeTableInput(req.Name, req.Description)
@@ -208,7 +279,7 @@ func (s *TableService) UpdateTable(tableID string, req UpdateTableRequest, userI
 	}
 
 	var existingTable models.Table
-	err = s.db.Where("database_id = ? AND name = ? AND id != ? AND deleted_at IS NULL", table.DatabaseID, req.Name, tableID).First(&existingTable).Error
+	err = s.db.Where("database_id = ? AND name = ? AND id != ? AND deleted_at IS NULL", table.DatabaseID, req.Name, table.ID).First(&existingTable).Error
 	if err == nil {
 		return nil, errors.New("a table with this name already exists in the database")
 	}
@@ -227,25 +298,26 @@ func (s *TableService) UpdateTable(tableID string, req UpdateTableRequest, userI
 }
 
 func (s *TableService) DeleteTable(tableID, userID string) error {
+	// Resolve table identifier (supports ID or name)
+	table, err := s.resolveTable(tableID)
+	if err != nil {
+		return err
+	}
+
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
 	if err != nil {
 		return err
 	}
-	if !authorizer.CanAccessTable(tableID, authz.ActionManage) {
+	if !authorizer.CanAccessTable(table.ID, authz.ActionManage) {
 		return errors.New("permission denied: cannot delete this table")
-	}
-
-	table, err := s.getActiveTable(tableID)
-	if err != nil {
-		return fmt.Errorf("table not found: %w", err)
 	}
 
 	now := time.Now()
 	result := s.db.Model(&models.Table{}).
-		Where("id = ? AND deleted_at IS NULL", tableID).
+		Where("id = ? AND deleted_at IS NULL", table.ID).
 		Updates(map[string]interface{}{
 			"deleted_at": now,
-			"name":       buildDeletedTableName(table.Name, tableID),
+			"name":       buildDeletedTableName(table.Name, table.ID),
 			"updated_at": now,
 		})
 	if result.Error != nil {

@@ -46,7 +46,6 @@ func CreateDatabase(c *gin.Context) {
 		"id":          database.ID,
 		"name":        database.Name,
 		"description": database.Description,
-		"created_at":  database.CreatedAt,
 	})
 }
 
@@ -153,7 +152,6 @@ func UpdateDatabase(c *gin.Context) {
 		"id":          database.ID,
 		"name":        database.Name,
 		"description": database.Description,
-		"updated_at":  database.UpdatedAt,
 	})
 }
 

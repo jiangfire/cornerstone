@@ -20,6 +20,29 @@ func NewDatabaseService(db *gorm.DB) *DatabaseService {
 	return &DatabaseService{db: db}
 }
 
+// ResolveDatabase resolves a database identifier to a database model.
+// It first tries to find by ID, then falls back to name lookup.
+func (s *DatabaseService) ResolveDatabase(identifier string) (*models.Database, error) {
+	var database models.Database
+	// Try ID first
+	err := s.db.Where("id = ? AND deleted_at IS NULL", identifier).First(&database).Error
+	if err == nil {
+		return &database, nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, fmt.Errorf("database query failed: %w", err)
+	}
+	// Fallback to name
+	err = s.db.Where("name = ? AND deleted_at IS NULL", identifier).First(&database).Error
+	if err == nil {
+		return &database, nil
+	}
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return nil, errors.New("database not found")
+	}
+	return nil, fmt.Errorf("database query failed: %w", err)
+}
+
 type CreateDBRequest struct {
 	Name        string `json:"name" binding:"required,min=2,max=255"`
 	Description string `json:"description" binding:"max=500"`
@@ -34,8 +57,6 @@ type DBResponse struct {
 	ID          string `json:"id"`
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	CreatedAt   string `json:"created_at"`
-	UpdatedAt   string `json:"updated_at"`
 }
 
 func validateDatabaseName(name string) error {
@@ -107,6 +128,11 @@ func (s *DatabaseService) CreateDatabase(req CreateDBRequest, ownerID string) (*
 		return nil, fmt.Errorf("failed to create database: %w", err)
 	}
 
+	// Reload to get database-generated timestamps
+	if err := s.db.First(&database, "id = ?", database.ID).Error; err != nil {
+		return nil, fmt.Errorf("failed to reload database: %w", err)
+	}
+
 	return &database, nil
 }
 
@@ -139,8 +165,6 @@ func (s *DatabaseService) ListDatabases(userID string) ([]DBResponse, error) {
 			ID:          d.ID,
 			Name:        d.Name,
 			Description: d.Description,
-			CreatedAt:   d.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedAt:   d.UpdatedAt.Format("2006-01-02 15:04:05"),
 		}
 	}
 
@@ -148,38 +172,39 @@ func (s *DatabaseService) ListDatabases(userID string) ([]DBResponse, error) {
 }
 
 func (s *DatabaseService) GetDatabase(dbID, userID string) (*DBResponse, error) {
+	// Resolve identifier (supports ID or name)
+	database, err := s.ResolveDatabase(dbID)
+	if err != nil {
+		return nil, err
+	}
+
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
 	if err != nil {
 		return nil, err
 	}
-	if !authorizer.CanAccessDatabase(dbID, authz.ActionRead) {
+	if !authorizer.CanAccessDatabase(database.ID, authz.ActionRead) {
 		return nil, errors.New("permission denied: cannot access this database")
-	}
-
-	var database models.Database
-	err = s.db.Where("id = ? AND deleted_at IS NULL", dbID).First(&database).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("database not found")
-		}
-		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 
 	return &DBResponse{
 		ID:          database.ID,
 		Name:        database.Name,
 		Description: database.Description,
-		CreatedAt:   database.CreatedAt.Format("2006-01-02 15:04:05"),
-		UpdatedAt:   database.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
 }
 
 func (s *DatabaseService) UpdateDatabase(dbID string, req UpdateDBRequest, userID string) (*models.Database, error) {
+	// Resolve identifier (supports ID or name)
+	database, err := s.ResolveDatabase(dbID)
+	if err != nil {
+		return nil, err
+	}
+
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
 	if err != nil {
 		return nil, err
 	}
-	if !authorizer.CanAccessDatabase(dbID, authz.ActionManage) {
+	if !authorizer.CanAccessDatabase(database.ID, authz.ActionManage) {
 		return nil, errors.New("permission denied: cannot modify this database")
 	}
 
@@ -193,14 +218,8 @@ func (s *DatabaseService) UpdateDatabase(dbID string, req UpdateDBRequest, userI
 		return nil, fmt.Errorf("description validation failed: %w", err)
 	}
 
-	var database models.Database
-	err = s.db.Where("id = ? AND deleted_at IS NULL", dbID).First(&database).Error
-	if err != nil {
-		return nil, errors.New("database not found")
-	}
-
 	var duplicate models.Database
-	err = s.db.Where("name = ? AND id <> ? AND deleted_at IS NULL", req.Name, dbID).First(&duplicate).Error
+	err = s.db.Where("name = ? AND id <> ? AND deleted_at IS NULL", req.Name, database.ID).First(&duplicate).Error
 	if err == nil {
 		return nil, errors.New("database name already exists")
 	}
@@ -208,31 +227,31 @@ func (s *DatabaseService) UpdateDatabase(dbID string, req UpdateDBRequest, userI
 	database.Name = req.Name
 	database.Description = req.Description
 
-	if err := s.db.Save(&database).Error; err != nil {
+	if err := s.db.Save(database).Error; err != nil {
 		return nil, fmt.Errorf("failed to update database: %w", err)
 	}
 
-	return &database, nil
+	return database, nil
 }
 
 func (s *DatabaseService) DeleteDatabase(dbID, userID string) error {
+	// Resolve identifier (supports ID or name)
+	database, err := s.ResolveDatabase(dbID)
+	if err != nil {
+		return err
+	}
+
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
 	if err != nil {
 		return err
 	}
-	if !authorizer.CanAccessDatabase(dbID, authz.ActionManage) {
+	if !authorizer.CanAccessDatabase(database.ID, authz.ActionManage) {
 		return errors.New("permission denied: cannot delete this database")
-	}
-
-	var database models.Database
-	err = s.db.Where("id = ? AND deleted_at IS NULL", dbID).First(&database).Error
-	if err != nil {
-		return errors.New("database not found")
 	}
 
 	now := time.Now()
 	result := s.db.Model(&models.Database{}).
-		Where("id = ? AND deleted_at IS NULL", dbID).
+		Where("id = ? AND deleted_at IS NULL", database.ID).
 		Updates(map[string]interface{}{
 			"deleted_at": now,
 			"updated_at": now,

@@ -16,7 +16,7 @@ var tableCmd = &cobra.Command{
 }
 
 var tableListCmd = &cobra.Command{
-	Use:   "list [database-id]",
+	Use:   "list [database-id-or-name]",
 	Short: "list all tables in a database",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -39,7 +39,7 @@ var tableListCmd = &cobra.Command{
 }
 
 var tableCreateCmd = &cobra.Command{
-	Use:   "create [database-id] [name]",
+	Use:   "create [database-id-or-name] [name]",
 	Short: "create a table in a database",
 	Args:  cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -67,7 +67,7 @@ var tableCreateCmd = &cobra.Command{
 }
 
 var tableGetCmd = &cobra.Command{
-	Use:   "get [id]",
+	Use:   "get [id-or-name]",
 	Short: "get table details",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -90,7 +90,7 @@ var tableGetCmd = &cobra.Command{
 }
 
 var tableUpdateCmd = &cobra.Command{
-	Use:   "update [id]",
+	Use:   "update [id-or-name]",
 	Short: "update a table",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
@@ -118,7 +118,7 @@ var tableUpdateCmd = &cobra.Command{
 }
 
 var tableDeleteCmd = &cobra.Command{
-	Use:   "delete [id]",
+	Use:   "delete [id-or-name]",
 	Short: "delete a table",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
