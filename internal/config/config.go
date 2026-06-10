@@ -11,11 +11,12 @@ import (
 
 // Config holds all application configuration
 type Config struct {
-	Database DatabaseConfig
-	Server   ServerConfig
-	Logger   LoggerConfig
-	LLM      LLMConfig
-	MCP      MCPConfig
+	Database    DatabaseConfig
+	Server      ServerConfig
+	Logger      LoggerConfig
+	LLM         LLMConfig
+	MCP         MCPConfig
+	FileStorage FileStorageConfig
 }
 
 // DatabaseConfig is the database configuration
@@ -50,6 +51,17 @@ type MCPConfig struct {
 	SSEKeepaliveSec int
 	SSERetryMS      int
 	SSEReplayBuffer int
+}
+
+// FileStorageConfig is the file storage configuration
+type FileStorageConfig struct {
+	Type        string // "local" | "s3"
+	LocalDir    string // default "./uploads"
+	S3Endpoint  string
+	S3Bucket    string
+	S3Region    string
+	S3AccessKey string
+	S3SecretKey string
 }
 
 func loadEnvFiles() {
@@ -93,6 +105,15 @@ func Load() (*Config, error) {
 			SSEKeepaliveSec: getEnvAsInt("MCP_SSE_KEEPALIVE_SEC", 25),
 			SSERetryMS:      getEnvAsInt("MCP_SSE_RETRY_MS", 3000),
 			SSEReplayBuffer: getEnvAsInt("MCP_SSE_REPLAY_BUFFER", 128),
+		},
+		FileStorage: FileStorageConfig{
+			Type:        getEnv("FILE_STORAGE_TYPE", "local"),
+			LocalDir:    getEnv("FILE_STORAGE_LOCAL_DIR", "./uploads"),
+			S3Endpoint:  getEnv("FILE_STORAGE_S3_ENDPOINT", ""),
+			S3Bucket:    getEnv("FILE_STORAGE_S3_BUCKET", ""),
+			S3Region:    getEnv("FILE_STORAGE_S3_REGION", ""),
+			S3AccessKey: getEnv("FILE_STORAGE_S3_ACCESS_KEY", ""),
+			S3SecretKey: getEnv("FILE_STORAGE_S3_SECRET_KEY", ""),
 		},
 	}
 

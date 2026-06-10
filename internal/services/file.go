@@ -1,12 +1,11 @@
 package services
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"mime/multipart"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -16,38 +15,23 @@ import (
 
 // FileService manages file operations
 type FileService struct {
-	db *gorm.DB
+	db      *gorm.DB
+	storage StorageProvider
 }
 
-// fileUploadDir is the root directory for file storage (relative to process working directory).
-// All download/delete paths must be validated by ResolveSecureStoragePath to be within this directory,
-// preventing path traversal if StorageURL in DB is tampered with.
-const fileUploadDir = "./uploads"
-
-// ResolveSecureStoragePath resolves storageURL to an absolute path,
-// validates it is within fileUploadDir, and returns the safe absolute path or an error.
-func ResolveSecureStoragePath(storageURL string) (string, error) {
-	if strings.TrimSpace(storageURL) == "" {
-		return "", errors.New("file path is empty")
-	}
-	rootAbs, err := filepath.Abs(fileUploadDir)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve upload directory: %w", err)
-	}
-	targetAbs, err := filepath.Abs(storageURL)
-	if err != nil {
-		return "", fmt.Errorf("failed to resolve file path: %w", err)
-	}
-	rel, err := filepath.Rel(rootAbs, targetAbs)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
-		return "", errors.New("illegal file path")
-	}
-	return targetAbs, nil
-}
-
-// NewFileService creates a new FileService instance
+// NewFileService creates a new FileService with the default storage provider.
 func NewFileService(db *gorm.DB) *FileService {
-	return &FileService{db: db}
+	return NewFileServiceWithStorage(db, DefaultStorageProvider())
+}
+
+// NewFileServiceWithStorage creates a new FileService with the given storage provider.
+func NewFileServiceWithStorage(db *gorm.DB, storage StorageProvider) *FileService {
+	return &FileService{db: db, storage: storage}
+}
+
+// Storage returns the underlying storage provider.
+func (s *FileService) Storage() StorageProvider {
+	return s.storage
 }
 
 // UploadFileRequest is the file upload request
@@ -252,56 +236,18 @@ func (s *FileService) UploadFile(req UploadFileRequest, userID string) (*models.
 		}
 	}
 
-	// Create upload directory
-	uploadDir := fileUploadDir
-	if err := os.MkdirAll(uploadDir, 0o750); err != nil {
-		return nil, fmt.Errorf("failed to create upload directory: %w", err)
-	}
-
-	// Generate unique file name
+	// Generate unique storage key
 	filename := fmt.Sprintf("%s_%s", models.GenerateID("file"), fileName)
-	targetFilepath := filepath.Join(uploadDir, filename)
 
-	// Validate file path safety (prevent directory traversal)
-	uploadDirAbs, err := filepath.Abs(uploadDir)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get upload directory absolute path: %w", err)
-	}
-	targetFilepathAbs, err := filepath.Abs(targetFilepath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to get file absolute path: %w", err)
-	}
-	// Check file path is within upload directory
-	if !strings.HasPrefix(targetFilepathAbs, uploadDirAbs) {
-		return nil, errors.New("illegal file path")
-	}
-
-	// Save file
 	src, err := req.File.Open()
 	if err != nil {
 		return nil, fmt.Errorf("failed to open uploaded file: %w", err)
 	}
-	defer func() {
-		//nolint:staticcheck // SA9003 - Close errors are informational in defer
-		if err := src.Close(); err != nil {
-			// Log close error
-		}
-	}()
+	defer src.Close()
 
-	// #nosec G304 - path validated by filepath.Abs() to be within allowed directory
-	dst, err := os.Create(targetFilepath)
+	storageURL, err := s.storage.Upload(context.Background(), filename, src, req.File.Size)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create file: %w", err)
-	}
-	defer func() {
-		//nolint:staticcheck // SA9003 - Close errors are informational in defer
-		if err := dst.Close(); err != nil {
-			// Log close error
-		}
-	}()
-
-	if _, err := io.Copy(dst, src); err != nil {
-		return nil, fmt.Errorf("failed to save file: %w", err)
+		return nil, fmt.Errorf("failed to store file: %w", err)
 	}
 
 	// Create file record
@@ -311,15 +257,11 @@ func (s *FileService) UploadFile(req UploadFileRequest, userID string) (*models.
 		FileName:   fileName,
 		FileSize:   req.File.Size,
 		FileType:   contentType,
-		StorageURL: targetFilepath,
+		StorageURL: storageURL,
 	}
 
 	if err := s.db.Create(&file).Error; err != nil {
-		// Delete saved file
-		//nolint:staticcheck // SA9003 - Cleanup error is informational
-		if rmErr := os.Remove(targetFilepath); rmErr != nil {
-			// Log deletion failure but return primary error
-		}
+		_ = s.storage.Delete(context.Background(), storageURL)
 		return nil, fmt.Errorf("failed to create file record: %w", err)
 	}
 
@@ -347,7 +289,7 @@ func (s *FileService) DeleteFile(fileID, userID string) error {
 	}
 
 	// Delete physical file
-	if err := os.Remove(file.StorageURL); err != nil && !os.IsNotExist(err) {
+	if err := s.storage.Delete(context.Background(), file.StorageURL); err != nil {
 		return fmt.Errorf("failed to delete physical file: %w", err)
 	}
 

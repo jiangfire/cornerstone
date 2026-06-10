@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/internal/middleware"
 	"github.com/jiangfire/cornerstone/internal/services"
@@ -98,6 +100,7 @@ func GetFile(c *gin.Context) {
 // @Description  Download the actual file content by ID.
 //
 //	Returns the file as a binary attachment with Content-Disposition header.
+//	For S3 storage, returns a 302 redirect to a presigned URL.
 //	The authenticated token must have access to the associated record.
 //
 // @Tags         files
@@ -105,6 +108,7 @@ func GetFile(c *gin.Context) {
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "File ID"
 // @Success      200  {file}  binary
+// @Success      302  "Redirect to presigned URL (S3 mode)"
 // @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this file"
 // @Failure      404  {object}  swagger.ErrorResponse  "File not found"
@@ -117,6 +121,17 @@ func DownloadFile(c *gin.Context) {
 	file, err := fileService.GetFile(fileID, tokenID)
 	if err != nil {
 		handleServiceError(c, err)
+		return
+	}
+
+	storage := fileService.Storage()
+	if storage.SupportsPresignedDownload() {
+		url, err := storage.PresignedDownloadURL(c.Request.Context(), file.StorageURL)
+		if err != nil {
+			dto.Error(c, 500, "failed to generate download URL: "+err.Error())
+			return
+		}
+		c.Redirect(http.StatusFound, url)
 		return
 	}
 

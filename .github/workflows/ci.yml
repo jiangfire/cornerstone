@@ -377,3 +377,60 @@ jobs:
             wait $SERVER_PID 2>/dev/null || true
             echo "Server stopped"
           fi
+
+  test-s3:
+    name: Tests (S3 Storage via MinIO)
+    runs-on: ubuntu-latest
+    services:
+      minio:
+        image: minio/minio:latest
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        ports:
+          - 9000:9000
+        options: >-
+          --health-cmd="curl -sf http://localhost:9000/minio/health/live"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+    env:
+      FILE_STORAGE_TYPE: s3
+      FILE_STORAGE_S3_ENDPOINT: localhost:9000
+      FILE_STORAGE_S3_BUCKET: cornerstone-test
+      FILE_STORAGE_S3_REGION: us-east-1
+      FILE_STORAGE_S3_ACCESS_KEY: minioadmin
+      FILE_STORAGE_S3_SECRET_KEY: minioadmin
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.4'
+          cache: false
+
+      - name: Wait for MinIO
+        run: |
+          for i in {1..30}; do
+            if curl -sf http://localhost:9000/minio/health/live > /dev/null 2>&1; then
+              echo "MinIO is ready"
+              break
+            fi
+            echo "Waiting for MinIO... ($i/30)"
+            sleep 2
+          done
+
+      - name: Create test bucket
+        run: |
+          go install github.com/minio/mc@latest
+          mc alias set local http://localhost:9000 minioadmin minioadmin
+          mc mb local/cornerstone-test --ignore-existing
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run S3 storage tests
+        run: go test -v -count=1 -run "TestS3StorageProvider" ./internal/services/

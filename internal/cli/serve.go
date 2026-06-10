@@ -71,6 +71,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 	taskCtx, cancelTasks := context.WithCancel(context.Background())
 	periodicTaskWG := db.SetupPeriodicTasks(taskCtx)
 
+	initStorage(cfg)
+
 	gin.SetMode(cfg.Server.Mode)
 	r := gin.New()
 	handlers.SetVersion(Version)
@@ -256,4 +258,30 @@ func retryOperation(op func() error, maxAttempts int, baseDelay time.Duration) e
 		return nil
 	}
 	return lastErr
+}
+
+func initStorage(cfg *config.Config) {
+	switch cfg.FileStorage.Type {
+	case "s3":
+		s3Cfg := services.S3Config{
+			Endpoint:  cfg.FileStorage.S3Endpoint,
+			Bucket:    cfg.FileStorage.S3Bucket,
+			Region:    cfg.FileStorage.S3Region,
+			AccessKey: cfg.FileStorage.S3AccessKey,
+			SecretKey: cfg.FileStorage.S3SecretKey,
+		}
+		provider, err := services.NewS3StorageProvider(s3Cfg)
+		if err != nil {
+			applog.Fatalf("Failed to initialize S3 storage: %v", err)
+		}
+		services.SetDefaultStorageProvider(provider)
+		applog.Info("File storage initialized: s3", zap.String("bucket", cfg.FileStorage.S3Bucket))
+	default:
+		dir := cfg.FileStorage.LocalDir
+		if dir == "" {
+			dir = "./uploads"
+		}
+		services.SetDefaultStorageProvider(services.NewLocalStorageProvider(dir))
+		applog.Info("File storage initialized: local", zap.String("dir", dir))
+	}
 }
