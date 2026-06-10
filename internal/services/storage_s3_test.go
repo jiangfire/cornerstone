@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"os"
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,13 +17,17 @@ func s3ConfigFromEnv() (S3Config, bool) {
 	if endpoint == "" || bucket == "" {
 		return S3Config{}, false
 	}
+	secure := false
+	if v := os.Getenv("FILE_STORAGE_S3_SECURE"); v != "" {
+		secure, _ = strconv.ParseBool(v)
+	}
 	return S3Config{
 		Endpoint:  endpoint,
 		Bucket:    bucket,
 		Region:    os.Getenv("FILE_STORAGE_S3_REGION"),
 		AccessKey: os.Getenv("FILE_STORAGE_S3_ACCESS_KEY"),
 		SecretKey: os.Getenv("FILE_STORAGE_S3_SECRET_KEY"),
-		Secure:    true,
+		Secure:    secure,
 	}, true
 }
 

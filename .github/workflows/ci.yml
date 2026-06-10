@@ -388,6 +388,7 @@ jobs:
       FILE_STORAGE_S3_REGION: us-east-1
       FILE_STORAGE_S3_ACCESS_KEY: minioadmin
       FILE_STORAGE_S3_SECRET_KEY: minioadmin
+      FILE_STORAGE_S3_SECURE: "false"
 
     steps:
       - name: Checkout code
