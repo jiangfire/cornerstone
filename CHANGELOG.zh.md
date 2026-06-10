@@ -7,6 +7,34 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [v1.7.0] - 2026-06-10
+
+### 新增
+
+- **记录字段选择** - `GET /api/v1/records?fields=name,status` 和 `GET /api/v1/records/:id?fields=name` 仅返回指定字段
+- **YAML 导入数据库** - `POST /api/v1/databases/import/yaml` 接受 YAML 格式创建数据库、表和字段
+- **YAML 模板下载** - `GET /api/v1/databases/import/template` 返回带注释的 YAML 模板
+- **CLI `db import` 命令** - `cornerstone db import --file schema.yaml` 通过 YAML 创建数据库
+- **S3 兼容文件存储** - 可插拔的 `StorageProvider` 接口，支持本地和 S3（MinIO）后端，通过 `FILE_STORAGE_TYPE` 配置
+- **Swagger UI** - 在线 API 文档 `/swagger/index.html`
+- **名称引用** - CLI 和 API 大多数操作支持使用数据库名/表名（而非仅 ID）
+- **类型化响应 DTO** - 所有 HTTP 响应使用 `pkg/dto` 结构体替代 `gin.H`，统一通过 `HttpResult` 封装
+
+### 修复
+
+- **时间戳字段泄露** - 从所有 API 响应中移除 `created_at`/`updated_at`/`deleted_at`（数据库批量创建、Token 列表/更新、文件元数据、CLI 记录 JSON）
+- **S3 凭据安全** - 新增 `FILE_STORAGE_S3_SECURE` 配置（默认 `true`），防止凭据通过 HTTP 明文传输
+- **下载路径 Bug** - 本地文件下载改用 `StorageProvider.Download()` 替代硬编码 `./uploads` 路径，修复自定义 `FILE_STORAGE_LOCAL_DIR` 时的下载失败
+- **FileStorage 配置校验** - 拒绝未知存储类型，S3 模式下必填字段为空时报错
+- **Create 后实体重载** - 数据库批量创建和文件上传后重新加载实体以填充数据库生成的默认值
+- **Handler 响应字段完整性** - `CreateField`/`UpdateField` 现在包含 `options`；`UpdateTable` 现在包含 `database_id`
+
+### 变更
+
+- **S3 上传包含 Content-Type** - `StorageProvider.Upload` 接口新增 `contentType` 参数
+- **`.env.example`** - 补充所有 `FILE_STORAGE_*` 环境变量说明
+- **CLI 输出降噪** - 非 JSON 模式 CLI 默认将日志级别设为 `fatal`
+
 ## [v1.6.3] - 2026-06-09
 
 ### 修复

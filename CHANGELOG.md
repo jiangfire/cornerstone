@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.7.0] - 2026-06-10
+
+### Added
+
+- **Field selection on record CRUD** - `GET /api/v1/records?fields=name,status` and `GET /api/v1/records/:id?fields=name` return only specified fields
+- **YAML import for databases** - `POST /api/v1/databases/import/yaml` accepts YAML body to create databases with tables and fields
+- **YAML template download** - `GET /api/v1/databases/import/template` returns an annotated YAML template
+- **CLI `db import` command** - `cornerstone db import --file schema.yaml` for YAML-based database creation
+- **S3-compatible file storage** - Pluggable `StorageProvider` interface with local and S3 (MinIO) backends, configurable via `FILE_STORAGE_TYPE`
+- **Swagger UI** - Online API documentation at `/swagger/index.html`
+- **Name resolution** - CLI and API accept database/table names (not just IDs) for most operations
+- **Typed response DTOs** - All HTTP responses use `pkg/dto` structs instead of `gin.H` maps, wrapped in `HttpResult`
+
+### Fixed
+
+- **Timestamp field leaks** - Removed `created_at`/`updated_at`/`deleted_at` from all API responses (database bulk create, token list/update, file metadata, CLI record JSON)
+- **S3 credential security** - Added `FILE_STORAGE_S3_SECURE` config (default `true`) to prevent plaintext credential transmission over HTTP
+- **Download path bug** - Local file download now uses `StorageProvider.Download()` instead of hardcoded `./uploads` path, fixing breakage with custom `FILE_STORAGE_LOCAL_DIR`
+- **FileStorage config validation** - Rejects unknown storage types, requires S3 fields when `FILE_STORAGE_TYPE=s3`
+- **Entity reload after create** - Database bulk create and file upload now reload entities to populate DB-generated defaults
+- **Handler response completeness** - `CreateField`/`UpdateField` now include `options`; `UpdateTable` now includes `database_id`
+
+### Changed
+
+- **S3 uploads include Content-Type** - `StorageProvider.Upload` interface now accepts `contentType` parameter
+- **`.env.example`** - Added all `FILE_STORAGE_*` environment variable documentation
+- **CLI output noise** - Non-JSON CLI mode sets log level to `fatal` by default
+
 ## [v1.6.3] - 2026-06-09
 
 ### Fixed
