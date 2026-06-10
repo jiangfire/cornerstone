@@ -381,14 +381,6 @@ jobs:
   test-s3:
     name: Tests (S3 Storage via MinIO)
     runs-on: ubuntu-latest
-    services:
-      minio:
-        image: minio/minio:RELEASE.2025-04-08T15-41-24Z
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        ports:
-          - 9000:9000
     env:
       FILE_STORAGE_TYPE: s3
       FILE_STORAGE_S3_ENDPOINT: localhost:9000
@@ -407,8 +399,13 @@ jobs:
           go-version: '1.26.4'
           cache: false
 
-      - name: Wait for MinIO
+      - name: Start MinIO
         run: |
+          docker run -d --name minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio server /data --console-address ":9001"
           for i in {1..30}; do
             if curl -sf http://localhost:9000/minio/health/live > /dev/null 2>&1; then
               echo "MinIO is ready"
@@ -417,6 +414,7 @@ jobs:
             echo "Waiting for MinIO... ($i/30)"
             sleep 2
           done
+          curl -sf http://localhost:9000/minio/health/live || (echo "MinIO failed to start" && exit 1)
 
       - name: Create test bucket
         run: |
@@ -429,3 +427,7 @@ jobs:
 
       - name: Run S3 storage tests
         run: go test -v -count=1 -run "TestS3StorageProvider" ./internal/services/
+
+      - name: Stop MinIO
+        if: always()
+        run: docker stop minio 2>/dev/null || true
