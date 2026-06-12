@@ -32,7 +32,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.AIChatRequest"
+                            "$ref": "#/definitions/dto.AIChatRequest"
                         }
                     }
                 ],
@@ -42,13 +42,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.AIChatResponse"
+                                            "$ref": "#/definitions/dto.AIChatData"
                                         }
                                     }
                                 }
@@ -58,19 +58,19 @@
                     "400": {
                         "description": "Validation error - message is required",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "503": {
                         "description": "AI service unavailable - LLM_API_KEY not configured",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -97,13 +97,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.DatabaseListResponse"
+                                            "$ref": "#/definitions/dto.DatabaseListData"
                                         }
                                     }
                                 }
@@ -113,13 +113,13 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -148,7 +148,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.DatabaseCreateRequest"
+                            "$ref": "#/definitions/dto.DatabaseCreateRequest"
                         }
                     }
                 ],
@@ -158,13 +158,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.DatabaseObject"
+                                            "$ref": "#/definitions/dto.DatabaseObject"
                                         }
                                     }
                                 }
@@ -174,19 +174,119 @@
                     "400": {
                         "description": "Validation error - invalid request body",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - master token required",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/databases/import/template": {
+            "get": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Returns a commented YAML template with all available options for the import endpoint.",
+                "produces": [
+                    "application/x-yaml"
+                ],
+                "tags": [
+                    "databases"
+                ],
+                "summary": "Download import template",
+                "responses": {
+                    "200": {
+                        "description": "YAML template file",
+                        "schema": {
+                            "type": "file"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid or missing API key",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/databases/import/yaml": {
+            "post": {
+                "security": [
+                    {
+                        "ApiKeyAuth": []
+                    }
+                ],
+                "description": "Import a database definition from YAML format. Creates the database together with nested tables and fields.",
+                "consumes": [
+                    "application/x-yaml"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "databases"
+                ],
+                "summary": "Import database from YAML",
+                "parameters": [
+                    {
+                        "description": "YAML document",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/dto.APIResponse"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/dto.BulkCreateData"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Validation error - invalid YAML or missing fields",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized - invalid or missing API key",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden - master token required",
+                        "schema": {
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -217,7 +317,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.DatabaseBulkCreateRequest"
+                            "$ref": "#/definitions/dto.DatabaseBulkCreateRequest"
                         }
                     }
                 ],
@@ -227,13 +327,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.DatabaseBulkCreateResponse"
+                                            "$ref": "#/definitions/dto.BulkCreateData"
                                         }
                                     }
                                 }
@@ -243,19 +343,19 @@
                     "400": {
                         "description": "Validation error - invalid request body",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - master token required",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -291,13 +391,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.DatabaseObject"
+                                            "$ref": "#/definitions/dto.DatabaseObject"
                                         }
                                     }
                                 }
@@ -307,19 +407,19 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this database",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Database not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -355,7 +455,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.DatabaseUpdateRequest"
+                            "$ref": "#/definitions/dto.DatabaseUpdateRequest"
                         }
                     }
                 ],
@@ -365,13 +465,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.DatabaseObject"
+                                            "$ref": "#/definitions/dto.DatabaseObject"
                                         }
                                     }
                                 }
@@ -381,25 +481,25 @@
                     "400": {
                         "description": "Validation error - invalid request body",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this database",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Database not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -433,7 +533,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -449,19 +549,19 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this database",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Database not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -497,13 +597,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.TableListResponse"
+                                            "$ref": "#/definitions/dto.TableListData"
                                         }
                                     }
                                 }
@@ -513,13 +613,13 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this database",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -550,7 +650,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.FieldCreateRequest"
+                            "$ref": "#/definitions/dto.FieldCreateRequest"
                         }
                     }
                 ],
@@ -560,13 +660,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.FieldObject"
+                                            "$ref": "#/definitions/dto.FieldObject"
                                         }
                                     }
                                 }
@@ -576,19 +676,19 @@
                     "400": {
                         "description": "Validation error - invalid request body or field type",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to parent table",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -624,13 +724,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.FieldObject"
+                                            "$ref": "#/definitions/dto.FieldObject"
                                         }
                                     }
                                 }
@@ -640,19 +740,19 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this field",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Field not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -688,7 +788,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.FieldUpdateRequest"
+                            "$ref": "#/definitions/dto.FieldUpdateRequest"
                         }
                     }
                 ],
@@ -698,13 +798,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.FieldObject"
+                                            "$ref": "#/definitions/dto.FieldObject"
                                         }
                                     }
                                 }
@@ -714,25 +814,25 @@
                     "400": {
                         "description": "Validation error - invalid request body or field type",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this field",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Field not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -766,7 +866,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -782,19 +882,19 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this field",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Field not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -845,13 +945,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.FileObject"
+                                            "$ref": "#/definitions/dto.FileObject"
                                         }
                                     }
                                 }
@@ -861,19 +961,19 @@
                     "400": {
                         "description": "Validation error - missing file or record_id/field_id",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to target record/field",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -909,13 +1009,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.FileObject"
+                                            "$ref": "#/definitions/dto.FileObject"
                                         }
                                     }
                                 }
@@ -925,23 +1025,25 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this file",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "File not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
-            },
+            }
+        },
+        "/api/v1/files/{id}/delete": {
             "delete": {
                 "security": [
                     {
@@ -971,7 +1073,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -987,19 +1089,19 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this file",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "File not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1036,22 +1138,25 @@
                             "type": "file"
                         }
                     },
+                    "302": {
+                        "description": "Redirect to presigned URL (S3 mode)"
+                    },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this file",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "File not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1082,7 +1187,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.QueryDSLRequest"
+                            "$ref": "#/definitions/dto.QueryDSLRequest"
                         }
                     }
                 ],
@@ -1092,13 +1197,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.QueryResult"
+                                            "$ref": "#/definitions/dto.QueryResult"
                                         }
                                     }
                                 }
@@ -1108,19 +1213,19 @@
                     "400": {
                         "description": "Validation error - invalid query DSL",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to queried resource",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1149,7 +1254,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.QueryDSLRequest"
+                            "$ref": "#/definitions/dto.QueryDSLRequest"
                         }
                     }
                 ],
@@ -1159,13 +1264,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.QueryResult"
+                                            "$ref": "#/definitions/dto.QueryResult"
                                         }
                                     }
                                 }
@@ -1175,19 +1280,19 @@
                     "400": {
                         "description": "Validation error - invalid query DSL",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to queried resource",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1218,7 +1323,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.BatchQueryRequest"
+                            "$ref": "#/definitions/dto.BatchQueryRequest"
                         }
                     }
                 ],
@@ -1228,7 +1333,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -1244,19 +1349,19 @@
                     "400": {
                         "description": "Validation error - invalid query DSL",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to queried resource",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1287,7 +1392,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.QueryDSLRequest"
+                            "$ref": "#/definitions/dto.QueryDSLRequest"
                         }
                     }
                 ],
@@ -1297,7 +1402,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -1313,19 +1418,19 @@
                     "400": {
                         "description": "Validation error - invalid query DSL",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to queried resource",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1361,7 +1466,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -1377,19 +1482,19 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this table",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Table not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1452,13 +1557,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.QueryResult"
+                                            "$ref": "#/definitions/dto.QueryResult"
                                         }
                                     }
                                 }
@@ -1468,19 +1573,19 @@
                     "400": {
                         "description": "Validation error - missing table or invalid parameters",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to queried table",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1507,7 +1612,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -1523,13 +1628,13 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1560,7 +1665,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.QueryDSLRequest"
+                            "$ref": "#/definitions/dto.QueryDSLRequest"
                         }
                     }
                 ],
@@ -1568,25 +1673,25 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/swagger.APIResponse"
+                            "$ref": "#/definitions/dto.APIResponse"
                         }
                     },
                     "400": {
                         "description": "Validation error - invalid query DSL",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to queried resource",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1634,6 +1739,12 @@
                         "description": "JSON filter expression",
                         "name": "filter",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated field names to include in data",
+                        "name": "fields",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1642,13 +1753,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.RecordListResponse"
+                                            "$ref": "#/definitions/dto.RecordListData"
                                         }
                                     }
                                 }
@@ -1658,19 +1769,19 @@
                     "400": {
                         "description": "Validation error - missing table_id",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to target table",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1699,7 +1810,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.RecordCreateRequest"
+                            "$ref": "#/definitions/dto.RecordCreateRequest"
                         }
                     }
                 ],
@@ -1709,13 +1820,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.RecordObject"
+                                            "$ref": "#/definitions/dto.RecordObject"
                                         }
                                     }
                                 }
@@ -1725,19 +1836,19 @@
                     "400": {
                         "description": "Validation error - invalid request body or field values",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to target table",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1776,7 +1887,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.RecordBatchCreateRequest"
+                            "$ref": "#/definitions/dto.RecordBatchCreateRequest"
                         }
                     }
                 ],
@@ -1786,7 +1897,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -1802,19 +1913,19 @@
                     "400": {
                         "description": "Validation error - invalid request body or count out of range",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to target table",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1867,19 +1978,19 @@
                     "400": {
                         "description": "Validation error - missing table_id or invalid format",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to target table",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1907,6 +2018,12 @@
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Comma-separated field names to include in data",
+                        "name": "fields",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -1915,13 +2032,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.RecordObject"
+                                            "$ref": "#/definitions/dto.RecordObject"
                                         }
                                     }
                                 }
@@ -1931,19 +2048,19 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this record",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Record not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -1979,7 +2096,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.RecordUpdateRequest"
+                            "$ref": "#/definitions/dto.RecordUpdateRequest"
                         }
                     }
                 ],
@@ -1989,13 +2106,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.RecordObject"
+                                            "$ref": "#/definitions/dto.RecordObject"
                                         }
                                     }
                                 }
@@ -2005,25 +2122,25 @@
                     "400": {
                         "description": "Validation error or version conflict",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this record",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Record not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -2057,7 +2174,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -2073,19 +2190,19 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this record",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Record not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -2121,13 +2238,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.FileListResponse"
+                                            "$ref": "#/definitions/dto.FileListData"
                                         }
                                     }
                                 }
@@ -2137,13 +2254,13 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this record",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -2174,7 +2291,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.TableCreateRequest"
+                            "$ref": "#/definitions/dto.TableCreateRequest"
                         }
                     }
                 ],
@@ -2184,13 +2301,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.TableObject"
+                                            "$ref": "#/definitions/dto.TableObject"
                                         }
                                     }
                                 }
@@ -2200,19 +2317,19 @@
                     "400": {
                         "description": "Validation error - invalid request body",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to parent database",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -2248,13 +2365,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.TableObject"
+                                            "$ref": "#/definitions/dto.TableObject"
                                         }
                                     }
                                 }
@@ -2264,19 +2381,19 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this table",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Table not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -2312,7 +2429,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.TableUpdateRequest"
+                            "$ref": "#/definitions/dto.TableUpdateRequest"
                         }
                     }
                 ],
@@ -2322,13 +2439,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.TableObject"
+                                            "$ref": "#/definitions/dto.TableObject"
                                         }
                                     }
                                 }
@@ -2338,25 +2455,25 @@
                     "400": {
                         "description": "Validation error - invalid request body",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this table",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Table not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -2390,7 +2507,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -2406,19 +2523,19 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this table",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Table not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -2454,13 +2571,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.FieldListResponse"
+                                            "$ref": "#/definitions/dto.FieldListData"
                                         }
                                     }
                                 }
@@ -2470,13 +2587,13 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - no access to this table",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -2503,13 +2620,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.TokenListResponse"
+                                            "$ref": "#/definitions/dto.TokenListData"
                                         }
                                     }
                                 }
@@ -2519,13 +2636,13 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -2554,7 +2671,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.TokenCreateRequest"
+                            "$ref": "#/definitions/dto.TokenCreateRequest"
                         }
                     }
                 ],
@@ -2564,13 +2681,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.TokenCreateResponse"
+                                            "$ref": "#/definitions/dto.TokenCreateData"
                                         }
                                     }
                                 }
@@ -2580,25 +2697,25 @@
                     "400": {
                         "description": "Validation error - invalid request body",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - requires Master Token",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -2636,7 +2753,7 @@
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/swagger.TokenUpdateRequest"
+                            "$ref": "#/definitions/dto.TokenUpdateRequest"
                         }
                     }
                 ],
@@ -2646,13 +2763,13 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/swagger.TokenObject"
+                                            "$ref": "#/definitions/dto.TokenObject"
                                         }
                                     }
                                 }
@@ -2662,25 +2779,25 @@
                     "400": {
                         "description": "Validation error - invalid request body",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - requires Master Token",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Token not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -2714,7 +2831,7 @@
                         "schema": {
                             "allOf": [
                                 {
-                                    "$ref": "#/definitions/swagger.APIResponse"
+                                    "$ref": "#/definitions/dto.APIResponse"
                                 },
                                 {
                                     "type": "object",
@@ -2730,19 +2847,19 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "403": {
                         "description": "Forbidden - insufficient permissions",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "404": {
                         "description": "Token not found",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -2793,7 +2910,7 @@
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "406": {
@@ -2842,13 +2959,13 @@
                     "400": {
                         "description": "Parse error - invalid JSON-RPC",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     },
                     "401": {
                         "description": "Unauthorized - invalid or missing API key",
                         "schema": {
-                            "$ref": "#/definitions/swagger.ErrorResponse"
+                            "$ref": "#/definitions/dto.ErrorResponse"
                         }
                     }
                 }
@@ -2882,23 +2999,7 @@
         }
     },
     "definitions": {
-        "swagger.AIChatRequest": {
-            "type": "object",
-            "required": [
-                "message"
-            ],
-            "properties": {
-                "context": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "message": {
-                    "type": "string",
-                    "example": "Show me all databases"
-                }
-            }
-        },
-        "swagger.AIChatResponse": {
+        "dto.AIChatData": {
             "type": "object",
             "properties": {
                 "context": {
@@ -2915,7 +3016,23 @@
                 }
             }
         },
-        "swagger.APIResponse": {
+        "dto.AIChatRequest": {
+            "type": "object",
+            "required": [
+                "message"
+            ],
+            "properties": {
+                "context": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "message": {
+                    "type": "string",
+                    "example": "Show me all databases"
+                }
+            }
+        },
+        "dto.APIResponse": {
             "type": "object",
             "properties": {
                 "code": {
@@ -2929,35 +3046,51 @@
                 }
             }
         },
-        "swagger.AggregateFunc": {
-            "type": "object",
-            "properties": {
-                "as": {
-                    "type": "string",
-                    "example": "total"
-                },
-                "field": {
-                    "type": "string",
-                    "example": "id"
-                },
-                "func": {
-                    "type": "string",
-                    "example": "count"
-                }
-            }
-        },
-        "swagger.BatchQueryRequest": {
+        "dto.BatchQueryRequest": {
             "type": "object",
             "properties": {
                 "queries": {
                     "type": "object",
                     "additionalProperties": {
-                        "$ref": "#/definitions/swagger.QueryDSLRequest"
+                        "$ref": "#/definitions/dto.QueryDSLRequest"
                     }
                 }
             }
         },
-        "swagger.BulkCreateTable": {
+        "dto.BulkCreateData": {
+            "type": "object",
+            "properties": {
+                "database": {
+                    "$ref": "#/definitions/dto.DatabaseObject"
+                },
+                "fields": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.FieldObject"
+                    }
+                },
+                "summary": {
+                    "type": "object",
+                    "properties": {
+                        "field_count": {
+                            "type": "integer",
+                            "example": 5
+                        },
+                        "table_count": {
+                            "type": "integer",
+                            "example": 2
+                        }
+                    }
+                },
+                "tables": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.TableObject"
+                    }
+                }
+            }
+        },
+        "dto.BulkCreateTable": {
             "type": "object",
             "required": [
                 "name"
@@ -2970,7 +3103,7 @@
                 "fields": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/swagger.BulkCreateTableField"
+                        "$ref": "#/definitions/dto.BulkCreateTableField"
                     }
                 },
                 "name": {
@@ -2979,7 +3112,7 @@
                 }
             }
         },
-        "swagger.BulkCreateTableField": {
+        "dto.BulkCreateTableField": {
             "type": "object",
             "required": [
                 "name",
@@ -3004,38 +3137,7 @@
                 }
             }
         },
-        "swagger.Condition": {
-            "type": "object",
-            "properties": {
-                "and": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/swagger.Condition"
-                    }
-                },
-                "field": {
-                    "type": "string",
-                    "example": "name"
-                },
-                "not": {
-                    "type": "boolean"
-                },
-                "op": {
-                    "type": "string",
-                    "example": "eq"
-                },
-                "or": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/swagger.Condition"
-                    }
-                },
-                "value": {
-                    "example": "Alice"
-                }
-            }
-        },
-        "swagger.DatabaseBulkCreateRequest": {
+        "dto.DatabaseBulkCreateRequest": {
             "type": "object",
             "required": [
                 "name"
@@ -3054,45 +3156,12 @@
                 "tables": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/swagger.BulkCreateTable"
+                        "$ref": "#/definitions/dto.BulkCreateTable"
                     }
                 }
             }
         },
-        "swagger.DatabaseBulkCreateResponse": {
-            "type": "object",
-            "properties": {
-                "database": {
-                    "$ref": "#/definitions/swagger.DatabaseObject"
-                },
-                "fields": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/swagger.FieldObject"
-                    }
-                },
-                "summary": {
-                    "type": "object",
-                    "properties": {
-                        "field_count": {
-                            "type": "integer",
-                            "example": 5
-                        },
-                        "table_count": {
-                            "type": "integer",
-                            "example": 2
-                        }
-                    }
-                },
-                "tables": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/swagger.TableObject"
-                    }
-                }
-            }
-        },
-        "swagger.DatabaseCreateRequest": {
+        "dto.DatabaseCreateRequest": {
             "type": "object",
             "required": [
                 "name"
@@ -3111,13 +3180,13 @@
                 }
             }
         },
-        "swagger.DatabaseListResponse": {
+        "dto.DatabaseListData": {
             "type": "object",
             "properties": {
                 "databases": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/swagger.DatabaseObject"
+                        "$ref": "#/definitions/dto.DatabaseObject"
                     }
                 },
                 "total": {
@@ -3126,7 +3195,7 @@
                 }
             }
         },
-        "swagger.DatabaseObject": {
+        "dto.DatabaseObject": {
             "type": "object",
             "properties": {
                 "description": {
@@ -3143,7 +3212,7 @@
                 }
             }
         },
-        "swagger.DatabaseUpdateRequest": {
+        "dto.DatabaseUpdateRequest": {
             "type": "object",
             "required": [
                 "name"
@@ -3162,7 +3231,7 @@
                 }
             }
         },
-        "swagger.ErrorResponse": {
+        "dto.ErrorResponse": {
             "type": "object",
             "properties": {
                 "code": {
@@ -3175,7 +3244,7 @@
                 }
             }
         },
-        "swagger.FieldConfig": {
+        "dto.FieldConfig": {
             "type": "object",
             "properties": {
                 "allowed_types": {
@@ -3232,7 +3301,7 @@
                 }
             }
         },
-        "swagger.FieldCreateRequest": {
+        "dto.FieldCreateRequest": {
             "type": "object",
             "required": [
                 "name",
@@ -3241,7 +3310,7 @@
             ],
             "properties": {
                 "config": {
-                    "$ref": "#/definitions/swagger.FieldConfig"
+                    "$ref": "#/definitions/dto.FieldConfig"
                 },
                 "description": {
                     "type": "string",
@@ -3272,13 +3341,13 @@
                 }
             }
         },
-        "swagger.FieldListResponse": {
+        "dto.FieldListData": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/swagger.FieldObject"
+                        "$ref": "#/definitions/dto.FieldObject"
                     }
                 },
                 "total": {
@@ -3287,11 +3356,11 @@
                 }
             }
         },
-        "swagger.FieldObject": {
+        "dto.FieldObject": {
             "type": "object",
             "properties": {
                 "config": {
-                    "$ref": "#/definitions/swagger.FieldConfig"
+                    "$ref": "#/definitions/dto.FieldConfig"
                 },
                 "description": {
                     "type": "string",
@@ -3323,7 +3392,7 @@
                 }
             }
         },
-        "swagger.FieldUpdateRequest": {
+        "dto.FieldUpdateRequest": {
             "type": "object",
             "required": [
                 "name",
@@ -3331,7 +3400,7 @@
             ],
             "properties": {
                 "config": {
-                    "$ref": "#/definitions/swagger.FieldConfig"
+                    "$ref": "#/definitions/dto.FieldConfig"
                 },
                 "description": {
                     "type": "string",
@@ -3358,18 +3427,18 @@
                 }
             }
         },
-        "swagger.FileListResponse": {
+        "dto.FileListData": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/swagger.FileObject"
+                        "$ref": "#/definitions/dto.FileObject"
                     }
                 }
             }
         },
-        "swagger.FileObject": {
+        "dto.FileObject": {
             "type": "object",
             "properties": {
                 "field_id": {
@@ -3402,146 +3471,10 @@
                 }
             }
         },
-        "swagger.JoinClause": {
-            "type": "object",
-            "properties": {
-                "as": {
-                    "type": "string",
-                    "example": "f"
-                },
-                "on": {
-                    "$ref": "#/definitions/swagger.JoinCondition"
-                },
-                "select": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "name",
-                        "type"
-                    ]
-                },
-                "table": {
-                    "type": "string",
-                    "example": "fields"
-                },
-                "type": {
-                    "type": "string",
-                    "example": "left"
-                }
-            }
+        "dto.QueryDSLRequest": {
+            "type": "object"
         },
-        "swagger.JoinCondition": {
-            "type": "object",
-            "properties": {
-                "left": {
-                    "type": "string",
-                    "example": "tables.id"
-                },
-                "op": {
-                    "type": "string",
-                    "example": "="
-                },
-                "right": {
-                    "type": "string",
-                    "example": "f.table_id"
-                }
-            }
-        },
-        "swagger.OrderByClause": {
-            "type": "object",
-            "properties": {
-                "dir": {
-                    "type": "string",
-                    "example": "desc"
-                },
-                "field": {
-                    "type": "string",
-                    "example": "created_at"
-                }
-            }
-        },
-        "swagger.QueryDSLRequest": {
-            "type": "object",
-            "properties": {
-                "aggregate": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/swagger.AggregateFunc"
-                    }
-                },
-                "filter": {
-                    "type": "object",
-                    "additionalProperties": {}
-                },
-                "from": {
-                    "type": "string",
-                    "example": "records"
-                },
-                "groupBy": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "table_id"
-                    ]
-                },
-                "having": {
-                    "$ref": "#/definitions/swagger.WhereClause"
-                },
-                "join": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/swagger.JoinClause"
-                    }
-                },
-                "orderBy": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/swagger.OrderByClause"
-                    }
-                },
-                "page": {
-                    "type": "integer",
-                    "example": 1
-                },
-                "select": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    },
-                    "example": [
-                        "id",
-                        "name",
-                        "data"
-                    ]
-                },
-                "size": {
-                    "type": "integer",
-                    "example": 20
-                },
-                "sort": {
-                    "type": "string",
-                    "example": "-created_at"
-                },
-                "table": {
-                    "type": "string",
-                    "example": "records"
-                },
-                "union": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/swagger.QueryDSLRequest"
-                    }
-                },
-                "where": {
-                    "$ref": "#/definitions/swagger.WhereClause"
-                }
-            }
-        },
-        "swagger.QueryResult": {
+        "dto.QueryResult": {
             "type": "object",
             "properties": {
                 "data": {
@@ -3569,7 +3502,7 @@
                 }
             }
         },
-        "swagger.RecordBatchCreateRequest": {
+        "dto.RecordBatchCreateRequest": {
             "type": "object",
             "required": [
                 "data",
@@ -3586,7 +3519,7 @@
                 }
             }
         },
-        "swagger.RecordCreateRequest": {
+        "dto.RecordCreateRequest": {
             "type": "object",
             "required": [
                 "data",
@@ -3603,7 +3536,7 @@
                 }
             }
         },
-        "swagger.RecordListResponse": {
+        "dto.RecordListData": {
             "type": "object",
             "properties": {
                 "has_more": {
@@ -3613,7 +3546,7 @@
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/swagger.RecordObject"
+                        "$ref": "#/definitions/dto.RecordObject"
                     }
                 },
                 "total": {
@@ -3622,7 +3555,7 @@
                 }
             }
         },
-        "swagger.RecordObject": {
+        "dto.RecordObject": {
             "type": "object",
             "properties": {
                 "data": {
@@ -3643,7 +3576,7 @@
                 }
             }
         },
-        "swagger.RecordUpdateRequest": {
+        "dto.RecordUpdateRequest": {
             "type": "object",
             "required": [
                 "data"
@@ -3659,7 +3592,7 @@
                 }
             }
         },
-        "swagger.TableCreateRequest": {
+        "dto.TableCreateRequest": {
             "type": "object",
             "required": [
                 "database_id",
@@ -3683,13 +3616,13 @@
                 }
             }
         },
-        "swagger.TableListResponse": {
+        "dto.TableListData": {
             "type": "object",
             "properties": {
                 "tables": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/swagger.TableObject"
+                        "$ref": "#/definitions/dto.TableObject"
                     }
                 },
                 "total": {
@@ -3698,7 +3631,7 @@
                 }
             }
         },
-        "swagger.TableObject": {
+        "dto.TableObject": {
             "type": "object",
             "properties": {
                 "database_id": {
@@ -3719,7 +3652,7 @@
                 }
             }
         },
-        "swagger.TableUpdateRequest": {
+        "dto.TableUpdateRequest": {
             "type": "object",
             "required": [
                 "name"
@@ -3738,29 +3671,7 @@
                 }
             }
         },
-        "swagger.TokenCreateRequest": {
-            "type": "object",
-            "required": [
-                "name"
-            ],
-            "properties": {
-                "expires_at": {
-                    "type": "string",
-                    "example": "2027-01-01T00:00:00Z"
-                },
-                "name": {
-                    "type": "string",
-                    "maxLength": 255,
-                    "minLength": 1,
-                    "example": "my-app-token"
-                },
-                "scopes": {
-                    "type": "string",
-                    "example": "read,write"
-                }
-            }
-        },
-        "swagger.TokenCreateResponse": {
+        "dto.TokenCreateData": {
             "type": "object",
             "properties": {
                 "expires_at": {
@@ -3785,13 +3696,35 @@
                 }
             }
         },
-        "swagger.TokenListResponse": {
+        "dto.TokenCreateRequest": {
+            "type": "object",
+            "required": [
+                "name"
+            ],
+            "properties": {
+                "expires_at": {
+                    "type": "string",
+                    "example": "2027-01-01T00:00:00Z"
+                },
+                "name": {
+                    "type": "string",
+                    "maxLength": 255,
+                    "minLength": 1,
+                    "example": "my-app-token"
+                },
+                "scopes": {
+                    "type": "string",
+                    "example": "read,write"
+                }
+            }
+        },
+        "dto.TokenListData": {
             "type": "object",
             "properties": {
                 "tokens": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/swagger.TokenObject"
+                        "$ref": "#/definitions/dto.TokenObject"
                     }
                 },
                 "total": {
@@ -3800,7 +3733,7 @@
                 }
             }
         },
-        "swagger.TokenObject": {
+        "dto.TokenObject": {
             "type": "object",
             "properties": {
                 "expires_at": {
@@ -3825,7 +3758,7 @@
                 }
             }
         },
-        "swagger.TokenUpdateRequest": {
+        "dto.TokenUpdateRequest": {
             "type": "object",
             "properties": {
                 "expires_at": {
@@ -3835,23 +3768,6 @@
                 "scopes": {
                     "type": "string",
                     "example": "read"
-                }
-            }
-        },
-        "swagger.WhereClause": {
-            "type": "object",
-            "properties": {
-                "and": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/swagger.Condition"
-                    }
-                },
-                "or": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/swagger.Condition"
-                    }
                 }
             }
         }

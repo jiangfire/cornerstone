@@ -20,11 +20,11 @@ import (
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  swagger.TableCreateRequest  true  "Table to create"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.TableObject}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to parent database"
+// @Param        body  body  dto.TableCreateRequest  true  "Table to create"
+// @Success      200  {object}  dto.APIResponse{data=dto.TableObject}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to parent database"
 // @Router       /api/v1/tables [post]
 func CreateTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
@@ -57,9 +57,9 @@ func CreateTable(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Database ID"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.TableListResponse}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this database"
+// @Success      200  {object}  dto.APIResponse{data=dto.TableListData}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this database"
 // @Router       /api/v1/databases/{id}/tables [get]
 func ListTables(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
@@ -90,10 +90,10 @@ func ListTables(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Table ID"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.TableObject}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
-// @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
+// @Success      200  {object}  dto.APIResponse{data=dto.TableObject}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this table"
+// @Failure      404  {object}  dto.ErrorResponse  "Table not found"
 // @Router       /api/v1/tables/{id} [get]
 func GetTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
@@ -122,12 +122,12 @@ func GetTable(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id    path  string                true  "Table ID"
-// @Param        body  body  swagger.TableUpdateRequest  true  "Table update fields"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.TableObject}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
-// @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
+// @Param        body  body  dto.TableUpdateRequest  true  "Table update fields"
+// @Success      200  {object}  dto.APIResponse{data=dto.TableObject}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this table"
+// @Failure      404  {object}  dto.ErrorResponse  "Table not found"
 // @Router       /api/v1/tables/{id} [put]
 func UpdateTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
@@ -161,10 +161,10 @@ func UpdateTable(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Table ID"
-// @Success      200  {object}  swagger.APIResponse{data=object}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
-// @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
+// @Success      200  {object}  dto.APIResponse{data=object}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this table"
+// @Failure      404  {object}  dto.ErrorResponse  "Table not found"
 // @Router       /api/v1/tables/{id} [delete]
 func DeleteTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)

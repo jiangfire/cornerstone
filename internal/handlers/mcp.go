@@ -71,8 +71,8 @@ func ConfigureMCP(options MCPOptions) {
 // @Security     ApiKeyAuth
 // @Param        body  body  object  true  "JSON-RPC request"
 // @Success      200  {object}  object
-// @Failure      400  {object}  swagger.ErrorResponse  "Parse error - invalid JSON-RPC"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      400  {object}  dto.ErrorResponse  "Parse error - invalid JSON-RPC"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Router       /mcp [post]
 func HandleMCP(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
@@ -129,7 +129,7 @@ func HandleMCP(c *gin.Context) {
 // @Produce      text/event-stream
 // @Security     ApiKeyAuth
 // @Success      200  {string}  string  "SSE stream"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Failure      406  {object}  object  "Not Acceptable - requires Accept: text/event-stream"
 // @Router       /mcp [get]
 func HandleMCPGet(c *gin.Context) {

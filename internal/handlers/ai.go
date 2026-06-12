@@ -34,11 +34,11 @@ func InitAIAgent(agent *services.AIAgent) {
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  swagger.AIChatRequest  true  "Chat request"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.AIChatResponse}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - message is required"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      503  {object}  swagger.ErrorResponse  "AI service unavailable - LLM_API_KEY not configured"
+// @Param        body  body  dto.AIChatRequest  true  "Chat request"
+// @Success      200  {object}  dto.APIResponse{data=dto.AIChatData}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - message is required"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      503  {object}  dto.ErrorResponse  "AI service unavailable - LLM_API_KEY not configured"
 // @Router       /api/v1/ai/chat [post]
 func ChatWithAI(c *gin.Context) {
 	if aiAgent == nil {

@@ -22,9 +22,9 @@ import (
 // @Tags         tokens
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Success      200  {object}  swagger.APIResponse{data=swagger.TokenListResponse}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      500  {object}  swagger.ErrorResponse
+// @Success      200  {object}  dto.APIResponse{data=dto.TokenListData}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      500  {object}  dto.ErrorResponse
 // @Router       /api/v1/tokens [get]
 func ListTokens(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -61,12 +61,12 @@ func ListTokens(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  swagger.TokenCreateRequest  true  "Token to create"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.TokenCreateResponse}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - requires Master Token"
-// @Failure      500  {object}  swagger.ErrorResponse
+// @Param        body  body  dto.TokenCreateRequest  true  "Token to create"
+// @Success      200  {object}  dto.APIResponse{data=dto.TokenCreateData}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - requires Master Token"
+// @Failure      500  {object}  dto.ErrorResponse
 // @Router       /api/v1/tokens [post]
 func CreateToken(c *gin.Context) {
 	var req services.CreateTokenRequest
@@ -103,10 +103,10 @@ func CreateToken(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Token ID"
-// @Success      200  {object}  swagger.APIResponse{data=object}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - insufficient permissions"
-// @Failure      404  {object}  swagger.ErrorResponse  "Token not found"
+// @Success      200  {object}  dto.APIResponse{data=object}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - insufficient permissions"
+// @Failure      404  {object}  dto.ErrorResponse  "Token not found"
 // @Router       /api/v1/tokens/{id} [delete]
 func DeleteToken(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -136,12 +136,12 @@ func DeleteToken(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id    path  string              true  "Token ID"
-// @Param        body  body  swagger.TokenUpdateRequest  true  "Token update fields"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.TokenObject}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - requires Master Token"
-// @Failure      404  {object}  swagger.ErrorResponse  "Token not found"
+// @Param        body  body  dto.TokenUpdateRequest  true  "Token update fields"
+// @Success      200  {object}  dto.APIResponse{data=dto.TokenObject}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - requires Master Token"
+// @Failure      404  {object}  dto.ErrorResponse  "Token not found"
 // @Router       /api/v1/tokens/{id} [put]
 func UpdateToken(c *gin.Context) {
 	targetID := c.Param("id")

@@ -42,11 +42,11 @@ func NewQueryHandler() *QueryHandler {
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  swagger.QueryDSLRequest  true  "Query DSL body"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.QueryResult}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid query DSL"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to queried resource"
+// @Param        body  body  dto.QueryDSLRequest  true  "Query DSL body"
+// @Success      200  {object}  dto.APIResponse{data=dto.QueryResult}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid query DSL"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to queried resource"
 // @Router       /api/v1/query [post]
 // @Router       /api/v1/query [get]
 func (h *QueryHandler) Query(c *gin.Context) {
@@ -108,11 +108,11 @@ func (h *QueryHandler) Query(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  swagger.QueryDSLRequest  true  "Query DSL body"
-// @Success      200  {object}  swagger.APIResponse{data=object}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid query DSL"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to queried resource"
+// @Param        body  body  dto.QueryDSLRequest  true  "Query DSL body"
+// @Success      200  {object}  dto.APIResponse{data=object}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid query DSL"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to queried resource"
 // @Router       /api/v1/query/explain [post]
 func (h *QueryHandler) QueryExplain(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
@@ -165,11 +165,11 @@ func (h *QueryHandler) QueryExplain(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  swagger.QueryDSLRequest  true  "Query DSL body"
-// @Success      200  {object}  swagger.APIResponse
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid query DSL"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to queried resource"
+// @Param        body  body  dto.QueryDSLRequest  true  "Query DSL body"
+// @Success      200  {object}  dto.APIResponse
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid query DSL"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to queried resource"
 // @Router       /api/v1/query/validate [post]
 func (h *QueryHandler) QueryValidate(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
@@ -215,11 +215,11 @@ func (h *QueryHandler) QueryValidate(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  swagger.BatchQueryRequest  true  "Batch query request"
-// @Success      200  {object}  swagger.APIResponse{data=object}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid query DSL"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to queried resource"
+// @Param        body  body  dto.BatchQueryRequest  true  "Batch query request"
+// @Success      200  {object}  dto.APIResponse{data=object}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid query DSL"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to queried resource"
 // @Router       /api/v1/query/batch [post]
 func (h *QueryHandler) BatchQuery(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
@@ -257,9 +257,9 @@ func (h *QueryHandler) BatchQuery(c *gin.Context) {
 // @Tags         query
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Success      200  {object}  swagger.APIResponse{data=object}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      500  {object}  swagger.ErrorResponse
+// @Success      200  {object}  dto.APIResponse{data=object}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      500  {object}  dto.ErrorResponse
 // @Router       /api/v1/query/tables [get]
 func (h *QueryHandler) ListTables(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
@@ -289,10 +289,10 @@ func (h *QueryHandler) ListTables(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        table  path  string  true  "Table name (records, tables, databases, fields, files, tokens)"
-// @Success      200  {object}  swagger.APIResponse{data=object}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
-// @Failure      404  {object}  swagger.ErrorResponse  "Table not found"
+// @Success      200  {object}  dto.APIResponse{data=object}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this table"
+// @Failure      404  {object}  dto.ErrorResponse  "Table not found"
 // @Router       /api/v1/query/schema/{table} [get]
 func (h *QueryHandler) GetTableSchema(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
@@ -332,10 +332,10 @@ func (h *QueryHandler) GetTableSchema(c *gin.Context) {
 // @Param        sort    query  string  false  "Sort expression (prefix with - for desc)"  default(-created_at)
 // @Param        page    query  int     false  "Page number"  default(1)
 // @Param        size    query  int     false  "Page size (max 1000)"  default(20)
-// @Success      200  {object}  swagger.APIResponse{data=swagger.QueryResult}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - missing table or invalid parameters"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to queried table"
+// @Success      200  {object}  dto.APIResponse{data=dto.QueryResult}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - missing table or invalid parameters"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to queried table"
 // @Router       /api/v1/query/simple [get]
 func (h *QueryHandler) SimplifiedQuery(c *gin.Context) {
 	userID := middleware.GetTokenID(c)

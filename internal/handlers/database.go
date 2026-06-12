@@ -24,11 +24,11 @@ import (
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  swagger.DatabaseCreateRequest  true  "Database to create"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseObject}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - master token required"
+// @Param        body  body  dto.DatabaseCreateRequest  true  "Database to create"
+// @Success      200  {object}  dto.APIResponse{data=dto.DatabaseObject}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - master token required"
 // @Router       /api/v1/databases [post]
 func CreateDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -64,9 +64,9 @@ func CreateDatabase(c *gin.Context) {
 // @Tags         databases
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseListResponse}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      500  {object}  swagger.ErrorResponse
+// @Success      200  {object}  dto.APIResponse{data=dto.DatabaseListData}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      500  {object}  dto.ErrorResponse
 // @Router       /api/v1/databases [get]
 func ListDatabases(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -98,10 +98,10 @@ func ListDatabases(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Database ID"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseObject}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this database"
-// @Failure      404  {object}  swagger.ErrorResponse  "Database not found"
+// @Success      200  {object}  dto.APIResponse{data=dto.DatabaseObject}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this database"
+// @Failure      404  {object}  dto.ErrorResponse  "Database not found"
 // @Router       /api/v1/databases/{id} [get]
 func GetDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -134,12 +134,12 @@ func GetDatabase(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id    path  string                true  "Database ID"
-// @Param        body  body  swagger.DatabaseUpdateRequest  true  "Database update fields"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseObject}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this database"
-// @Failure      404  {object}  swagger.ErrorResponse  "Database not found"
+// @Param        body  body  dto.DatabaseUpdateRequest  true  "Database update fields"
+// @Success      200  {object}  dto.APIResponse{data=dto.DatabaseObject}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this database"
+// @Failure      404  {object}  dto.ErrorResponse  "Database not found"
 // @Router       /api/v1/databases/{id} [put]
 func UpdateDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -177,10 +177,10 @@ func UpdateDatabase(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Database ID"
-// @Success      200  {object}  swagger.APIResponse{data=object}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this database"
-// @Failure      404  {object}  swagger.ErrorResponse  "Database not found"
+// @Success      200  {object}  dto.APIResponse{data=object}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this database"
+// @Failure      404  {object}  dto.ErrorResponse  "Database not found"
 // @Router       /api/v1/databases/{id} [delete]
 func DeleteDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -210,11 +210,11 @@ func DeleteDatabase(c *gin.Context) {
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  swagger.DatabaseBulkCreateRequest  true  "Database with nested tables and fields"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseBulkCreateResponse}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - master token required"
+// @Param        body  body  dto.DatabaseBulkCreateRequest  true  "Database with nested tables and fields"
+// @Success      200  {object}  dto.APIResponse{data=dto.BulkCreateData}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid request body"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - master token required"
 // @Router       /api/v1/databases/with-tables [post]
 func CreateDatabaseWithTables(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -244,14 +244,14 @@ func CreateDatabaseWithTables(c *gin.Context) {
 //	Content-Type must be application/x-yaml or text/yaml.
 //
 // @Tags         databases
-// @Accept       x-yaml
+// @Accept       application/x-yaml
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        body  body  string  true  "YAML document"  example:"name: My App"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.DatabaseBulkCreateResponse}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid YAML or missing fields"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - master token required"
+// @Success      200  {object}  dto.APIResponse{data=dto.BulkCreateData}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid YAML or missing fields"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - master token required"
 // @Router       /api/v1/databases/import/yaml [post]
 func ImportDatabaseYAML(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -280,10 +280,10 @@ func ImportDatabaseYAML(c *gin.Context) {
 //	Can be downloaded as a file or used as a reference for creating import documents.
 //
 // @Tags         databases
-// @Produce      x-yaml
+// @Produce      application/x-yaml
 // @Security     ApiKeyAuth
 // @Success      200  {file}  binary  "YAML template file"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
 // @Router       /api/v1/databases/import/template [get]
 func GetImportTemplate(c *gin.Context) {
 	template := services.YAMLTemplate()

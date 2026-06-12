@@ -28,10 +28,10 @@ import (
 // @Param        file       formData  file    true   "File to upload"
 // @Param        record_id  formData  string  false  "Record ID to attach to"
 // @Param        field_id   formData  string  false  "Field ID to attach to"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.FileObject}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - missing file or record_id/field_id"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to target record/field"
+// @Success      200  {object}  dto.APIResponse{data=dto.FileObject}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - missing file or record_id/field_id"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to target record/field"
 // @Router       /api/v1/files/upload [post]
 func UploadFile(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -77,10 +77,10 @@ func UploadFile(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "File ID"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.FileObject}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this file"
-// @Failure      404  {object}  swagger.ErrorResponse  "File not found"
+// @Success      200  {object}  dto.APIResponse{data=dto.FileObject}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this file"
+// @Failure      404  {object}  dto.ErrorResponse  "File not found"
 // @Router       /api/v1/files/{id} [get]
 func GetFile(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -111,9 +111,9 @@ func GetFile(c *gin.Context) {
 // @Param        id  path  string  true  "File ID"
 // @Success      200  {file}  binary
 // @Success      302  "Redirect to presigned URL (S3 mode)"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this file"
-// @Failure      404  {object}  swagger.ErrorResponse  "File not found"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this file"
+// @Failure      404  {object}  dto.ErrorResponse  "File not found"
 // @Router       /api/v1/files/{id}/download [get]
 func DownloadFile(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -164,10 +164,10 @@ func DownloadFile(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "File ID"
-// @Success      200  {object}  swagger.APIResponse{data=object}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this file"
-// @Failure      404  {object}  swagger.ErrorResponse  "File not found"
+// @Success      200  {object}  dto.APIResponse{data=object}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this file"
+// @Failure      404  {object}  dto.ErrorResponse  "File not found"
 // @Router       /api/v1/files/{id}/delete [delete]
 func DeleteFile(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -194,9 +194,9 @@ func DeleteFile(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Record ID"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.FileListResponse}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this record"
+// @Success      200  {object}  dto.APIResponse{data=dto.FileListData}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this record"
 // @Router       /api/v1/records/{id}/files [get]
 func ListRecordFiles(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)

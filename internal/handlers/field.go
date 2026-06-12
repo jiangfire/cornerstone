@@ -26,11 +26,11 @@ import (
 // @Accept       json
 // @Produce      json
 // @Security     ApiKeyAuth
-// @Param        body  body  swagger.FieldCreateRequest  true  "Field to create"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.FieldObject}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body or field type"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to parent table"
+// @Param        body  body  dto.FieldCreateRequest  true  "Field to create"
+// @Success      200  {object}  dto.APIResponse{data=dto.FieldObject}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid request body or field type"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to parent table"
 // @Router       /api/v1/fields [post]
 func CreateField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -63,9 +63,9 @@ func CreateField(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Table ID"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.FieldListResponse}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this table"
+// @Success      200  {object}  dto.APIResponse{data=dto.FieldListData}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this table"
 // @Router       /api/v1/tables/{id}/fields [get]
 func ListFields(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -97,10 +97,10 @@ func ListFields(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Field ID"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.FieldObject}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this field"
-// @Failure      404  {object}  swagger.ErrorResponse  "Field not found"
+// @Success      200  {object}  dto.APIResponse{data=dto.FieldObject}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this field"
+// @Failure      404  {object}  dto.ErrorResponse  "Field not found"
 // @Router       /api/v1/fields/{id} [get]
 func GetField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -131,12 +131,12 @@ func GetField(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id    path  string                true  "Field ID"
-// @Param        body  body  swagger.FieldUpdateRequest  true  "Field update fields"
-// @Success      200  {object}  swagger.APIResponse{data=swagger.FieldObject}
-// @Failure      400  {object}  swagger.ErrorResponse  "Validation error - invalid request body or field type"
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this field"
-// @Failure      404  {object}  swagger.ErrorResponse  "Field not found"
+// @Param        body  body  dto.FieldUpdateRequest  true  "Field update fields"
+// @Success      200  {object}  dto.APIResponse{data=dto.FieldObject}
+// @Failure      400  {object}  dto.ErrorResponse  "Validation error - invalid request body or field type"
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this field"
+// @Failure      404  {object}  dto.ErrorResponse  "Field not found"
 // @Router       /api/v1/fields/{id} [put]
 func UpdateField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
@@ -170,10 +170,10 @@ func UpdateField(c *gin.Context) {
 // @Produce      json
 // @Security     ApiKeyAuth
 // @Param        id  path  string  true  "Field ID"
-// @Success      200  {object}  swagger.APIResponse{data=object}
-// @Failure      401  {object}  swagger.ErrorResponse  "Unauthorized - invalid or missing API key"
-// @Failure      403  {object}  swagger.ErrorResponse  "Forbidden - no access to this field"
-// @Failure      404  {object}  swagger.ErrorResponse  "Field not found"
+// @Success      200  {object}  dto.APIResponse{data=object}
+// @Failure      401  {object}  dto.ErrorResponse  "Unauthorized - invalid or missing API key"
+// @Failure      403  {object}  dto.ErrorResponse  "Forbidden - no access to this field"
+// @Failure      404  {object}  dto.ErrorResponse  "Field not found"
 // @Router       /api/v1/fields/{id} [delete]
 func DeleteField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
