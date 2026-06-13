@@ -7,6 +7,16 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [v1.7.1] - 2026-06-13
+
+### 变更
+
+- **Swagger 模型合并到 `pkg/dto`** - 将所有请求/响应 DTO 类型从 `internal/swagger/models.go` 合并到 `pkg/dto/types.go`，消除了 swagger 模型包，减少了导入复杂度
+
+### 修复
+
+- **S3 配置环境变量读取** - `FILE_STORAGE_S3_SECURE` 现在在 S3 存储提供程序测试中正确从环境变量中读取
+
 ## [v1.7.0] - 2026-06-10
 
 ### 新增
