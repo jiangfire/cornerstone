@@ -6,22 +6,16 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type HttpResult struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
-	Data    any    `json:"data,omitempty"`
-}
-
 func Success(c *gin.Context, data any) {
-	c.JSON(http.StatusOK, HttpResult{Code: 0, Data: data})
+	c.JSON(http.StatusOK, APIResponse{Code: 0, Data: data})
 }
 
 func SuccessWithMessage(c *gin.Context, message string, data any) {
-	c.JSON(http.StatusOK, HttpResult{Code: 0, Message: message, Data: data})
+	c.JSON(http.StatusOK, APIResponse{Code: 0, Message: message, Data: data})
 }
 
 func Error(c *gin.Context, code int, message string) {
-	c.JSON(code, HttpResult{Code: code, Message: message})
+	c.JSON(code, APIResponse{Code: code, Message: message})
 }
 
 func BadRequest(c *gin.Context, message string) {

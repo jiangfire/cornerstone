@@ -22,9 +22,9 @@ func setupTestContext(t *testing.T) (*gin.Context, *httptest.ResponseRecorder) {
 	return c, w
 }
 
-func decodeResponse(t *testing.T, w *httptest.ResponseRecorder) HttpResult {
+func decodeResponse(t *testing.T, w *httptest.ResponseRecorder) APIResponse {
 	t.Helper()
-	var result HttpResult
+	var result APIResponse
 	err := json.Unmarshal(w.Body.Bytes(), &result)
 	require.NoError(t, err)
 	return result
