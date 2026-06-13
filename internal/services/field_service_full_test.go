@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
 // ============================================================
@@ -43,7 +44,7 @@ func TestCreateField_AllValidTypes(t *testing.T) {
 
 	types := []string{"string", "number", "boolean", "date", "datetime", "json", "list"}
 	for i, ft := range types {
-		field, err := svc.CreateField(CreateFieldRequest{
+		field, err := svc.CreateField(dto.FieldCreateRequest{
 			TableID: table.ID,
 			Name:    fmt.Sprintf("field_%s", ft),
 			Type:    ft,
@@ -62,14 +63,14 @@ func TestCreateField_AllValidTypes(t *testing.T) {
 func TestCreateField_DuplicateName(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
-	_, err := svc.CreateField(CreateFieldRequest{
+	_, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "email",
 		Type:    "string",
 	}, master.ID)
 	require.NoError(t, err)
 
-	_, err = svc.CreateField(CreateFieldRequest{
+	_, err = svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "email",
 		Type:    "text",
@@ -85,7 +86,7 @@ func TestCreateField_DuplicateName(t *testing.T) {
 func TestCreateField_NonexistentTable(t *testing.T) {
 	svc, _, _, _, master := setupFieldFullTestEnv(t)
 
-	_, err := svc.CreateField(CreateFieldRequest{
+	_, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: "tbl_nonexistent",
 		Name:    "email",
 		Type:    "string",
@@ -103,7 +104,7 @@ func TestCreateField_InvalidType(t *testing.T) {
 
 	invalidTypes := []string{"integer", "float", "array", "object", "blob", "timestamp", ""}
 	for _, ft := range invalidTypes {
-		_, err := svc.CreateField(CreateFieldRequest{
+		_, err := svc.CreateField(dto.FieldCreateRequest{
 			TableID: table.ID,
 			Name:    "test_field",
 			Type:    ft,
@@ -120,7 +121,7 @@ func TestCreateField_InvalidType(t *testing.T) {
 func TestCreateField_NameTooLong(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
-	_, err := svc.CreateField(CreateFieldRequest{
+	_, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    strings.Repeat("a", 256),
 		Type:    "string",
@@ -137,11 +138,11 @@ func TestCreateField_WithConfig(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
 	maxLen := 100
-	field, err := svc.CreateField(CreateFieldRequest{
+	field, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "username",
 		Type:    "string",
-		Config: FieldConfig{
+		Config: dto.FieldConfig{
 			MaxLength:  &maxLen,
 			Validation: `^[a-zA-Z0-9_]+$`,
 		},
@@ -149,7 +150,7 @@ func TestCreateField_WithConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotEmpty(t, field.ID)
 
-	var config FieldConfig
+	var config dto.FieldConfig
 	require.NoError(t, json.Unmarshal([]byte(field.Options), &config))
 	assert.Equal(t, 100, *config.MaxLength)
 	assert.Equal(t, `^[a-zA-Z0-9_]+$`, config.Validation)
@@ -162,14 +163,14 @@ func TestCreateField_WithConfig(t *testing.T) {
 func TestListFields_ReturnsFields(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
-	_, err := svc.CreateField(CreateFieldRequest{
+	_, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "name",
 		Type:    "string",
 	}, master.ID)
 	require.NoError(t, err)
 
-	_, err = svc.CreateField(CreateFieldRequest{
+	_, err = svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "age",
 		Type:    "number",
@@ -204,7 +205,7 @@ func TestListFields_NonexistentTable(t *testing.T) {
 func TestGetField_Success(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
-	created, err := svc.CreateField(CreateFieldRequest{
+	created, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID:  table.ID,
 		Name:     "email",
 		Type:     "string",
@@ -239,14 +240,14 @@ func TestGetField_Nonexistent(t *testing.T) {
 func TestUpdateField_Success(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
-	created, err := svc.CreateField(CreateFieldRequest{
+	created, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "email",
 		Type:    "string",
 	}, master.ID)
 	require.NoError(t, err)
 
-	updated, err := svc.UpdateField(created.ID, UpdateFieldRequest{
+	updated, err := svc.UpdateField(created.ID, dto.FieldUpdateRequest{
 		Name:        "email_address",
 		Type:        "text",
 		Required:    true,
@@ -266,21 +267,21 @@ func TestUpdateField_Success(t *testing.T) {
 func TestUpdateField_DuplicateName(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
-	_, err := svc.CreateField(CreateFieldRequest{
+	_, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "name",
 		Type:    "string",
 	}, master.ID)
 	require.NoError(t, err)
 
-	f2, err := svc.CreateField(CreateFieldRequest{
+	f2, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "email",
 		Type:    "string",
 	}, master.ID)
 	require.NoError(t, err)
 
-	_, err = svc.UpdateField(f2.ID, UpdateFieldRequest{
+	_, err = svc.UpdateField(f2.ID, dto.FieldUpdateRequest{
 		Name: "name",
 		Type: "string",
 	}, master.ID)
@@ -295,7 +296,7 @@ func TestUpdateField_DuplicateName(t *testing.T) {
 func TestUpdateField_Nonexistent(t *testing.T) {
 	svc, _, _, _, master := setupFieldFullTestEnv(t)
 
-	_, err := svc.UpdateField("fld_nonexistent", UpdateFieldRequest{
+	_, err := svc.UpdateField("fld_nonexistent", dto.FieldUpdateRequest{
 		Name: "new_name",
 		Type: "string",
 	}, master.ID)
@@ -310,7 +311,7 @@ func TestUpdateField_Nonexistent(t *testing.T) {
 func TestDeleteField_Success(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
-	created, err := svc.CreateField(CreateFieldRequest{
+	created, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "email",
 		Type:    "string",
@@ -328,7 +329,7 @@ func TestDeleteField_Success(t *testing.T) {
 func TestDeleteField_DeletedNameSuffix(t *testing.T) {
 	svc, db, _, table, master := setupFieldFullTestEnv(t)
 
-	created, err := svc.CreateField(CreateFieldRequest{
+	created, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "email",
 		Type:    "string",
@@ -365,7 +366,7 @@ func TestDeleteField_Nonexistent(t *testing.T) {
 func TestCheckFieldPermission_MasterCanAccess(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
-	created, err := svc.CreateField(CreateFieldRequest{
+	created, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "email",
 		Type:    "string",
@@ -406,7 +407,7 @@ func TestValidateFieldConfig_TooManyOptions(t *testing.T) {
 		options[i] = fmt.Sprintf("option_%d", i)
 	}
 
-	err := validateFieldConfig(FieldConfig{Options: options})
+	err := validateFieldConfig(dto.FieldConfig{Options: options})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "number of options must not exceed 100")
 }
@@ -416,7 +417,7 @@ func TestValidateFieldConfig_TooManyOptions(t *testing.T) {
 // ============================================================
 
 func TestValidateFieldConfig_OptionTooLong(t *testing.T) {
-	err := validateFieldConfig(FieldConfig{
+	err := validateFieldConfig(dto.FieldConfig{
 		Options: []string{strings.Repeat("a", 256)},
 	})
 	assert.Error(t, err)
@@ -431,7 +432,7 @@ func TestValidateFieldConfig_MinGreaterThanMax(t *testing.T) {
 	cfgMin := 10.0
 	cfgMax := 5.0
 
-	err := validateFieldConfig(FieldConfig{
+	err := validateFieldConfig(dto.FieldConfig{
 		Min: &cfgMin,
 		Max: &cfgMax,
 	})
@@ -446,7 +447,7 @@ func TestValidateFieldConfig_MinGreaterThanMax(t *testing.T) {
 func TestValidateFieldConfig_MaxLengthLessThanOne(t *testing.T) {
 	maxLen := 0
 
-	err := validateFieldConfig(FieldConfig{
+	err := validateFieldConfig(dto.FieldConfig{
 		MaxLength: &maxLen,
 	})
 	assert.Error(t, err)
@@ -456,7 +457,7 @@ func TestValidateFieldConfig_MaxLengthLessThanOne(t *testing.T) {
 func TestValidateFieldConfig_NegativeMaxLength(t *testing.T) {
 	maxLen := -1
 
-	err := validateFieldConfig(FieldConfig{
+	err := validateFieldConfig(dto.FieldConfig{
 		MaxLength: &maxLen,
 	})
 	assert.Error(t, err)
@@ -468,7 +469,7 @@ func TestValidateFieldConfig_NegativeMaxLength(t *testing.T) {
 // ============================================================
 
 func TestValidateFieldConfig_InvalidRegex(t *testing.T) {
-	err := validateFieldConfig(FieldConfig{
+	err := validateFieldConfig(dto.FieldConfig{
 		Validation: "[invalid",
 	})
 	assert.Error(t, err)
@@ -485,7 +486,7 @@ func TestValidateFieldConfig_TooManyAllowedTypes(t *testing.T) {
 		types[i] = fmt.Sprintf(".%s", string(rune('a'+i%26)))
 	}
 
-	err := validateFieldConfig(FieldConfig{
+	err := validateFieldConfig(dto.FieldConfig{
 		AllowedTypes: types,
 	})
 	assert.Error(t, err)
@@ -497,7 +498,7 @@ func TestValidateFieldConfig_TooManyAllowedTypes(t *testing.T) {
 // ============================================================
 
 func TestValidateFieldConfig_NegativeMaxFileSize(t *testing.T) {
-	err := validateFieldConfig(FieldConfig{
+	err := validateFieldConfig(dto.FieldConfig{
 		MaxFileSizeMB: -1,
 	})
 	assert.Error(t, err)
@@ -513,7 +514,7 @@ func TestValidateFieldConfig_Valid(t *testing.T) {
 	cfgMax := 100.0
 	maxLen := 50
 
-	err := validateFieldConfig(FieldConfig{
+	err := validateFieldConfig(dto.FieldConfig{
 		Options:       []string{"a", "b"},
 		Min:           &cfgMin,
 		Max:           &cfgMax,
@@ -554,7 +555,7 @@ func TestSanitizeFieldName(t *testing.T) {
 // ============================================================
 
 func TestSanitizeFieldConfig(t *testing.T) {
-	config := FieldConfig{
+	config := dto.FieldConfig{
 		Options:      []string{`<option>`, `"quoted"`, `'single'`, "  spaced  ", ""},
 		Validation:   "  ^[a-z]+$  ",
 		AllowedTypes: []string{"  .pdf  ", "", "  .doc  "},
@@ -629,14 +630,14 @@ func TestListFields_RespectsFieldPermissions(t *testing.T) {
 	table := &models.Table{DatabaseID: database.ID, Name: "perm_table"}
 	require.NoError(t, db.Create(table).Error)
 
-	f1, err := svc.CreateField(CreateFieldRequest{
+	f1, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "visible_field",
 		Type:    "string",
 	}, "user1")
 	require.NoError(t, err)
 
-	f2, err := svc.CreateField(CreateFieldRequest{
+	f2, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "hidden_field",
 		Type:    "number",
@@ -771,7 +772,7 @@ func TestRequiredActionForRoles(t *testing.T) {
 func TestCreateField_ListOptionsFromString(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
-	field, err := svc.CreateField(CreateFieldRequest{
+	field, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "status",
 		Type:    "list",
@@ -779,7 +780,7 @@ func TestCreateField_ListOptionsFromString(t *testing.T) {
 	}, master.ID)
 	require.NoError(t, err)
 
-	var config FieldConfig
+	var config dto.FieldConfig
 	require.NoError(t, json.Unmarshal([]byte(field.Options), &config))
 	assert.Contains(t, config.Options, "active")
 	assert.Contains(t, config.Options, "inactive")
@@ -793,7 +794,7 @@ func TestCreateField_ListOptionsFromString(t *testing.T) {
 func TestUpdateField_WithConfig(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
-	created, err := svc.CreateField(CreateFieldRequest{
+	created, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "score",
 		Type:    "number",
@@ -802,11 +803,11 @@ func TestUpdateField_WithConfig(t *testing.T) {
 
 	cfgMin := 0.0
 	cfgMax := 100.0
-	updated, err := svc.UpdateField(created.ID, UpdateFieldRequest{
+	updated, err := svc.UpdateField(created.ID, dto.FieldUpdateRequest{
 		Name:     "score",
 		Type:     "number",
 		Required: true,
-		Config: FieldConfig{
+		Config: dto.FieldConfig{
 			Min: &cfgMin,
 			Max: &cfgMax,
 		},
@@ -814,7 +815,7 @@ func TestUpdateField_WithConfig(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, updated.Required)
 
-	var config FieldConfig
+	var config dto.FieldConfig
 	require.NoError(t, json.Unmarshal([]byte(updated.Options), &config))
 	assert.Equal(t, 0.0, *config.Min)
 	assert.Equal(t, 100.0, *config.Max)
@@ -827,7 +828,7 @@ func TestUpdateField_WithConfig(t *testing.T) {
 func TestCreateField_RequiredFlag(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
-	field, err := svc.CreateField(CreateFieldRequest{
+	field, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID:  table.ID,
 		Name:     "mandatory",
 		Type:     "string",
@@ -836,7 +837,7 @@ func TestCreateField_RequiredFlag(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, field.Required)
 
-	field2, err := svc.CreateField(CreateFieldRequest{
+	field2, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID:  table.ID,
 		Name:     "optional",
 		Type:     "string",
@@ -866,14 +867,14 @@ func TestCreateField_SameNameDifferentTables(t *testing.T) {
 	master := &models.Token{Name: "master", Token: "cs_master_multitable", IsMaster: true, Scopes: "{}"}
 	require.NoError(t, db.Create(master).Error)
 
-	f1, err := svc.CreateField(CreateFieldRequest{
+	f1, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table1.ID,
 		Name:    "name",
 		Type:    "string",
 	}, master.ID)
 	require.NoError(t, err)
 
-	f2, err := svc.CreateField(CreateFieldRequest{
+	f2, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table2.ID,
 		Name:    "name",
 		Type:    "string",
@@ -890,7 +891,7 @@ func TestCreateField_SameNameDifferentTables(t *testing.T) {
 func TestCheckFieldPermission_MasterCanWrite(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
-	created, err := svc.CreateField(CreateFieldRequest{
+	created, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "email",
 		Type:    "string",
@@ -932,7 +933,7 @@ func TestSanitizeFieldDescription(t *testing.T) {
 func TestValidateFieldConfig_AllowedTypeTooLong(t *testing.T) {
 	longType := strings.Repeat("x", 101)
 
-	err := validateFieldConfig(FieldConfig{
+	err := validateFieldConfig(dto.FieldConfig{
 		AllowedTypes: []string{longType},
 	})
 	assert.Error(t, err)
@@ -944,7 +945,7 @@ func TestValidateFieldConfig_AllowedTypeTooLong(t *testing.T) {
 // ============================================================
 
 func TestValidateFieldConfig_ValidAllowedTypes(t *testing.T) {
-	err := validateFieldConfig(FieldConfig{
+	err := validateFieldConfig(dto.FieldConfig{
 		AllowedTypes: []string{".pdf", "image/*", ".docx"},
 	})
 	assert.NoError(t, err)
@@ -955,7 +956,7 @@ func TestValidateFieldConfig_ValidAllowedTypes(t *testing.T) {
 // ============================================================
 
 func TestValidateFieldConfig_ZeroMaxFileSize(t *testing.T) {
-	err := validateFieldConfig(FieldConfig{
+	err := validateFieldConfig(dto.FieldConfig{
 		MaxFileSizeMB: 0,
 	})
 	assert.NoError(t, err)
@@ -966,7 +967,7 @@ func TestValidateFieldConfig_ZeroMaxFileSize(t *testing.T) {
 // ============================================================
 
 func TestValidateFieldConfig_EmptyValidation(t *testing.T) {
-	err := validateFieldConfig(FieldConfig{
+	err := validateFieldConfig(dto.FieldConfig{
 		Validation: "",
 	})
 	assert.NoError(t, err)
@@ -978,7 +979,7 @@ func TestValidateFieldConfig_EmptyValidation(t *testing.T) {
 
 func TestValidateFieldConfig_MinOnly(t *testing.T) {
 	cfgMin := 5.0
-	err := validateFieldConfig(FieldConfig{Min: &cfgMin})
+	err := validateFieldConfig(dto.FieldConfig{Min: &cfgMin})
 	assert.NoError(t, err)
 }
 
@@ -988,7 +989,7 @@ func TestValidateFieldConfig_MinOnly(t *testing.T) {
 
 func TestValidateFieldConfig_MaxOnly(t *testing.T) {
 	cfgMax := 100.0
-	err := validateFieldConfig(FieldConfig{Max: &cfgMax})
+	err := validateFieldConfig(dto.FieldConfig{Max: &cfgMax})
 	assert.NoError(t, err)
 }
 
@@ -998,7 +999,7 @@ func TestValidateFieldConfig_MaxOnly(t *testing.T) {
 
 func TestValidateFieldConfig_MinEqualsMax(t *testing.T) {
 	val := 50.0
-	err := validateFieldConfig(FieldConfig{Min: &val, Max: &val})
+	err := validateFieldConfig(dto.FieldConfig{Min: &val, Max: &val})
 	assert.NoError(t, err)
 }
 
@@ -1009,7 +1010,7 @@ func TestValidateFieldConfig_MinEqualsMax(t *testing.T) {
 func TestGetField_ResponseBodyFormat(t *testing.T) {
 	svc, _, _, table, master := setupFieldFullTestEnv(t)
 
-	created, err := svc.CreateField(CreateFieldRequest{
+	created, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID:  table.ID,
 		Name:     "email",
 		Type:     "string",
@@ -1037,7 +1038,7 @@ func TestDeleteField_NoAccess(t *testing.T) {
 	table := &models.Table{DatabaseID: database.ID, Name: "del_table"}
 	require.NoError(t, db.Create(table).Error)
 
-	created, err := svc.CreateField(CreateFieldRequest{
+	created, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "email",
 		Type:    "string",

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
 func setupFieldTestEnv(t *testing.T) (*FieldService, *models.Table, *models.Token) {
@@ -34,7 +35,7 @@ func TestFieldService_CreateField_AcceptsValidTypes(t *testing.T) {
 	}
 
 	for _, fieldType := range validTypes {
-		field, err := svc.CreateField(CreateFieldRequest{
+		field, err := svc.CreateField(dto.FieldCreateRequest{
 			TableID: table.ID,
 			Name:    "field_" + fieldType,
 			Type:    fieldType,
@@ -59,7 +60,7 @@ func TestFieldService_CreateField_RejectsInvalidType(t *testing.T) {
 	}
 
 	for _, fieldType := range invalidTypes {
-		_, err := svc.CreateField(CreateFieldRequest{
+		_, err := svc.CreateField(dto.FieldCreateRequest{
 			TableID: table.ID,
 			Name:    "field_bad",
 			Type:    fieldType,
@@ -73,7 +74,7 @@ func TestFieldService_CreateField_RejectsInvalidName(t *testing.T) {
 	svc, table, master := setupFieldTestEnv(t)
 
 	t.Run("empty name", func(t *testing.T) {
-		_, err := svc.CreateField(CreateFieldRequest{
+		_, err := svc.CreateField(dto.FieldCreateRequest{
 			TableID: table.ID,
 			Name:    "",
 			Type:    "string",
@@ -83,7 +84,7 @@ func TestFieldService_CreateField_RejectsInvalidName(t *testing.T) {
 	})
 
 	t.Run("name with spaces", func(t *testing.T) {
-		_, err := svc.CreateField(CreateFieldRequest{
+		_, err := svc.CreateField(dto.FieldCreateRequest{
 			TableID: table.ID,
 			Name:    "has spaces",
 			Type:    "string",
@@ -92,7 +93,7 @@ func TestFieldService_CreateField_RejectsInvalidName(t *testing.T) {
 	})
 
 	t.Run("name starts with digit", func(t *testing.T) {
-		_, err := svc.CreateField(CreateFieldRequest{
+		_, err := svc.CreateField(dto.FieldCreateRequest{
 			TableID: table.ID,
 			Name:    "1field",
 			Type:    "string",
@@ -102,7 +103,7 @@ func TestFieldService_CreateField_RejectsInvalidName(t *testing.T) {
 	})
 
 	t.Run("name with special characters", func(t *testing.T) {
-		_, err := svc.CreateField(CreateFieldRequest{
+		_, err := svc.CreateField(dto.FieldCreateRequest{
 			TableID: table.ID,
 			Name:    "field@name!",
 			Type:    "string",
@@ -114,14 +115,14 @@ func TestFieldService_CreateField_RejectsInvalidName(t *testing.T) {
 func TestFieldService_CreateField_RejectsDuplicateName(t *testing.T) {
 	svc, table, master := setupFieldTestEnv(t)
 
-	_, err := svc.CreateField(CreateFieldRequest{
+	_, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "username",
 		Type:    "string",
 	}, master.ID)
 	require.NoError(t, err)
 
-	_, err = svc.CreateField(CreateFieldRequest{
+	_, err = svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "username",
 		Type:    "text",
@@ -133,7 +134,7 @@ func TestFieldService_CreateField_RejectsDuplicateName(t *testing.T) {
 func TestFieldService_CreateField_StoresConfig(t *testing.T) {
 	svc, table, master := setupFieldTestEnv(t)
 
-	field, err := svc.CreateField(CreateFieldRequest{
+	field, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "tags",
 		Type:    "list",
@@ -149,7 +150,7 @@ func TestFieldService_CreateField_StoresConfig(t *testing.T) {
 func TestFieldService_CreateField_WithRequired(t *testing.T) {
 	svc, table, master := setupFieldTestEnv(t)
 
-	field, err := svc.CreateField(CreateFieldRequest{
+	field, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID:  table.ID,
 		Name:     "email",
 		Type:     "string",
@@ -176,7 +177,7 @@ func TestFieldService_CreateField_UnauthorizedToken(t *testing.T) {
 	}
 	require.NoError(t, db.Create(viewer).Error)
 
-	_, err := svc.CreateField(CreateFieldRequest{
+	_, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "unauthorized_field",
 		Type:    "string",

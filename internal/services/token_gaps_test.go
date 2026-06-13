@@ -9,6 +9,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
 func TestTokenService_CreateToken_DBError(t *testing.T) {
@@ -18,7 +19,7 @@ func TestTokenService_CreateToken_DBError(t *testing.T) {
 	require.NoError(t, sqlDB.Close())
 
 	svc := NewTokenService(d)
-	_, err = svc.CreateToken(CreateTokenRequest{
+	_, err = svc.CreateToken(dto.TokenCreateRequest{
 		Name:   "test",
 		Scopes: "{}",
 	})

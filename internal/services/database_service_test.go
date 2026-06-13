@@ -8,6 +8,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/jiangfire/cornerstone/internal/testutil"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
 func setupTestDB(t *testing.T) *gorm.DB {
@@ -73,19 +74,14 @@ func TestDatabaseService_CreateDatabaseWithTables(t *testing.T) {
 	svc := NewDatabaseService(db)
 
 	t.Run("create database with nested tables and fields", func(t *testing.T) {
-		req := CreateDBWithTablesRequest{
+		req := dto.DatabaseBulkCreateRequest{
 			Name:        "ecommerce",
 			Description: "E-commerce database",
-			Tables: []CreateTableWithFieldsRequest{
+			Tables: []dto.BulkCreateTable{
 				{
 					Name:        "orders",
 					Description: "Order table",
-					Fields: []struct {
-						Name        string `json:"name" binding:"required"`
-						Type        string `json:"type" binding:"required"`
-						Description string `json:"description"`
-						Required    bool   `json:"required"`
-					}{
+					Fields: []dto.BulkCreateTableField{
 						{Name: "order_no", Type: "string", Required: true},
 						{Name: "amount", Type: "number", Required: true},
 						{Name: "status", Type: "string"},
@@ -94,12 +90,7 @@ func TestDatabaseService_CreateDatabaseWithTables(t *testing.T) {
 				{
 					Name:        "customers",
 					Description: "Customer table",
-					Fields: []struct {
-						Name        string `json:"name" binding:"required"`
-						Type        string `json:"type" binding:"required"`
-						Description string `json:"description"`
-						Required    bool   `json:"required"`
-					}{
+					Fields: []dto.BulkCreateTableField{
 						{Name: "name", Type: "string", Required: true},
 						{Name: "email", Type: "string", Required: true},
 					},
@@ -120,9 +111,9 @@ func TestDatabaseService_CreateDatabaseWithTables(t *testing.T) {
 	})
 
 	t.Run("duplicate database name", func(t *testing.T) {
-		req := CreateDBWithTablesRequest{
+		req := dto.DatabaseBulkCreateRequest{
 			Name:   "ecommerce",
-			Tables: []CreateTableWithFieldsRequest{},
+			Tables: []dto.BulkCreateTable{},
 		}
 
 		_, err := svc.CreateDatabaseWithTables(req, "test_user")
@@ -131,9 +122,9 @@ func TestDatabaseService_CreateDatabaseWithTables(t *testing.T) {
 	})
 
 	t.Run("invalid database name", func(t *testing.T) {
-		req := CreateDBWithTablesRequest{
+		req := dto.DatabaseBulkCreateRequest{
 			Name:   "a",
-			Tables: []CreateTableWithFieldsRequest{},
+			Tables: []dto.BulkCreateTable{},
 		}
 
 		_, err := svc.CreateDatabaseWithTables(req, "test_user")
@@ -147,7 +138,7 @@ func TestDatabaseService_CRUD(t *testing.T) {
 	svc := NewDatabaseService(db)
 
 	t.Run("create and get database", func(t *testing.T) {
-		database, err := svc.CreateDatabase(CreateDBRequest{
+		database, err := svc.CreateDatabase(dto.DatabaseCreateRequest{
 			Name:        "TestDB",
 			Description: "Test database",
 		}, "user1")
@@ -160,8 +151,8 @@ func TestDatabaseService_CRUD(t *testing.T) {
 	})
 
 	t.Run("list databases", func(t *testing.T) {
-		svc.CreateDatabase(CreateDBRequest{Name: "DB1"}, "user1")
-		svc.CreateDatabase(CreateDBRequest{Name: "DB2"}, "user1")
+		svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "DB1"}, "user1")
+		svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "DB2"}, "user1")
 
 		databases, err := svc.ListDatabases("user1")
 		require.NoError(t, err)
@@ -169,9 +160,9 @@ func TestDatabaseService_CRUD(t *testing.T) {
 	})
 
 	t.Run("update database", func(t *testing.T) {
-		database, _ := svc.CreateDatabase(CreateDBRequest{Name: "UpdateDB"}, "user1")
+		database, _ := svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "UpdateDB"}, "user1")
 
-		updated, err := svc.UpdateDatabase(database.ID, UpdateDBRequest{
+		updated, err := svc.UpdateDatabase(database.ID, dto.DatabaseUpdateRequest{
 			Name:        "UpdatedDB",
 			Description: "Updated description",
 		}, "user1")
@@ -180,7 +171,7 @@ func TestDatabaseService_CRUD(t *testing.T) {
 	})
 
 	t.Run("delete database", func(t *testing.T) {
-		database, _ := svc.CreateDatabase(CreateDBRequest{Name: "DeleteDB"}, "user1")
+		database, _ := svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "DeleteDB"}, "user1")
 
 		err := svc.DeleteDatabase(database.ID, "user1")
 		require.NoError(t, err)

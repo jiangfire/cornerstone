@@ -11,6 +11,7 @@ import (
 	"github.com/jiangfire/cornerstone/internal/config"
 	appdb "github.com/jiangfire/cornerstone/internal/db"
 	"github.com/jiangfire/cornerstone/internal/services"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"github.com/jiangfire/cornerstone/pkg/db"
 	applog "github.com/jiangfire/cornerstone/pkg/log"
 	"github.com/spf13/cobra"
@@ -173,7 +174,7 @@ var dbCreateCmd = &cobra.Command{
 			return err
 		}
 		svc := services.NewDatabaseService(db.DB())
-		database, err := svc.CreateDatabase(services.CreateDBRequest{
+		database, err := svc.CreateDatabase(dto.DatabaseCreateRequest{
 			Name:        args[0],
 			Description: desc,
 		}, token)
@@ -224,7 +225,7 @@ var dbUpdateCmd = &cobra.Command{
 			return err
 		}
 		svc := services.NewDatabaseService(db.DB())
-		database, err := svc.UpdateDatabase(args[0], services.UpdateDBRequest{
+		database, err := svc.UpdateDatabase(args[0], dto.DatabaseUpdateRequest{
 			Name:        name,
 			Description: desc,
 		}, token)

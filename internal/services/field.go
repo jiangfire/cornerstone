@@ -10,6 +10,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"gorm.io/gorm"
 )
 
@@ -120,7 +121,7 @@ func validateFieldType(fieldType string) error {
 func validateMutableFieldType(fieldType string) error { return nil }
 
 // validateFieldConfig validates field configuration
-func validateFieldConfig(config FieldConfig) error {
+func validateFieldConfig(config dto.FieldConfig) error {
 	// Validate options count
 	if len(config.Options) > 100 {
 		return errors.New("number of options must not exceed 100")
@@ -180,7 +181,7 @@ func sanitizeFieldName(name string) string {
 }
 
 // sanitizeFieldConfig sanitizes field config
-func sanitizeFieldConfig(config FieldConfig) FieldConfig {
+func sanitizeFieldConfig(config dto.FieldConfig) dto.FieldConfig {
 	// Sanitize options
 	cleanedOptions := make([]string, 0, len(config.Options))
 	for _, option := range config.Options {
@@ -220,54 +221,6 @@ func validateFieldDescription(description string) error {
 		return errors.New("field description must not exceed 1000 characters")
 	}
 	return nil
-}
-
-// FieldConfig holds field configuration
-type FieldConfig struct {
-	Options       []string `json:"options,omitempty"`          // list suggestions
-	Required      bool     `json:"required,omitempty"`         // required flag
-	Min           *float64 `json:"min,omitempty"`              // minimum value
-	Max           *float64 `json:"max,omitempty"`              // maximum value
-	Format        string   `json:"format,omitempty"`           // date format, etc.
-	MaxLength     *int     `json:"max_length,omitempty"`       // maximum length
-	Validation    string   `json:"validation,omitempty"`       // regex validation
-	AllowedTypes  []string `json:"allowed_types,omitempty"`    // allowed attachment types, e.g. image/*, .pdf
-	MaxFileSizeMB int      `json:"max_file_size_mb,omitempty"` // max attachment size in MB
-	Multiple      bool     `json:"multiple,omitempty"`         // allow multiple attachments
-}
-
-// CreateFieldRequest is the request to create a field
-type CreateFieldRequest struct {
-	TableID     string      `json:"table_id" binding:"required"`
-	Name        string      `json:"name" binding:"required,min=1,max=255"`
-	Type        string      `json:"type" binding:"required"`
-	Description string      `json:"description" binding:"max=1000"`
-	Required    bool        `json:"required"`
-	Options     string      `json:"options"` // list options, comma-separated
-	Config      FieldConfig `json:"config"`
-}
-
-// UpdateFieldRequest is the request to update a field
-type UpdateFieldRequest struct {
-	Name        string      `json:"name" binding:"required,min=1,max=255"`
-	Type        string      `json:"type" binding:"required"`
-	Description string      `json:"description" binding:"max=1000"`
-	Required    bool        `json:"required"`
-	Options     string      `json:"options"`
-	Config      FieldConfig `json:"config"`
-}
-
-// FieldResponse is the field API response
-type FieldResponse struct {
-	ID          string      `json:"id"`
-	TableID     string      `json:"table_id"`
-	Name        string      `json:"name"`
-	Type        string      `json:"type"`
-	Description string      `json:"description"`
-	Deprecated  bool        `json:"deprecated"`
-	Required    bool        `json:"required"`
-	Options     string      `json:"options,omitempty"`
-	Config      FieldConfig `json:"config"`
 }
 
 func buildDeletedFieldName(name, fieldID string) string {
@@ -369,7 +322,7 @@ func containsRole(roles []string, role string) bool {
 }
 
 // CreateField creates a new field
-func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*models.Field, error) {
+func (s *FieldService) CreateField(req dto.FieldCreateRequest, userID string) (*models.Field, error) {
 	// 1. Resolve table identifier (supports ID or name)
 	table, err := s.resolveTable(req.TableID)
 	if err != nil {
@@ -461,7 +414,7 @@ func (s *FieldService) CreateField(req CreateFieldRequest, userID string) (*mode
 }
 
 // ListFields lists fields for a table
-func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, error) {
+func (s *FieldService) ListFields(tableID, userID string) ([]dto.FieldObject, error) {
 	// 1. Resolve table identifier (supports ID or name)
 	table, err := s.resolveTable(tableID)
 	if err != nil {
@@ -480,7 +433,7 @@ func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, erro
 		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 	if len(fields) == 0 {
-		return []FieldResponse{}, nil
+		return []dto.FieldObject{}, nil
 	}
 
 	fieldIDs := make([]string, len(fields))
@@ -493,20 +446,20 @@ func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, erro
 	}
 
 	// 3. Convert to response format
-	result := make([]FieldResponse, len(fields))
+	result := make([]dto.FieldObject, len(fields))
 	index := 0
 	for _, f := range fields {
 		if !readResults[f.ID] {
 			continue
 		}
 
-		var config FieldConfig
+		var config dto.FieldConfig
 		if f.Options != "" {
 			_ = json.Unmarshal([]byte(f.Options), &config)
 			// config is safely stored in DB; parse failure does not affect core functionality
 		}
 
-		result[index] = FieldResponse{
+		result[index] = dto.FieldObject{
 			ID:          f.ID,
 			TableID:     f.TableID,
 			Name:        f.Name,
@@ -524,7 +477,7 @@ func (s *FieldService) ListFields(tableID, userID string) ([]FieldResponse, erro
 }
 
 // GetField gets field details
-func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) {
+func (s *FieldService) GetField(fieldID, userID string) (*dto.FieldObject, error) {
 	// 1. Resolve field identifier (supports ID or name)
 	// For name lookup, we need a table context; try ID first via getActiveField
 	field, err := s.getActiveField(fieldID)
@@ -541,13 +494,13 @@ func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) 
 	}
 
 	// 3. Parse config
-	var config FieldConfig
+	var config dto.FieldConfig
 	if field.Options != "" {
 		_ = json.Unmarshal([]byte(field.Options), &config)
 		// config is safely stored in DB; parse failure does not affect core functionality
 	}
 
-	return &FieldResponse{
+	return &dto.FieldObject{
 		ID:          field.ID,
 		TableID:     field.TableID,
 		Name:        field.Name,
@@ -561,7 +514,7 @@ func (s *FieldService) GetField(fieldID, userID string) (*FieldResponse, error) 
 }
 
 // UpdateField updates a field
-func (s *FieldService) UpdateField(fieldID string, req UpdateFieldRequest, userID string) (*models.Field, error) {
+func (s *FieldService) UpdateField(fieldID string, req dto.FieldUpdateRequest, userID string) (*models.Field, error) {
 	// 1. Get field info
 	field, err := s.getActiveField(fieldID)
 	if err != nil {

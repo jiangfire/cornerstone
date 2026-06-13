@@ -150,6 +150,7 @@ type FieldObject struct {
 	Name        string      `json:"name" example:"status"`
 	Type        string      `json:"type" example:"string"`
 	Description string      `json:"description" example:"Current status"`
+	Deprecated  bool        `json:"deprecated" example:"false"`
 	Required    bool        `json:"required" example:"true"`
 	Options     string      `json:"options,omitempty" example:"active,inactive"`
 	Config      FieldConfig `json:"config"`
@@ -185,9 +186,23 @@ type RecordObject struct {
 
 // RecordListData is the data payload for GET /api/records.
 type RecordListData struct {
-	Items   []RecordObject `json:"items"`
+	Records []RecordObject `json:"records"`
 	Total   int64          `json:"total" example:"42"`
 	HasMore bool           `json:"has_more" example:"true"`
+}
+
+// RecordListQueryRequest is the simplified list query for GET /api/records.
+type RecordListQueryRequest struct {
+	TableID string `json:"table_id" form:"table_id" binding:"required"`
+	Limit   int    `json:"limit" form:"limit" binding:"min=1,max=100"`
+	Offset  int    `json:"offset" form:"offset" binding:"min=0"`
+	Filter  string `json:"filter" form:"filter"`
+	Fields  string `json:"fields" form:"fields"`
+}
+
+// BatchQueryData is the data payload for POST /api/query/batch.
+type BatchQueryData struct {
+	Results map[string]QueryResult `json:"results"`
 }
 
 // RecordBatchCreateRequest body for POST /api/records/batch

@@ -7,6 +7,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"gorm.io/gorm"
 )
 
@@ -89,7 +90,7 @@ func TestCreateRecord_DBCreateError(t *testing.T) {
 	svc, db, tableID := setupRecordDB(t)
 	injectDBCreateError(t, db)
 
-	_, err := svc.CreateRecord(CreateRecordRequest{
+	_, err := svc.CreateRecord(dto.RecordCreateRequest{
 		TableID: tableID,
 		Data:    map[string]interface{}{"title": "test"},
 	}, "user1")
@@ -103,7 +104,7 @@ func TestCreateRecord_DBQueryFieldError(t *testing.T) {
 	SharedFieldCache.Clear()
 	injectQueryErrorOnNthCall(t, db, 2)
 
-	_, err := svc.CreateRecord(CreateRecordRequest{
+	_, err := svc.CreateRecord(dto.RecordCreateRequest{
 		TableID: tableID,
 		Data:    map[string]interface{}{"title": "test"},
 	}, "user1")
@@ -113,7 +114,7 @@ func TestCreateRecord_DBQueryFieldError(t *testing.T) {
 func TestUpdateRecord_DBUpdateError(t *testing.T) {
 	svc, db, tableID := setupRecordDB(t)
 
-	record, err := svc.CreateRecord(CreateRecordRequest{
+	record, err := svc.CreateRecord(dto.RecordCreateRequest{
 		TableID: tableID,
 		Data:    map[string]interface{}{"title": "original"},
 	}, "user1")
@@ -121,7 +122,7 @@ func TestUpdateRecord_DBUpdateError(t *testing.T) {
 
 	injectDBUpdateError(t, db)
 
-	_, err = svc.UpdateRecord(record.ID, UpdateRecordRequest{
+	_, err = svc.UpdateRecord(record.ID, dto.RecordUpdateRequest{
 		Data: map[string]interface{}{"title": "updated"},
 	}, "user1")
 	require.Error(t, err)
@@ -131,7 +132,7 @@ func TestUpdateRecord_DBUpdateError(t *testing.T) {
 func TestUpdateRecord_DBQueryFieldError(t *testing.T) {
 	svc, db, tableID := setupRecordDB(t)
 
-	record, err := svc.CreateRecord(CreateRecordRequest{
+	record, err := svc.CreateRecord(dto.RecordCreateRequest{
 		TableID: tableID,
 		Data:    map[string]interface{}{"title": "original"},
 	}, "user1")
@@ -140,7 +141,7 @@ func TestUpdateRecord_DBQueryFieldError(t *testing.T) {
 	SharedFieldCache.Clear()
 	injectDBQueryError(t, db)
 
-	_, err = svc.UpdateRecord(record.ID, UpdateRecordRequest{
+	_, err = svc.UpdateRecord(record.ID, dto.RecordUpdateRequest{
 		Data: map[string]interface{}{"title": "updated"},
 	}, "user1")
 	require.Error(t, err)
@@ -152,7 +153,7 @@ func TestListRecords_DBQueryError(t *testing.T) {
 	SharedFieldCache.Clear()
 	injectListRecordsPageError(t, db)
 
-	_, err := svc.ListRecords(QueryRequest{
+	_, err := svc.ListRecords(dto.RecordListQueryRequest{
 		TableID: tableID,
 		Limit:   10,
 	}, "user1")
@@ -162,7 +163,7 @@ func TestListRecords_DBQueryError(t *testing.T) {
 func TestDeleteRecord_DBDeleteError(t *testing.T) {
 	svc, db, tableID := setupRecordDB(t)
 
-	record, err := svc.CreateRecord(CreateRecordRequest{
+	record, err := svc.CreateRecord(dto.RecordCreateRequest{
 		TableID: tableID,
 		Data:    map[string]interface{}{"title": "to-delete"},
 	}, "user1")
@@ -198,7 +199,7 @@ func TestBatchCreateRecords_DBCreateError(t *testing.T) {
 	svc, db, tableID := setupRecordDB(t)
 	injectDBCreateError(t, db)
 
-	_, err := svc.BatchCreateRecords(CreateRecordRequest{
+	_, err := svc.BatchCreateRecords(dto.RecordCreateRequest{
 		TableID: tableID,
 		Data:    map[string]interface{}{"title": "batch"},
 	}, "user1", 3)

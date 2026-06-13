@@ -74,7 +74,7 @@ func recordObjectFromModel(record *models.Record, extraFields map[string]any) dt
 func CreateRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
-	var req services.CreateRecordRequest
+	var req dto.RecordCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
@@ -161,7 +161,7 @@ func ExportRecords(c *gin.Context) {
 func ListRecords(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
-	var req services.QueryRequest
+	var req dto.RecordListQueryRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
 		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
@@ -235,7 +235,7 @@ func UpdateRecord(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	recordID := c.Param("id")
 
-	var req services.UpdateRecordRequest
+	var req dto.RecordUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
@@ -307,7 +307,7 @@ func DeleteRecord(c *gin.Context) {
 func BatchCreateRecords(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
-	var req services.CreateRecordRequest
+	var req dto.RecordCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, 400, "invalid request: "+err.Error())
 		return

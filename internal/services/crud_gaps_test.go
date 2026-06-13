@@ -11,6 +11,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
 func createTestField(t *testing.T, db *gorm.DB, tableID, name, fieldType string) *models.Field {
@@ -55,7 +56,7 @@ func TestGetField_WithConfig(t *testing.T) {
 	svc := NewFieldService(db)
 
 	maxLen := 50
-	config := FieldConfig{
+	config := dto.FieldConfig{
 		Required:  true,
 		MaxLength: &maxLen,
 		Options:   []string{"a", "b"},
@@ -113,7 +114,7 @@ func TestUpdateField_NameAndTypeChange(t *testing.T) {
 
 	field := createTestField(t, db, table.ID, "old_name", "string")
 
-	updated, err := svc.UpdateField(field.ID, UpdateFieldRequest{
+	updated, err := svc.UpdateField(field.ID, dto.FieldUpdateRequest{
 		Name: "new_name",
 		Type: "text",
 	}, master.ID)
@@ -134,17 +135,17 @@ func TestUpdateField_ConfigChanges(t *testing.T) {
 
 	cfgMin := 0.0
 	cfgMax := 100.0
-	updated, err := svc.UpdateField(field.ID, UpdateFieldRequest{
+	updated, err := svc.UpdateField(field.ID, dto.FieldUpdateRequest{
 		Name: "score",
 		Type: "number",
-		Config: FieldConfig{
+		Config: dto.FieldConfig{
 			Min: &cfgMin,
 			Max: &cfgMax,
 		},
 	}, master.ID)
 	require.NoError(t, err)
 
-	var config FieldConfig
+	var config dto.FieldConfig
 	require.NoError(t, json.Unmarshal([]byte(updated.Options), &config))
 	assert.Equal(t, 0.0, *config.Min)
 	assert.Equal(t, 100.0, *config.Max)
@@ -160,7 +161,7 @@ func TestUpdateField_InvalidName(t *testing.T) {
 
 	field := createTestField(t, db, table.ID, "valid", "string")
 
-	_, err := svc.UpdateField(field.ID, UpdateFieldRequest{
+	_, err := svc.UpdateField(field.ID, dto.FieldUpdateRequest{
 		Name: "",
 		Type: "string",
 	}, master.ID)
@@ -178,7 +179,7 @@ func TestUpdateField_InvalidType(t *testing.T) {
 
 	field := createTestField(t, db, table.ID, "valid", "string")
 
-	_, err := svc.UpdateField(field.ID, UpdateFieldRequest{
+	_, err := svc.UpdateField(field.ID, dto.FieldUpdateRequest{
 		Name: "valid",
 		Type: "notatype",
 	}, master.ID)
@@ -229,7 +230,7 @@ func TestUpdateTable_NoAccess(t *testing.T) {
 	}
 	require.NoError(t, db.Create(viewer).Error)
 
-	_, err := svc.UpdateTable(table.ID, UpdateTableRequest{
+	_, err := svc.UpdateTable(table.ID, dto.TableUpdateRequest{
 		Name: "new_name",
 	}, viewer.ID)
 	assert.Error(t, err)
@@ -249,7 +250,7 @@ func TestValidateAttachmentFieldValue_SingleFile(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "avatar", Type: "file"},
-		FieldConfig{},
+		dto.FieldConfig{},
 		file.ID,
 		"",
 		"user1",
@@ -271,7 +272,7 @@ func TestValidateAttachmentFieldValue_MultipleNotAllowed(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "avatar", Type: "file"},
-		FieldConfig{Multiple: false},
+		dto.FieldConfig{Multiple: false},
 		[]string{f1.ID, f2.ID},
 		"",
 		"user1",
@@ -293,7 +294,7 @@ func TestValidateAttachmentFieldValue_DuplicateFileID(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "doc", Type: "file"},
-		FieldConfig{Multiple: true},
+		dto.FieldConfig{Multiple: true},
 		[]string{file.ID, file.ID},
 		"",
 		"user1",
@@ -314,7 +315,7 @@ func TestValidateAttachmentFieldValue_FileNotAccessible(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "doc", Type: "file"},
-		FieldConfig{Multiple: true},
+		dto.FieldConfig{Multiple: true},
 		[]string{"fil_nonexistent"},
 		"",
 		"user1",
@@ -337,7 +338,7 @@ func TestValidateAttachmentFieldValue_WrongField(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "doc", Type: "file"},
-		FieldConfig{Multiple: true},
+		dto.FieldConfig{Multiple: true},
 		[]string{file.ID},
 		"",
 		"user1",
@@ -363,7 +364,7 @@ func TestValidateAttachmentFieldValue_BoundToOtherRecord(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "doc", Type: "file"},
-		FieldConfig{Multiple: true},
+		dto.FieldConfig{Multiple: true},
 		[]string{file.ID},
 		"rec_other_record_id",
 		"user1",
@@ -485,18 +486,18 @@ func TestValidateFieldDescription_TooLong(t *testing.T) {
 // ============================================================
 
 func TestValidateFieldConfig_MaxFileSizeMB_Negative(t *testing.T) {
-	err := validateFieldConfig(FieldConfig{MaxFileSizeMB: -5})
+	err := validateFieldConfig(dto.FieldConfig{MaxFileSizeMB: -5})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "max file size must not be negative")
 }
 
 func TestValidateFieldConfig_MaxFileSizeMB_Zero(t *testing.T) {
-	err := validateFieldConfig(FieldConfig{MaxFileSizeMB: 0})
+	err := validateFieldConfig(dto.FieldConfig{MaxFileSizeMB: 0})
 	assert.NoError(t, err)
 }
 
 func TestValidateFieldConfig_MaxFileSizeMB_Positive(t *testing.T) {
-	err := validateFieldConfig(FieldConfig{MaxFileSizeMB: 50})
+	err := validateFieldConfig(dto.FieldConfig{MaxFileSizeMB: 50})
 	assert.NoError(t, err)
 }
 
@@ -521,7 +522,7 @@ func TestValidateAttachmentFieldValue_FileSizeExceedsLimit(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "doc", Type: "file"},
-		FieldConfig{MaxFileSizeMB: 1, Multiple: true},
+		dto.FieldConfig{MaxFileSizeMB: 1, Multiple: true},
 		[]string{largeFile.ID},
 		"",
 		"user1",
@@ -551,7 +552,7 @@ func TestValidateAttachmentFieldValue_FileTypeNotAllowed(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "doc", Type: "file"},
-		FieldConfig{AllowedTypes: []string{".pdf", "image/*"}, Multiple: true},
+		dto.FieldConfig{AllowedTypes: []string{".pdf", "image/*"}, Multiple: true},
 		[]string{file.ID},
 		"",
 		"user1",
@@ -577,7 +578,7 @@ func TestValidateAttachmentFieldValue_CreateWithBoundFile(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "doc", Type: "file"},
-		FieldConfig{Multiple: true},
+		dto.FieldConfig{Multiple: true},
 		[]string{file.ID},
 		"",
 		"user1",
@@ -603,7 +604,7 @@ func TestValidateAttachmentFieldValue_SameRecordUpdate(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "doc", Type: "file"},
-		FieldConfig{Multiple: true},
+		dto.FieldConfig{Multiple: true},
 		[]string{file.ID},
 		record.ID,
 		"user1",
@@ -623,7 +624,7 @@ func TestValidateAttachmentFieldValue_InvalidValueType(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "doc", Type: "file"},
-		FieldConfig{},
+		dto.FieldConfig{},
 		42,
 		"",
 		"user1",
@@ -705,7 +706,7 @@ func TestUpdateTable_ViewerNoManage(t *testing.T) {
 	}
 	require.NoError(t, db.Create(viewer).Error)
 
-	_, err := svc.UpdateTable(table.ID, UpdateTableRequest{Name: "new_name"}, viewer.ID)
+	_, err := svc.UpdateTable(table.ID, dto.TableUpdateRequest{Name: "new_name"}, viewer.ID)
 	assert.Error(t, err)
 }
 
@@ -799,7 +800,7 @@ func TestValidateAttachmentFieldValue_FileSizeWithinLimit(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "doc", Type: "file"},
-		FieldConfig{MaxFileSizeMB: 1, Multiple: true},
+		dto.FieldConfig{MaxFileSizeMB: 1, Multiple: true},
 		[]string{smallFile.ID},
 		"",
 		"user1",
@@ -828,7 +829,7 @@ func TestValidateAttachmentFieldValue_AllowedFileType(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "doc", Type: "file"},
-		FieldConfig{AllowedTypes: []string{".pdf"}, Multiple: true},
+		dto.FieldConfig{AllowedTypes: []string{".pdf"}, Multiple: true},
 		[]string{pdfFile.ID},
 		"",
 		"user1",
@@ -848,7 +849,7 @@ func TestValidateAttachmentFieldValue_EmptyFileList(t *testing.T) {
 
 	err := s.validateAttachmentFieldValue(
 		models.Field{ID: fld.ID, TableID: table.ID, Name: "doc", Type: "file"},
-		FieldConfig{},
+		dto.FieldConfig{},
 		[]string{},
 		"",
 		"user1",

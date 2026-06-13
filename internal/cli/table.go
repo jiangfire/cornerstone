@@ -5,6 +5,7 @@ import (
 
 	appdb "github.com/jiangfire/cornerstone/internal/db"
 	"github.com/jiangfire/cornerstone/internal/services"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"github.com/jiangfire/cornerstone/pkg/db"
 	"github.com/spf13/cobra"
 )
@@ -54,7 +55,7 @@ var tableCreateCmd = &cobra.Command{
 			return err
 		}
 		svc := services.NewTableService(db.DB())
-		table, err := svc.CreateTable(services.CreateTableRequest{
+		table, err := svc.CreateTable(dto.TableCreateRequest{
 			DatabaseID:  args[0],
 			Name:        args[1],
 			Description: desc,
@@ -106,7 +107,7 @@ var tableUpdateCmd = &cobra.Command{
 			return err
 		}
 		svc := services.NewTableService(db.DB())
-		table, err := svc.UpdateTable(args[0], services.UpdateTableRequest{
+		table, err := svc.UpdateTable(args[0], dto.TableUpdateRequest{
 			Name:        name,
 			Description: desc,
 		}, token)

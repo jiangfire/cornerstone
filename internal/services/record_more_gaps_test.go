@@ -9,6 +9,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
 func TestUpdateRecord_UnknownField(t *testing.T) {
@@ -23,13 +24,13 @@ func TestUpdateRecord_UnknownField(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	record, err := s.CreateRecord(CreateRecordRequest{
+	record, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"name": "original"},
 	}, "user1")
 	require.NoError(t, err)
 
-	_, err = s.UpdateRecord(record.ID, UpdateRecordRequest{
+	_, err = s.UpdateRecord(record.ID, dto.RecordUpdateRequest{
 		Data: map[string]interface{}{"nonexistent_field": "value"},
 	}, "user1")
 	require.Error(t, err)
@@ -48,13 +49,13 @@ func TestUpdateRecord_InvalidFieldType(t *testing.T) {
 		}{"count", "number", false},
 	)
 
-	record, err := s.CreateRecord(CreateRecordRequest{
+	record, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"count": float64(42)},
 	}, "user1")
 	require.NoError(t, err)
 
-	_, err = s.UpdateRecord(record.ID, UpdateRecordRequest{
+	_, err = s.UpdateRecord(record.ID, dto.RecordUpdateRequest{
 		Data: map[string]interface{}{"count": "not-a-number"},
 	}, "user1")
 	require.Error(t, err)
@@ -73,7 +74,7 @@ func TestGetRecord_NonMasterDenied(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	record, err := s.CreateRecord(CreateRecordRequest{
+	record, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"name": "secret"},
 	}, "user1")
@@ -104,7 +105,7 @@ func TestListRecords_NonMasterDenied(t *testing.T) {
 	require.NoError(t, db.Create(viewer).Error)
 	authz.ClearTokenCache()
 
-	_, err := s.ListRecords(QueryRequest{
+	_, err := s.ListRecords(dto.RecordListQueryRequest{
 		TableID: tbl.ID,
 		Limit:   10,
 	}, viewer.ID)
@@ -124,7 +125,7 @@ func TestExportRecords_ListFieldValues(t *testing.T) {
 		}{"tags", "list", false},
 	)
 
-	_, err := s.CreateRecord(CreateRecordRequest{
+	_, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"tags": []string{"a", "b", "c"}},
 	}, "user1")
@@ -151,7 +152,7 @@ func TestExportRecords_JSONFieldValues(t *testing.T) {
 		}{"meta", "json", false},
 	)
 
-	_, err := s.CreateRecord(CreateRecordRequest{
+	_, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"meta": map[string]interface{}{"key": "val", "num": float64(1)}},
 	}, "user1")
@@ -185,7 +186,7 @@ func TestCreateRecord_WithFileFieldNonEmpty(t *testing.T) {
 	}
 	require.NoError(t, db.Create(fileRecord).Error)
 
-	record, err := s.CreateRecord(CreateRecordRequest{
+	record, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"doc": []string{fileRecord.ID}},
 	}, "user1")

@@ -35,7 +35,7 @@ import (
 func CreateField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 
-	var req services.CreateFieldRequest
+	var req dto.FieldCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
@@ -78,11 +78,7 @@ func ListFields(c *gin.Context) {
 		return
 	}
 
-	items := make([]dto.FieldObject, len(fields))
-	for i := range fields {
-		items[i] = fieldObjectFromResponse(&fields[i])
-	}
-	dto.Success(c, dto.FieldListData{Items: items, Total: len(items)})
+	dto.Success(c, dto.FieldListData{Items: fields, Total: len(fields)})
 }
 
 // GetField
@@ -113,7 +109,7 @@ func GetField(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, fieldObjectFromResponse(field))
+	dto.Success(c, field)
 }
 
 // UpdateField
@@ -142,7 +138,7 @@ func UpdateField(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	fieldID := c.Param("id")
 
-	var req services.UpdateFieldRequest
+	var req dto.FieldUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, 400, "invalid request: "+err.Error())
 		return

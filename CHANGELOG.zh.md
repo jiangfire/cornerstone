@@ -7,6 +7,18 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/)，
 本项目遵循 [Semantic Versioning](https://semver.org/spec/v2.0.0.html)。
 
+## [v1.7.2] - 2026-06-13
+
+### 变更
+
+- **统一 DTO 包** - 所有请求/响应类型合并到 `pkg/dto`。从 `internal/services/` 删除了 18 个重复类型定义（database、table、field、record、token、file 服务）。Handler 转换函数（`tokenObjectFromResponse`、`tableObjectFromResponse`、`fieldObjectFromResponse`、`fileObjectFromModel`、`recordObjectFromModel`）已删除。
+- **RecordListData.Items → Records** - 重命名字段以提高清晰度
+- **新增 DTO 类型** - 添加 `dto.RecordListQueryRequest`（简化列表查询）、`dto.BatchQueryData`（批量查询响应），以及 `dto.FieldObject` 的 `Deprecated` 字段
+
+### 修复
+
+- **Swagger 文档已重新生成** - 更新以反映合并后的 dto 类型
+
 ## [v1.7.1] - 2026-06-13
 
 ### 变更

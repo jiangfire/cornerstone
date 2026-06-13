@@ -255,6 +255,9 @@ definitions:
     properties:
       config:
         $ref: '#/definitions/dto.FieldConfig'
+      deprecated:
+        example: false
+        type: boolean
       description:
         example: Current status
         type: string
@@ -385,7 +388,7 @@ definitions:
       has_more:
         example: true
         type: boolean
-      items:
+      records:
         items:
           $ref: '#/definitions/dto.RecordObject'
         type: array
@@ -395,9 +398,7 @@ definitions:
     type: object
   dto.RecordObject:
     properties:
-      data:
-        additionalProperties: true
-        type: object
+      data: {}
       id:
         example: rec_ghi012
         type: string

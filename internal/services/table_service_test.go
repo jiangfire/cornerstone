@@ -10,6 +10,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
 func setupTableTestEnv(t *testing.T) (*TableService, *gorm.DB, *models.Database, *models.Token) {
@@ -32,7 +33,7 @@ func setupTableTestEnv(t *testing.T) (*TableService, *gorm.DB, *models.Database,
 func TestTableService_CreateTable_Success(t *testing.T) {
 	svc, _, database, master := setupTableTestEnv(t)
 
-	table, err := svc.CreateTable(CreateTableRequest{
+	table, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID:  database.ID,
 		Name:        "orders",
 		Description: "order table",
@@ -48,13 +49,13 @@ func TestTableService_CreateTable_Success(t *testing.T) {
 func TestTableService_CreateTable_DuplicateName(t *testing.T) {
 	svc, _, database, master := setupTableTestEnv(t)
 
-	_, err := svc.CreateTable(CreateTableRequest{
+	_, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "orders",
 	}, master.ID)
 	require.NoError(t, err)
 
-	_, err = svc.CreateTable(CreateTableRequest{
+	_, err = svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "orders",
 	}, master.ID)
@@ -65,7 +66,7 @@ func TestTableService_CreateTable_DuplicateName(t *testing.T) {
 func TestTableService_CreateTable_NonexistentDatabase(t *testing.T) {
 	svc, _, _, master := setupTableTestEnv(t)
 
-	_, err := svc.CreateTable(CreateTableRequest{
+	_, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: "db_nonexistent",
 		Name:       "orders",
 	}, master.ID)
@@ -76,7 +77,7 @@ func TestTableService_CreateTable_NonexistentDatabase(t *testing.T) {
 func TestTableService_CreateTable_NameTooShort(t *testing.T) {
 	svc, _, database, master := setupTableTestEnv(t)
 
-	_, err := svc.CreateTable(CreateTableRequest{
+	_, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "a",
 	}, master.ID)
@@ -87,7 +88,7 @@ func TestTableService_CreateTable_NameTooShort(t *testing.T) {
 func TestTableService_CreateTable_NameTooLong(t *testing.T) {
 	svc, _, database, master := setupTableTestEnv(t)
 
-	_, err := svc.CreateTable(CreateTableRequest{
+	_, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       strings.Repeat("a", 256),
 	}, master.ID)
@@ -98,7 +99,7 @@ func TestTableService_CreateTable_NameTooLong(t *testing.T) {
 func TestTableService_CreateTable_NameStartsWithDigit(t *testing.T) {
 	svc, _, database, master := setupTableTestEnv(t)
 
-	_, err := svc.CreateTable(CreateTableRequest{
+	_, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "1table",
 	}, master.ID)
@@ -109,7 +110,7 @@ func TestTableService_CreateTable_NameStartsWithDigit(t *testing.T) {
 func TestTableService_CreateTable_NameWithInvalidChars(t *testing.T) {
 	svc, _, database, master := setupTableTestEnv(t)
 
-	_, err := svc.CreateTable(CreateTableRequest{
+	_, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "my table!",
 	}, master.ID)
@@ -124,13 +125,13 @@ func TestTableService_CreateTable_NameWithInvalidChars(t *testing.T) {
 func TestTableService_ListTables_ReturnsTables(t *testing.T) {
 	svc, _, database, master := setupTableTestEnv(t)
 
-	_, err := svc.CreateTable(CreateTableRequest{
+	_, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "orders",
 	}, master.ID)
 	require.NoError(t, err)
 
-	_, err = svc.CreateTable(CreateTableRequest{
+	_, err = svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "customers",
 	}, master.ID)
@@ -168,7 +169,7 @@ func TestTableService_ListTables_NoAccess(t *testing.T) {
 func TestTableService_GetTable_Success(t *testing.T) {
 	svc, _, database, master := setupTableTestEnv(t)
 
-	created, err := svc.CreateTable(CreateTableRequest{
+	created, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID:  database.ID,
 		Name:        "orders",
 		Description: "order table",
@@ -193,7 +194,7 @@ func TestTableService_GetTable_Nonexistent(t *testing.T) {
 func TestTableService_GetTable_NoAccess(t *testing.T) {
 	svc, db, database, _ := setupTableTestEnv(t)
 
-	created, err := svc.CreateTable(CreateTableRequest{
+	created, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "orders",
 	}, "user1")
@@ -219,14 +220,14 @@ func TestTableService_GetTable_NoAccess(t *testing.T) {
 func TestTableService_UpdateTable_Success(t *testing.T) {
 	svc, _, database, master := setupTableTestEnv(t)
 
-	created, err := svc.CreateTable(CreateTableRequest{
+	created, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID:  database.ID,
 		Name:        "orders",
 		Description: "old desc",
 	}, master.ID)
 	require.NoError(t, err)
 
-	updated, err := svc.UpdateTable(created.ID, UpdateTableRequest{
+	updated, err := svc.UpdateTable(created.ID, dto.TableUpdateRequest{
 		Name:        "orders_v2",
 		Description: "new desc",
 	}, master.ID)
@@ -238,19 +239,19 @@ func TestTableService_UpdateTable_Success(t *testing.T) {
 func TestTableService_UpdateTable_DuplicateName(t *testing.T) {
 	svc, _, database, master := setupTableTestEnv(t)
 
-	_, err := svc.CreateTable(CreateTableRequest{
+	_, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "orders",
 	}, master.ID)
 	require.NoError(t, err)
 
-	created2, err := svc.CreateTable(CreateTableRequest{
+	created2, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "customers",
 	}, master.ID)
 	require.NoError(t, err)
 
-	_, err = svc.UpdateTable(created2.ID, UpdateTableRequest{
+	_, err = svc.UpdateTable(created2.ID, dto.TableUpdateRequest{
 		Name: "orders",
 	}, master.ID)
 	assert.Error(t, err)
@@ -260,7 +261,7 @@ func TestTableService_UpdateTable_DuplicateName(t *testing.T) {
 func TestTableService_UpdateTable_Nonexistent(t *testing.T) {
 	svc, _, _, master := setupTableTestEnv(t)
 
-	_, err := svc.UpdateTable("tbl_nonexistent", UpdateTableRequest{
+	_, err := svc.UpdateTable("tbl_nonexistent", dto.TableUpdateRequest{
 		Name: "new_name",
 	}, master.ID)
 	assert.Error(t, err)
@@ -274,7 +275,7 @@ func TestTableService_UpdateTable_Nonexistent(t *testing.T) {
 func TestTableService_DeleteTable_Success(t *testing.T) {
 	svc, db, database, master := setupTableTestEnv(t)
 
-	created, err := svc.CreateTable(CreateTableRequest{
+	created, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "orders",
 	}, master.ID)
@@ -295,7 +296,7 @@ func TestTableService_DeleteTable_Success(t *testing.T) {
 func TestTableService_DeleteTable_SoftDeleteNameSuffix(t *testing.T) {
 	svc, db, database, master := setupTableTestEnv(t)
 
-	created, err := svc.CreateTable(CreateTableRequest{
+	created, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "orders",
 	}, master.ID)
@@ -321,7 +322,7 @@ func TestTableService_DeleteTable_Nonexistent(t *testing.T) {
 func TestTableService_DeleteTable_NoAccess(t *testing.T) {
 	svc, db, database, _ := setupTableTestEnv(t)
 
-	created, err := svc.CreateTable(CreateTableRequest{
+	created, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "orders",
 	}, "user1")
@@ -458,14 +459,14 @@ func TestCreateTable_SameNameDifferentDatabase(t *testing.T) {
 	master := &models.Token{Name: "master", Token: "cs_master_samenamedb", IsMaster: true, Scopes: "{}"}
 	require.NoError(t, db.Create(master).Error)
 
-	t1, err := svc.CreateTable(CreateTableRequest{
+	t1, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: db1.ID,
 		Name:       "orders",
 	}, master.ID)
 	require.NoError(t, err)
 	assert.NotEmpty(t, t1.ID)
 
-	t2, err := svc.CreateTable(CreateTableRequest{
+	t2, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: db2.ID,
 		Name:       "orders",
 	}, master.ID)
@@ -485,7 +486,7 @@ func TestListTables_EmptyDatabase(t *testing.T) {
 func TestGetTable_ResponseBodyFormat(t *testing.T) {
 	svc, _, database, master := setupTableTestEnv(t)
 
-	created, err := svc.CreateTable(CreateTableRequest{
+	created, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID:  database.ID,
 		Name:        "orders",
 		Description: "test table",
@@ -501,13 +502,13 @@ func TestGetTable_ResponseBodyFormat(t *testing.T) {
 func TestUpdateTable_SameNameAllowed(t *testing.T) {
 	svc, _, database, master := setupTableTestEnv(t)
 
-	created, err := svc.CreateTable(CreateTableRequest{
+	created, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "orders",
 	}, master.ID)
 	require.NoError(t, err)
 
-	updated, err := svc.UpdateTable(created.ID, UpdateTableRequest{
+	updated, err := svc.UpdateTable(created.ID, dto.TableUpdateRequest{
 		Name:        "orders",
 		Description: "updated description",
 	}, master.ID)
@@ -519,7 +520,7 @@ func TestUpdateTable_SameNameAllowed(t *testing.T) {
 func TestDeleteTable_BuildsDeletedName(t *testing.T) {
 	svc, db, database, master := setupTableTestEnv(t)
 
-	created, err := svc.CreateTable(CreateTableRequest{
+	created, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "orders",
 	}, master.ID)

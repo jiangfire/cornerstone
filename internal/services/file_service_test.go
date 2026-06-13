@@ -11,6 +11,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
 func createFileRecord(t *testing.T, db *gorm.DB, recordID, fieldID string) *models.File {
@@ -182,7 +183,7 @@ func TestRemoveAttachmentReferenceValue_OtherTypeReturnsFalse(t *testing.T) {
 
 func TestParseStoredFieldConfig_EmptyString(t *testing.T) {
 	config := parseStoredFieldConfig("")
-	assert.Equal(t, FieldConfig{}, config)
+	assert.Equal(t, dto.FieldConfig{}, config)
 }
 
 func TestParseStoredFieldConfig_ValidJSON(t *testing.T) {
@@ -195,7 +196,7 @@ func TestParseStoredFieldConfig_ValidJSON(t *testing.T) {
 
 func TestParseStoredFieldConfig_InvalidJSON(t *testing.T) {
 	config := parseStoredFieldConfig("{not valid json}")
-	assert.Equal(t, FieldConfig{}, config)
+	assert.Equal(t, dto.FieldConfig{}, config)
 }
 
 // --- File service CRUD ---

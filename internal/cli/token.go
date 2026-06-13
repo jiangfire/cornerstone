@@ -7,6 +7,7 @@ import (
 	appdb "github.com/jiangfire/cornerstone/internal/db"
 	"github.com/jiangfire/cornerstone/internal/services"
 	"github.com/jiangfire/cornerstone/pkg/db"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"github.com/spf13/cobra"
 )
 
@@ -65,7 +66,7 @@ var tokenCreateCmd = &cobra.Command{
 		}
 
 		svc := services.NewTokenService(db.DB())
-		token, err := svc.CreateToken(services.CreateTokenRequest{
+		token, err := svc.CreateToken(dto.TokenCreateRequest{
 			Name:      args[0],
 			Scopes:    scopes,
 			ExpiresAt: expiresAt,

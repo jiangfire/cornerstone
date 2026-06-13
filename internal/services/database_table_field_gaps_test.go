@@ -12,6 +12,7 @@ import (
 	"gorm.io/gorm"
 
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
 func createNonMasterToken(t *testing.T, db *gorm.DB) string {
@@ -31,7 +32,7 @@ func TestCreateDatabase_NonMasterDenied(t *testing.T) {
 	svc := NewDatabaseService(db)
 	viewerID := createNonMasterToken(t, db)
 
-	_, err := svc.CreateDatabase(CreateDBRequest{
+	_, err := svc.CreateDatabase(dto.DatabaseCreateRequest{
 		Name:        "testdb",
 		Description: "test",
 	}, viewerID)
@@ -43,7 +44,7 @@ func TestCreateDatabase_DescriptionTooLong(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)
 
-	_, err := svc.CreateDatabase(CreateDBRequest{
+	_, err := svc.CreateDatabase(dto.DatabaseCreateRequest{
 		Name:        "testdb",
 		Description: strings.Repeat("x", 501),
 	}, "user1")
@@ -55,9 +56,9 @@ func TestListDatabases_NonMasterEmptyScopes(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)
 
-	_, err := svc.CreateDatabase(CreateDBRequest{Name: "db1"}, "user1")
+	_, err := svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "db1"}, "user1")
 	require.NoError(t, err)
-	_, err = svc.CreateDatabase(CreateDBRequest{Name: "db2"}, "user1")
+	_, err = svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "db2"}, "user1")
 	require.NoError(t, err)
 
 	viewerID := createNonMasterToken(t, db)
@@ -71,7 +72,7 @@ func TestGetDatabase_NonMasterDenied(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)
 
-	database, err := svc.CreateDatabase(CreateDBRequest{Name: "secretdb"}, "user1")
+	database, err := svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "secretdb"}, "user1")
 	require.NoError(t, err)
 
 	viewerID := createNonMasterToken(t, db)
@@ -85,12 +86,12 @@ func TestUpdateDatabase_NonMasterDenied(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)
 
-	database, err := svc.CreateDatabase(CreateDBRequest{Name: "updatedb"}, "user1")
+	database, err := svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "updatedb"}, "user1")
 	require.NoError(t, err)
 
 	viewerID := createNonMasterToken(t, db)
 
-	_, err = svc.UpdateDatabase(database.ID, UpdateDBRequest{
+	_, err = svc.UpdateDatabase(database.ID, dto.DatabaseUpdateRequest{
 		Name:        "newname",
 		Description: "new desc",
 	}, viewerID)
@@ -102,12 +103,12 @@ func TestUpdateDatabase_DuplicateName(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)
 
-	db1, err := svc.CreateDatabase(CreateDBRequest{Name: "db_alpha"}, "user1")
+	db1, err := svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "db_alpha"}, "user1")
 	require.NoError(t, err)
-	_, err = svc.CreateDatabase(CreateDBRequest{Name: "db_beta"}, "user1")
+	_, err = svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "db_beta"}, "user1")
 	require.NoError(t, err)
 
-	_, err = svc.UpdateDatabase(db1.ID, UpdateDBRequest{
+	_, err = svc.UpdateDatabase(db1.ID, dto.DatabaseUpdateRequest{
 		Name: "db_beta",
 	}, "user1")
 	assert.Error(t, err)
@@ -118,7 +119,7 @@ func TestDeleteDatabase_NonMasterDenied(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)
 
-	database, err := svc.CreateDatabase(CreateDBRequest{Name: "del db"}, "user1")
+	database, err := svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "del db"}, "user1")
 	require.NoError(t, err)
 
 	viewerID := createNonMasterToken(t, db)
@@ -133,18 +134,13 @@ func TestCreateDatabaseWithTables_NonMasterDenied(t *testing.T) {
 	svc := NewDatabaseService(db)
 	viewerID := createNonMasterToken(t, db)
 
-	_, err := svc.CreateDatabaseWithTables(CreateDBWithTablesRequest{
+	_, err := svc.CreateDatabaseWithTables(dto.DatabaseBulkCreateRequest{
 		Name:        "bulkdb",
 		Description: "bulk create",
-		Tables: []CreateTableWithFieldsRequest{
+		Tables: []dto.BulkCreateTable{
 			{
 				Name: "orders",
-				Fields: []struct {
-					Name        string `json:"name" binding:"required"`
-					Type        string `json:"type" binding:"required"`
-					Description string `json:"description"`
-					Required    bool   `json:"required"`
-				}{
+				Fields: []dto.BulkCreateTableField{
 					{Name: "id", Type: "string", Required: true},
 				},
 			},
@@ -162,7 +158,7 @@ func TestCreateTable_NonMasterDenied(t *testing.T) {
 	svc := NewTableService(db)
 	viewerID := createNonMasterToken(t, db)
 
-	_, err := svc.CreateTable(CreateTableRequest{
+	_, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "denied_table",
 	}, viewerID)
@@ -179,13 +175,13 @@ func TestUpdateTable_InvalidName(t *testing.T) {
 	master := &models.Token{Name: "master", Token: "cs_master_updinv", IsMaster: true, Scopes: "{}"}
 	require.NoError(t, db.Create(master).Error)
 
-	table, err := svc.CreateTable(CreateTableRequest{
+	table, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "valid_table",
 	}, master.ID)
 	require.NoError(t, err)
 
-	_, err = svc.UpdateTable(table.ID, UpdateTableRequest{
+	_, err = svc.UpdateTable(table.ID, dto.TableUpdateRequest{
 		Name: "",
 	}, master.ID)
 	assert.Error(t, err)
@@ -201,12 +197,12 @@ func TestListTables_NonMasterWithScopes(t *testing.T) {
 	require.NoError(t, db.Create(master).Error)
 
 	svc := NewTableService(db)
-	_, err := svc.CreateTable(CreateTableRequest{
+	_, err := svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "tbl_one",
 	}, master.ID)
 	require.NoError(t, err)
-	_, err = svc.CreateTable(CreateTableRequest{
+	_, err = svc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: database.ID,
 		Name:       "tbl_two",
 	}, master.ID)
@@ -236,7 +232,7 @@ func TestCreateField_DescriptionTooLong(t *testing.T) {
 	master := &models.Token{Name: "master", Token: "cs_master_fielddesc", IsMaster: true, Scopes: "{}"}
 	require.NoError(t, db.Create(master).Error)
 
-	_, err := svc.CreateField(CreateFieldRequest{
+	_, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID:     table.ID,
 		Name:        "long_desc_field",
 		Type:        "string",
@@ -257,14 +253,14 @@ func TestUpdateField_DescriptionTooLong(t *testing.T) {
 	master := &models.Token{Name: "master", Token: "cs_master_upddesc", IsMaster: true, Scopes: "{}"}
 	require.NoError(t, db.Create(master).Error)
 
-	field, err := svc.CreateField(CreateFieldRequest{
+	field, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "status",
 		Type:    "string",
 	}, master.ID)
 	require.NoError(t, err)
 
-	_, err = svc.UpdateField(field.ID, UpdateFieldRequest{
+	_, err = svc.UpdateField(field.ID, dto.FieldUpdateRequest{
 		Name:        "status",
 		Type:        "string",
 		Description: strings.Repeat("y", 1001),
@@ -284,7 +280,7 @@ func TestUpdateField_WithOptionsString(t *testing.T) {
 	master := &models.Token{Name: "master", Token: "cs_master_opts", IsMaster: true, Scopes: "{}"}
 	require.NoError(t, db.Create(master).Error)
 
-	field, err := svc.CreateField(CreateFieldRequest{
+	field, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "priority",
 		Type:    "list",
@@ -292,14 +288,14 @@ func TestUpdateField_WithOptionsString(t *testing.T) {
 	}, master.ID)
 	require.NoError(t, err)
 
-	updated, err := svc.UpdateField(field.ID, UpdateFieldRequest{
+	updated, err := svc.UpdateField(field.ID, dto.FieldUpdateRequest{
 		Name:    "priority",
 		Type:    "list",
 		Options: "low, medium, high, critical",
 	}, master.ID)
 	require.NoError(t, err)
 
-	var config FieldConfig
+	var config dto.FieldConfig
 	require.NoError(t, json.Unmarshal([]byte(updated.Options), &config))
 	assert.Contains(t, config.Options, "low")
 	assert.Contains(t, config.Options, "medium")
@@ -318,14 +314,14 @@ func TestListFields_NonMasterSkipsHiddenFields(t *testing.T) {
 	master := &models.Token{Name: "master", Token: "cs_master_hidden", IsMaster: true, Scopes: "{}"}
 	require.NoError(t, db.Create(master).Error)
 
-	f1, err := svc.CreateField(CreateFieldRequest{
+	f1, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "visible_col",
 		Type:    "string",
 	}, master.ID)
 	require.NoError(t, err)
 
-	_, err = svc.CreateField(CreateFieldRequest{
+	_, err = svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "restricted_col",
 		Type:    "string",
@@ -392,14 +388,14 @@ func TestCheckFieldPermissions_BatchCheck(t *testing.T) {
 	master := &models.Token{Name: "master", Token: "cs_master_batch", IsMaster: true, Scopes: "{}"}
 	require.NoError(t, db.Create(master).Error)
 
-	f1, err := svc.CreateField(CreateFieldRequest{
+	f1, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "allowed_field",
 		Type:    "string",
 	}, master.ID)
 	require.NoError(t, err)
 
-	f2, err := svc.CreateField(CreateFieldRequest{
+	f2, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "blocked_field",
 		Type:    "string",
@@ -457,7 +453,7 @@ func TestUpdateDatabase_Nonexistent(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)
 
-	_, err := svc.UpdateDatabase("db_nonexistent", UpdateDBRequest{
+	_, err := svc.UpdateDatabase("db_nonexistent", dto.DatabaseUpdateRequest{
 		Name:        "newname",
 		Description: "desc",
 	}, "user1")
@@ -478,7 +474,7 @@ func TestCreateDatabase_InvalidName(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)
 
-	_, err := svc.CreateDatabase(CreateDBRequest{Name: "a"}, "user1")
+	_, err := svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "a"}, "user1")
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "database name validation failed")
 }
@@ -487,7 +483,7 @@ func TestCreateDatabase_SanitizesInput(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)
 
-	database, err := svc.CreateDatabase(CreateDBRequest{
+	database, err := svc.CreateDatabase(dto.DatabaseCreateRequest{
 		Name:        "<Test>DB\"",
 		Description: "a <b>desc</b>",
 	}, "user1")
@@ -500,8 +496,8 @@ func TestListDatabases_MasterSeesAll(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)
 
-	svc.CreateDatabase(CreateDBRequest{Name: "master_db1"}, "user1")
-	svc.CreateDatabase(CreateDBRequest{Name: "master_db2"}, "user1")
+	svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "master_db1"}, "user1")
+	svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "master_db2"}, "user1")
 
 	databases, err := svc.ListDatabases("user1")
 	require.NoError(t, err)
@@ -512,13 +508,13 @@ func TestUpdateDatabase_Success(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)
 
-	database, err := svc.CreateDatabase(CreateDBRequest{
+	database, err := svc.CreateDatabase(dto.DatabaseCreateRequest{
 		Name:        "upddb",
 		Description: "old",
 	}, "user1")
 	require.NoError(t, err)
 
-	updated, err := svc.UpdateDatabase(database.ID, UpdateDBRequest{
+	updated, err := svc.UpdateDatabase(database.ID, dto.DatabaseUpdateRequest{
 		Name:        "upddb_v2",
 		Description: "new",
 	}, "user1")
@@ -531,7 +527,7 @@ func TestDeleteDatabase_Success(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)
 
-	database, err := svc.CreateDatabase(CreateDBRequest{Name: "deldb"}, "user1")
+	database, err := svc.CreateDatabase(dto.DatabaseCreateRequest{Name: "deldb"}, "user1")
 	require.NoError(t, err)
 
 	err = svc.DeleteDatabase(database.ID, "user1")
@@ -546,10 +542,10 @@ func TestCreateDatabaseWithTables_EmptyTables(t *testing.T) {
 	db := setupTestDB(t)
 	svc := NewDatabaseService(db)
 
-	result, err := svc.CreateDatabaseWithTables(CreateDBWithTablesRequest{
+	result, err := svc.CreateDatabaseWithTables(dto.DatabaseBulkCreateRequest{
 		Name:        "empty_tables_db",
 		Description: "no tables",
-		Tables:      []CreateTableWithFieldsRequest{},
+		Tables:      []dto.BulkCreateTable{},
 	}, "user1")
 	require.NoError(t, err)
 	assert.NotNil(t, result.Database)
@@ -568,7 +564,7 @@ func TestCreateField_NonMasterNoAccess(t *testing.T) {
 
 	viewerID := createNonMasterToken(t, db)
 
-	_, err := svc.CreateField(CreateFieldRequest{
+	_, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "denied",
 		Type:    "string",
@@ -587,7 +583,7 @@ func TestCreateField_NameStartsWithDigit(t *testing.T) {
 	master := &models.Token{Name: "master", Token: "cs_master_digit", IsMaster: true, Scopes: "{}"}
 	require.NoError(t, db.Create(master).Error)
 
-	_, err := svc.CreateField(CreateFieldRequest{
+	_, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "1field",
 		Type:    "string",
@@ -604,7 +600,7 @@ func TestDeleteField_NonMasterDenied(t *testing.T) {
 	require.NoError(t, db.Create(table).Error)
 
 	svc := NewFieldService(db)
-	field, err := svc.CreateField(CreateFieldRequest{
+	field, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "to_delete",
 		Type:    "string",
@@ -625,7 +621,7 @@ func TestGetField_NonMasterDenied(t *testing.T) {
 	require.NoError(t, db.Create(table).Error)
 
 	svc := NewFieldService(db)
-	field, err := svc.CreateField(CreateFieldRequest{
+	field, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "secret_field",
 		Type:    "string",
@@ -646,7 +642,7 @@ func TestUpdateField_NonMasterDenied(t *testing.T) {
 	require.NoError(t, db.Create(table).Error)
 
 	svc := NewFieldService(db)
-	field, err := svc.CreateField(CreateFieldRequest{
+	field, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "upd_denied",
 		Type:    "string",
@@ -655,7 +651,7 @@ func TestUpdateField_NonMasterDenied(t *testing.T) {
 
 	viewerID := createNonMasterToken(t, db)
 
-	_, err = svc.UpdateField(field.ID, UpdateFieldRequest{
+	_, err = svc.UpdateField(field.ID, dto.FieldUpdateRequest{
 		Name: "upd_denied_new",
 		Type: "string",
 	}, viewerID)
@@ -735,7 +731,7 @@ func TestCreateField_WithFileField(t *testing.T) {
 	master := &models.Token{Name: "master", Token: "cs_master_filefld", IsMaster: true, Scopes: "{}"}
 	require.NoError(t, db.Create(master).Error)
 
-	field, err := svc.CreateField(CreateFieldRequest{
+	field, err := svc.CreateField(dto.FieldCreateRequest{
 		TableID: table.ID,
 		Name:    "attachment",
 		Type:    "file",

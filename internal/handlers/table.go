@@ -29,7 +29,7 @@ import (
 func CreateTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 
-	var req services.CreateTableRequest
+	var req dto.TableCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
@@ -72,11 +72,7 @@ func ListTables(c *gin.Context) {
 		return
 	}
 
-	items := make([]dto.TableObject, len(tables))
-	for i := range tables {
-		items[i] = tableObjectFromResponse(&tables[i])
-	}
-	dto.Success(c, dto.TableListData{Tables: items, Total: len(items)})
+	dto.Success(c, dto.TableListData{Tables: tables, Total: len(tables)})
 }
 
 // GetTable gets table details
@@ -106,7 +102,7 @@ func GetTable(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, tableObjectFromResponse(table))
+	dto.Success(c, table)
 }
 
 // UpdateTable updates a table
@@ -133,7 +129,7 @@ func UpdateTable(c *gin.Context) {
 	userID := middleware.GetTokenID(c)
 	tableID := c.Param("id")
 
-	var req services.UpdateTableRequest
+	var req dto.TableUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, 400, "invalid request: "+err.Error())
 		return

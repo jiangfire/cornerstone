@@ -10,6 +10,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/jiangfire/cornerstone/internal/testutil"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"gorm.io/gorm"
 )
 
@@ -109,7 +110,7 @@ func BenchmarkRecordServiceListRecords(b *testing.B) {
 	)
 
 	b.Run("no_filter", func(b *testing.B) {
-		req := QueryRequest{
+		req := dto.RecordListQueryRequest{
 			TableID: fixture.Table.ID,
 			Limit:   50,
 			Offset:  0,
@@ -152,7 +153,7 @@ func BenchmarkRecordServiceListRecords(b *testing.B) {
 	})
 
 	b.Run("structured_filter", func(b *testing.B) {
-		req := QueryRequest{
+		req := dto.RecordListQueryRequest{
 			TableID: fixture.Table.ID,
 			Limit:   50,
 			Offset:  0,
@@ -283,10 +284,10 @@ func benchmarkRecordResponseShaping(
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		responses := make([]RecordResponse, 0, len(records))
+		responses := make([]dto.RecordObject, 0, len(records))
 		for _, record := range records {
 			data := service.filterReadableData(fields, readableFields, parseRecordPayload(record.Data))
-			responses = append(responses, RecordResponse{
+			responses = append(responses, dto.RecordObject{
 				ID:      record.ID,
 				TableID: record.TableID,
 				Data:    data,

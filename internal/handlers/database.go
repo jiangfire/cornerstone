@@ -33,7 +33,7 @@ import (
 func CreateDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 
-	var req services.CreateDBRequest
+	var req dto.DatabaseCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
@@ -145,7 +145,7 @@ func UpdateDatabase(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 	dbID := c.Param("id")
 
-	var req services.UpdateDBRequest
+	var req dto.DatabaseUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
@@ -219,7 +219,7 @@ func DeleteDatabase(c *gin.Context) {
 func CreateDatabaseWithTables(c *gin.Context) {
 	tokenID := middleware.GetTokenID(c)
 
-	var req services.CreateDBWithTablesRequest
+	var req dto.DatabaseBulkCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
@@ -329,15 +329,6 @@ func buildBulkCreateData(result *services.CreateDBWithTablesResult) dto.BulkCrea
 	return data
 }
 
-func tableObjectFromResponse(t *services.TableResponse) dto.TableObject {
-	return dto.TableObject{
-		ID:          t.ID,
-		DatabaseID:  t.DatabaseID,
-		Name:        t.Name,
-		Description: t.Description,
-	}
-}
-
 func tableObjectFromModel(t *models.Table) dto.TableObject {
 	return dto.TableObject{
 		ID:          t.ID,
@@ -348,18 +339,6 @@ func tableObjectFromModel(t *models.Table) dto.TableObject {
 }
 
 func fieldObjectFromModel(f *models.Field) dto.FieldObject {
-	return dto.FieldObject{
-		ID:          f.ID,
-		TableID:     f.TableID,
-		Name:        f.Name,
-		Type:        f.Type,
-		Description: f.Description,
-		Required:    f.Required,
-		Options:     f.Options,
-	}
-}
-
-func fieldObjectFromResponse(f *services.FieldResponse) dto.FieldObject {
 	return dto.FieldObject{
 		ID:          f.ID,
 		TableID:     f.TableID,

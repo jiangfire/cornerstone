@@ -9,6 +9,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"gorm.io/gorm"
 )
 
@@ -52,24 +53,6 @@ func (s *TableService) ResolveTable(databaseIdentifier, tableIdentifier string) 
 		return nil, errors.New("table not found")
 	}
 	return nil, fmt.Errorf("table query failed: %w", err)
-}
-
-type CreateTableRequest struct {
-	DatabaseID  string `json:"database_id" binding:"required"`
-	Name        string `json:"name" binding:"required,min=2,max=255"`
-	Description string `json:"description" binding:"max=500"`
-}
-
-type UpdateTableRequest struct {
-	Name        string `json:"name" binding:"required,min=2,max=255"`
-	Description string `json:"description" binding:"max=500"`
-}
-
-type TableResponse struct {
-	ID          string `json:"id"`
-	DatabaseID  string `json:"database_id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
 }
 
 func buildDeletedTableName(name, tableID string) string {
@@ -143,7 +126,7 @@ func sanitizeTableInput(name, description string) (string, string) {
 	return name, description
 }
 
-func (s *TableService) CreateTable(req CreateTableRequest, userID string) (*models.Table, error) {
+func (s *TableService) CreateTable(req dto.TableCreateRequest, userID string) (*models.Table, error) {
 	// Resolve database identifier (supports ID or name)
 	dbService := NewDatabaseService(s.db)
 	database, err := dbService.ResolveDatabase(req.DatabaseID)
@@ -199,7 +182,7 @@ func (s *TableService) CreateTable(req CreateTableRequest, userID string) (*mode
 	return &table, nil
 }
 
-func (s *TableService) ListTables(dbID, userID string) ([]TableResponse, error) {
+func (s *TableService) ListTables(dbID, userID string) ([]dto.TableObject, error) {
 	// Resolve database identifier (supports ID or name)
 	dbService := NewDatabaseService(s.db)
 	database, err := dbService.ResolveDatabase(dbID)
@@ -221,9 +204,9 @@ func (s *TableService) ListTables(dbID, userID string) ([]TableResponse, error) 
 		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 
-	result := make([]TableResponse, len(tables))
+	result := make([]dto.TableObject, len(tables))
 	for i, t := range tables {
-		result[i] = TableResponse{
+		result[i] = dto.TableObject{
 			ID:          t.ID,
 			DatabaseID:  t.DatabaseID,
 			Name:        t.Name,
@@ -234,7 +217,7 @@ func (s *TableService) ListTables(dbID, userID string) ([]TableResponse, error) 
 	return result, nil
 }
 
-func (s *TableService) GetTable(tableID, userID string) (*TableResponse, error) {
+func (s *TableService) GetTable(tableID, userID string) (*dto.TableObject, error) {
 	// Resolve table identifier (supports ID or name)
 	table, err := s.resolveTable(tableID)
 	if err != nil {
@@ -249,7 +232,7 @@ func (s *TableService) GetTable(tableID, userID string) (*TableResponse, error) 
 		return nil, errors.New("permission denied: cannot access this table")
 	}
 
-	return &TableResponse{
+	return &dto.TableObject{
 		ID:          table.ID,
 		DatabaseID:  table.DatabaseID,
 		Name:        table.Name,
@@ -257,7 +240,7 @@ func (s *TableService) GetTable(tableID, userID string) (*TableResponse, error) 
 	}, nil
 }
 
-func (s *TableService) UpdateTable(tableID string, req UpdateTableRequest, userID string) (*models.Table, error) {
+func (s *TableService) UpdateTable(tableID string, req dto.TableUpdateRequest, userID string) (*models.Table, error) {
 	// Resolve table identifier (supports ID or name)
 	table, err := s.resolveTable(tableID)
 	if err != nil {

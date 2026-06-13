@@ -1,8 +1,6 @@
 package handlers
 
 import (
-	"time"
-
 	"github.com/gin-gonic/gin"
 	"github.com/jiangfire/cornerstone/internal/middleware"
 	"github.com/jiangfire/cornerstone/internal/services"
@@ -37,11 +35,7 @@ func ListTokens(c *gin.Context) {
 		return
 	}
 
-	items := make([]dto.TokenObject, len(tokens))
-	for i := range tokens {
-		items[i] = tokenObjectFromResponse(&tokens[i])
-	}
-	dto.Success(c, dto.TokenListData{Tokens: items, Total: len(items)})
+	dto.Success(c, dto.TokenListData{Tokens: tokens, Total: len(tokens)})
 }
 
 // CreateToken creates a token (requires master token)
@@ -69,7 +63,7 @@ func ListTokens(c *gin.Context) {
 // @Failure      500  {object}  dto.ErrorResponse
 // @Router       /api/v1/tokens [post]
 func CreateToken(c *gin.Context) {
-	var req services.CreateTokenRequest
+	var req dto.TokenCreateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
@@ -146,10 +140,7 @@ func DeleteToken(c *gin.Context) {
 func UpdateToken(c *gin.Context) {
 	targetID := c.Param("id")
 
-	var req struct {
-		Scopes    string     `json:"scopes"`
-		ExpiresAt *time.Time `json:"expires_at"`
-	}
+	var req dto.TokenUpdateRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		dto.Error(c, 400, "invalid request: "+err.Error())
 		return
@@ -162,15 +153,5 @@ func UpdateToken(c *gin.Context) {
 		return
 	}
 
-	dto.Success(c, tokenObjectFromResponse(token))
-}
-
-func tokenObjectFromResponse(t *services.TokenResponse) dto.TokenObject {
-	return dto.TokenObject{
-		ID:        t.ID,
-		Name:      t.Name,
-		IsMaster:  t.IsMaster,
-		Scopes:    t.Scopes,
-		ExpiresAt: t.ExpiresAt,
-	}
+	dto.Success(c, token)
 }

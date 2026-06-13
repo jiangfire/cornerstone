@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"gorm.io/gorm"
 )
 
@@ -39,17 +40,6 @@ type UploadFileRequest struct {
 	RecordID string
 	FieldID  string
 	File     *multipart.FileHeader
-}
-
-// FileResponse is the file API response
-type FileResponse struct {
-	ID         string `json:"id"`
-	RecordID   string `json:"record_id"`
-	FieldID    string `json:"field_id"`
-	FileName   string `json:"file_name"`
-	FileSize   int64  `json:"file_size"`
-	FileType   string `json:"file_type"`
-	StorageURL string `json:"storage_url"`
 }
 
 func (s *FileService) getAccessibleRecord(recordID, userID string, requiredRoles []string) (*models.Record, error) {
@@ -115,12 +105,12 @@ func (s *FileService) getMaxUploadSizeBytes() int64 {
 	return int64(50 * 1024 * 1024)
 }
 
-func parseStoredFieldConfig(options string) FieldConfig {
+func parseStoredFieldConfig(options string) dto.FieldConfig {
 	if options == "" {
-		return FieldConfig{}
+		return dto.FieldConfig{}
 	}
 
-	var config FieldConfig
+	var config dto.FieldConfig
 	_ = json.Unmarshal([]byte(options), &config)
 	return config
 }

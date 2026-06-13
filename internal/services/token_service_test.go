@@ -11,6 +11,7 @@ import (
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/jiangfire/cornerstone/internal/testutil"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
 func setupTokenTestDB(t *testing.T) *gorm.DB {
@@ -21,7 +22,7 @@ func TestTokenService_CreateToken(t *testing.T) {
 	d := setupTokenTestDB(t)
 	svc := NewTokenService(d)
 
-	token, err := svc.CreateToken(CreateTokenRequest{
+	token, err := svc.CreateToken(dto.TokenCreateRequest{
 		Name:   "test-token",
 		Scopes: `{"databases":{},"tables":{}}`,
 	})
@@ -39,7 +40,7 @@ func TestTokenService_CreateTokenWithExpiry(t *testing.T) {
 	svc := NewTokenService(d)
 
 	expiresAt := time.Now().Add(24 * time.Hour)
-	token, err := svc.CreateToken(CreateTokenRequest{
+	token, err := svc.CreateToken(dto.TokenCreateRequest{
 		Name:      "expiring",
 		Scopes:    "{}",
 		ExpiresAt: &expiresAt,
@@ -259,7 +260,7 @@ func TestTokenService_CreateToken_GeneratesID(t *testing.T) {
 	d := setupTokenTestDB(t)
 	svc := NewTokenService(d)
 
-	token, err := svc.CreateToken(CreateTokenRequest{
+	token, err := svc.CreateToken(dto.TokenCreateRequest{
 		Name:   "auto-id",
 		Scopes: "{}",
 	})
@@ -271,7 +272,7 @@ func TestTokenService_CreateToken_GeneratesTokenValue(t *testing.T) {
 	d := setupTokenTestDB(t)
 	svc := NewTokenService(d)
 
-	token, err := svc.CreateToken(CreateTokenRequest{
+	token, err := svc.CreateToken(dto.TokenCreateRequest{
 		Name:   "auto-value",
 		Scopes: "{}",
 	})

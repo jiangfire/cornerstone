@@ -7,6 +7,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"gorm.io/gorm"
 )
 
@@ -20,34 +21,8 @@ func NewTokenService(db *gorm.DB) *TokenService {
 	return &TokenService{db: db}
 }
 
-// CreateTokenRequest is the request to create a token
-type CreateTokenRequest struct {
-	Name      string     `json:"name" binding:"required,min=1,max=255"`
-	Scopes    string     `json:"scopes"`
-	ExpiresAt *time.Time `json:"expires_at"`
-}
-
-// TokenResponse is the DTO returned by token operations (no timestamps).
-type TokenResponse struct {
-	ID        string     `json:"id"`
-	Name      string     `json:"name"`
-	IsMaster  bool       `json:"is_master"`
-	Scopes    string     `json:"scopes"`
-	ExpiresAt *time.Time `json:"expires_at,omitempty"`
-}
-
-func tokenToResponse(t *models.Token) TokenResponse {
-	return TokenResponse{
-		ID:        t.ID,
-		Name:      t.Name,
-		IsMaster:  t.IsMaster,
-		Scopes:    t.Scopes,
-		ExpiresAt: t.ExpiresAt,
-	}
-}
-
 // CreateToken creates a new token (requires master token)
-func (s *TokenService) CreateToken(req CreateTokenRequest) (*models.Token, error) {
+func (s *TokenService) CreateToken(req dto.TokenCreateRequest) (*models.Token, error) {
 	token := &models.Token{
 		Name:      req.Name,
 		IsMaster:  false,
@@ -63,7 +38,7 @@ func (s *TokenService) CreateToken(req CreateTokenRequest) (*models.Token, error
 
 // ListTokens lists tokens
 // Master token sees all; regular tokens see only themselves
-func (s *TokenService) ListTokens(tokenID string, isMaster bool) ([]TokenResponse, error) {
+func (s *TokenService) ListTokens(tokenID string, isMaster bool) ([]dto.TokenObject, error) {
 	var tokens []models.Token
 	query := s.db.Where("is_master = ?", false).Order("created_at DESC")
 
@@ -75,9 +50,15 @@ func (s *TokenService) ListTokens(tokenID string, isMaster bool) ([]TokenRespons
 		return nil, fmt.Errorf("failed to list tokens: %w", err)
 	}
 
-	result := make([]TokenResponse, len(tokens))
+	result := make([]dto.TokenObject, len(tokens))
 	for i := range tokens {
-		result[i] = tokenToResponse(&tokens[i])
+		result[i] = dto.TokenObject{
+			ID:        tokens[i].ID,
+			Name:      tokens[i].Name,
+			IsMaster:  tokens[i].IsMaster,
+			Scopes:    tokens[i].Scopes,
+			ExpiresAt: tokens[i].ExpiresAt,
+		}
 	}
 	return result, nil
 }
@@ -109,7 +90,7 @@ func (s *TokenService) DeleteToken(tokenID string, targetID string, isMaster boo
 }
 
 // UpdateToken updates token permissions (requires master token)
-func (s *TokenService) UpdateToken(targetID string, scopes string, expiresAt *time.Time) (*TokenResponse, error) {
+func (s *TokenService) UpdateToken(targetID string, scopes string, expiresAt *time.Time) (*dto.TokenObject, error) {
 	var t models.Token
 	if err := s.db.Where("id = ?", targetID).First(&t).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -135,6 +116,12 @@ func (s *TokenService) UpdateToken(targetID string, scopes string, expiresAt *ti
 		return nil, fmt.Errorf("failed to query updated token: %w", err)
 	}
 	authz.InvalidateTokenCache(targetID)
-	resp := tokenToResponse(&t)
+	resp := dto.TokenObject{
+		ID:        t.ID,
+		Name:      t.Name,
+		IsMaster:  t.IsMaster,
+		Scopes:    t.Scopes,
+		ExpiresAt: t.ExpiresAt,
+	}
 	return &resp, nil
 }

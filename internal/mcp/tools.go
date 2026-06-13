@@ -8,6 +8,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/jiangfire/cornerstone/internal/services"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"github.com/jiangfire/cornerstone/pkg/query"
 	"gorm.io/gorm"
 )
@@ -763,7 +764,7 @@ func (s *ToolService) callGetTableSchema(ctx context.Context, args json.RawMessa
 // --- Database tools ---
 
 func (s *ToolService) callCreateDatabase(args json.RawMessage) (*ToolCallResult, error) {
-	var req services.CreateDBRequest
+	var req dto.DatabaseCreateRequest
 	if err := json.Unmarshal(args, &req); err != nil {
 		return nil, fmt.Errorf("invalid create_database arguments: %w", err)
 	}
@@ -831,7 +832,7 @@ func (s *ToolService) callUpdateDatabase(args json.RawMessage) (*ToolCallResult,
 		return nil, fmt.Errorf("invalid update_database arguments: %w", err)
 	}
 
-	database, err := s.databaseService.UpdateDatabase(req.DatabaseID, services.UpdateDBRequest{
+	database, err := s.databaseService.UpdateDatabase(req.DatabaseID, dto.DatabaseUpdateRequest{
 		Name:        req.Name,
 		Description: req.Description,
 	}, s.userID)
@@ -867,7 +868,7 @@ func (s *ToolService) callDeleteDatabase(args json.RawMessage) (*ToolCallResult,
 }
 
 func (s *ToolService) callCreateDatabaseWithTables(args json.RawMessage) (*ToolCallResult, error) {
-	var req services.CreateDBWithTablesRequest
+	var req dto.DatabaseBulkCreateRequest
 	if err := json.Unmarshal(args, &req); err != nil {
 		return nil, fmt.Errorf("invalid create_database_with_tables arguments: %w", err)
 	}
@@ -920,7 +921,7 @@ func (s *ToolService) callCreateTable(args json.RawMessage) (*ToolCallResult, er
 	}
 
 	tableService := services.NewTableService(s.db)
-	table, err := tableService.CreateTable(services.CreateTableRequest{
+	table, err := tableService.CreateTable(dto.TableCreateRequest{
 		DatabaseID:  req.DatabaseID,
 		Name:        req.Name,
 		Description: req.Description,
@@ -933,7 +934,7 @@ func (s *ToolService) callCreateTable(args json.RawMessage) (*ToolCallResult, er
 	var createdFields []map[string]interface{}
 	var fieldErrors []map[string]interface{}
 	for _, f := range req.Fields {
-		field, err := fieldService.CreateField(services.CreateFieldRequest{
+		field, err := fieldService.CreateField(dto.FieldCreateRequest{
 			TableID:     table.ID,
 			Name:        f.Name,
 			Type:        f.Type,
@@ -1021,7 +1022,7 @@ func (s *ToolService) callUpdateTable(args json.RawMessage) (*ToolCallResult, er
 	}
 
 	tableService := services.NewTableService(s.db)
-	table, err := tableService.UpdateTable(req.TableID, services.UpdateTableRequest{
+	table, err := tableService.UpdateTable(req.TableID, dto.TableUpdateRequest{
 		Name:        req.Name,
 		Description: req.Description,
 	}, s.userID)
@@ -1072,7 +1073,7 @@ func (s *ToolService) callCreateField(args json.RawMessage) (*ToolCallResult, er
 	}
 
 	fieldService := services.NewFieldService(s.db)
-	field, err := fieldService.CreateField(services.CreateFieldRequest{
+	field, err := fieldService.CreateField(dto.FieldCreateRequest{
 		TableID:     req.TableID,
 		Name:        req.Name,
 		Type:        req.Type,
@@ -1122,7 +1123,7 @@ func (s *ToolService) callUpdateField(args json.RawMessage) (*ToolCallResult, er
 	}
 
 	fieldService := services.NewFieldService(s.db)
-	field, err := fieldService.UpdateField(req.FieldID, services.UpdateFieldRequest{
+	field, err := fieldService.UpdateField(req.FieldID, dto.FieldUpdateRequest{
 		Name:        req.Name,
 		Type:        req.Type,
 		Description: req.Description,
@@ -1172,7 +1173,7 @@ func (s *ToolService) callInsertRecord(args json.RawMessage) (*ToolCallResult, e
 	}
 
 	recordService := services.NewRecordService(s.db)
-	record, err := recordService.CreateRecord(services.CreateRecordRequest{
+	record, err := recordService.CreateRecord(dto.RecordCreateRequest{
 		TableID: req.TableID,
 		Data:    req.Data,
 	}, s.userID)
@@ -1205,7 +1206,7 @@ func (s *ToolService) callListRecords(args json.RawMessage) (*ToolCallResult, er
 	}
 
 	recordService := services.NewRecordService(s.db)
-	result, err := recordService.ListRecords(services.QueryRequest{
+	result, err := recordService.ListRecords(dto.RecordListQueryRequest{
 		TableID: req.TableID,
 		Limit:   req.Limit,
 		Offset:  req.Offset,
@@ -1251,7 +1252,7 @@ func (s *ToolService) callUpdateRecord(args json.RawMessage) (*ToolCallResult, e
 	}
 
 	recordService := services.NewRecordService(s.db)
-	record, err := recordService.UpdateRecord(req.RecordID, services.UpdateRecordRequest{
+	record, err := recordService.UpdateRecord(req.RecordID, dto.RecordUpdateRequest{
 		Data: req.Data,
 	}, s.userID)
 	if err != nil {
@@ -1304,7 +1305,7 @@ func (s *ToolService) callBatchInsertRecords(args json.RawMessage) (*ToolCallRes
 	var errors []map[string]interface{}
 
 	for i, data := range req.Records {
-		record, err := recordService.CreateRecord(services.CreateRecordRequest{
+		record, err := recordService.CreateRecord(dto.RecordCreateRequest{
 			TableID: req.TableID,
 			Data:    data,
 		}, s.userID)

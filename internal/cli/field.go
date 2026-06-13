@@ -5,6 +5,7 @@ import (
 
 	appdb "github.com/jiangfire/cornerstone/internal/db"
 	"github.com/jiangfire/cornerstone/internal/services"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"github.com/jiangfire/cornerstone/pkg/db"
 	"github.com/spf13/cobra"
 )
@@ -58,7 +59,7 @@ var fieldCreateCmd = &cobra.Command{
 			return err
 		}
 		svc := services.NewFieldService(db.DB())
-		field, err := svc.CreateField(services.CreateFieldRequest{
+		field, err := svc.CreateField(dto.FieldCreateRequest{
 			TableID:     args[0],
 			Name:        args[1],
 			Type:        args[2],
@@ -116,7 +117,7 @@ var fieldUpdateCmd = &cobra.Command{
 			return err
 		}
 		svc := services.NewFieldService(db.DB())
-		field, err := svc.UpdateField(args[0], services.UpdateFieldRequest{
+		field, err := svc.UpdateField(args[0], dto.FieldUpdateRequest{
 			Name:        name,
 			Type:        fieldType,
 			Description: desc,

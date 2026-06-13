@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"time"
 
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"github.com/jiangfire/cornerstone/pkg/query"
 	"gorm.io/gorm"
 )
@@ -126,7 +127,7 @@ func executeCreateDatabase(db *gorm.DB, tokenID string, args map[string]any) (an
 	}
 	description, _ := args["description"].(string)
 
-	database, err := NewDatabaseService(db).CreateDatabase(CreateDBRequest{
+	database, err := NewDatabaseService(db).CreateDatabase(dto.DatabaseCreateRequest{
 		Name:        name,
 		Description: description,
 	}, tokenID)
@@ -150,7 +151,7 @@ func executeCreateTable(db *gorm.DB, tokenID string, args map[string]any) (any, 
 	}
 	description, _ := args["description"].(string)
 
-	table, err := NewTableService(db).CreateTable(CreateTableRequest{
+	table, err := NewTableService(db).CreateTable(dto.TableCreateRequest{
 		DatabaseID:  databaseID,
 		Name:        name,
 		Description: description,
@@ -178,7 +179,7 @@ func executeCreateTable(db *gorm.DB, tokenID string, args map[string]any) (any, 
 					continue
 				}
 
-				if _, err := fieldService.CreateField(CreateFieldRequest{
+				if _, err := fieldService.CreateField(dto.FieldCreateRequest{
 					TableID:     table.ID,
 					Name:        fieldName,
 					Type:        fieldType,
@@ -213,7 +214,7 @@ func executeCreateField(db *gorm.DB, tokenID string, args map[string]any) (any, 
 	description, _ := args["description"].(string)
 	required, _ := args["required"].(bool)
 
-	field, err := NewFieldService(db).CreateField(CreateFieldRequest{
+	field, err := NewFieldService(db).CreateField(dto.FieldCreateRequest{
 		TableID:     tableID,
 		Name:        name,
 		Type:        fieldType,
@@ -290,7 +291,7 @@ func executeInsertRecords(db *gorm.DB, tokenID string, args map[string]any) (any
 		if !ok {
 			continue
 		}
-		if _, err := recordService.CreateRecord(CreateRecordRequest{
+		if _, err := recordService.CreateRecord(dto.RecordCreateRequest{
 			TableID: tableID,
 			Data:    dataMap,
 		}, tokenID); err != nil {
@@ -315,7 +316,7 @@ func executeUpdateRecord(db *gorm.DB, tokenID string, args map[string]any) (any,
 		return nil, fmt.Errorf("data required")
 	}
 
-	record, err := NewRecordService(db).UpdateRecord(recordID, UpdateRecordRequest{
+	record, err := NewRecordService(db).UpdateRecord(recordID, dto.RecordUpdateRequest{
 		Data: dataRaw,
 	}, tokenID)
 	if err != nil {

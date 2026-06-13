@@ -3370,6 +3370,10 @@ const docTemplate = `{
                 "config": {
                     "$ref": "#/definitions/dto.FieldConfig"
                 },
+                "deprecated": {
+                    "type": "boolean",
+                    "example": false
+                },
                 "description": {
                     "type": "string",
                     "example": "Current status"
@@ -3551,7 +3555,7 @@ const docTemplate = `{
                     "type": "boolean",
                     "example": true
                 },
-                "items": {
+                "records": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/dto.RecordObject"
@@ -3566,10 +3570,7 @@ const docTemplate = `{
         "dto.RecordObject": {
             "type": "object",
             "properties": {
-                "data": {
-                    "type": "object",
-                    "additionalProperties": true
-                },
+                "data": {},
                 "id": {
                     "type": "string",
                     "example": "rec_ghi012"

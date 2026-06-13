@@ -12,6 +12,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
 func createTestTableWithFields(t *testing.T, db_ *gorm.DB, userID, dbName, tableName string, fieldDefs ...struct {
@@ -47,7 +48,7 @@ func TestCreateRecord_Success(t *testing.T) {
 		}{"name", "string", true},
 	)
 
-	record, err := s.CreateRecord(CreateRecordRequest{
+	record, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "hello"},
 	}, "user1")
@@ -68,7 +69,7 @@ func TestCreateRecord_TableNotExist(t *testing.T) {
 	db := setupTestDB(t)
 	s := NewRecordService(db)
 
-	_, err := s.CreateRecord(CreateRecordRequest{
+	_, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: "tbl_nonexistent",
 		Data:    map[string]any{"name": "test"},
 	}, "user1")
@@ -88,7 +89,7 @@ func TestCreateRecord_UnknownField(t *testing.T) {
 		}{"title", "string", false},
 	)
 
-	_, err := s.CreateRecord(CreateRecordRequest{
+	_, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"nonexistent_field": "value"},
 	}, "user1")
@@ -108,7 +109,7 @@ func TestCreateRecord_RequiredFieldMissing(t *testing.T) {
 		}{"title", "string", true},
 	)
 
-	_, err := s.CreateRecord(CreateRecordRequest{
+	_, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{},
 	}, "user1")
@@ -128,7 +129,7 @@ func TestCreateRecord_FieldByID(t *testing.T) {
 		}{"title", "string", false},
 	)
 
-	record, err := s.CreateRecord(CreateRecordRequest{
+	record, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{fields[0].ID: "via-id"},
 	}, "user1")
@@ -151,13 +152,13 @@ func TestUpdateRecord_Success(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	record, err := s.CreateRecord(CreateRecordRequest{
+	record, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "original"},
 	}, "user1")
 	require.NoError(t, err)
 
-	updated, err := s.UpdateRecord(record.ID, UpdateRecordRequest{
+	updated, err := s.UpdateRecord(record.ID, dto.RecordUpdateRequest{
 		Data: map[string]any{"name": "updated"},
 	}, "user1")
 	require.NoError(t, err)
@@ -185,13 +186,13 @@ func TestUpdateRecord_ReadOnlyFieldReject(t *testing.T) {
 		}{"age", "number", false},
 	)
 
-	record, err := s.CreateRecord(CreateRecordRequest{
+	record, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "test", "age": float64(10)},
 	}, "user1")
 	require.NoError(t, err)
 
-	updated, err := s.UpdateRecord(record.ID, UpdateRecordRequest{
+	updated, err := s.UpdateRecord(record.ID, dto.RecordUpdateRequest{
 		Data: map[string]any{"age": float64(20)},
 	}, "user1")
 	require.NoError(t, err)
@@ -213,12 +214,12 @@ func TestUpdateRecord_OptimisticLock(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	record, _ := s.CreateRecord(CreateRecordRequest{
+	record, _ := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "original"},
 	}, "user1")
 
-	_, err := s.UpdateRecord(record.ID, UpdateRecordRequest{
+	_, err := s.UpdateRecord(record.ID, dto.RecordUpdateRequest{
 		Data:    map[string]any{"name": "v2"},
 		Version: 999,
 	}, "user1")
@@ -243,12 +244,12 @@ func TestUpdateRecord_MergePartial(t *testing.T) {
 		}{"status", "string", false},
 	)
 
-	record, _ := s.CreateRecord(CreateRecordRequest{
+	record, _ := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "alice", "status": "active"},
 	}, "user1")
 
-	updated, err := s.UpdateRecord(record.ID, UpdateRecordRequest{
+	updated, err := s.UpdateRecord(record.ID, dto.RecordUpdateRequest{
 		Data: map[string]any{"status": "inactive"},
 	}, "user1")
 	require.NoError(t, err)
@@ -272,14 +273,14 @@ func TestListRecords_NoFilter(t *testing.T) {
 	)
 
 	for i := 0; i < 5; i++ {
-		_, err := s.CreateRecord(CreateRecordRequest{
+		_, err := s.CreateRecord(dto.RecordCreateRequest{
 			TableID: tbl.ID,
 			Data:    map[string]any{"name": "item"},
 		}, "user1")
 		require.NoError(t, err)
 	}
 
-	result, err := s.ListRecords(QueryRequest{TableID: tbl.ID, Limit: 3}, "user1")
+	result, err := s.ListRecords(dto.RecordListQueryRequest{TableID: tbl.ID, Limit: 3}, "user1")
 	require.NoError(t, err)
 	assert.Equal(t, int64(5), result.Total)
 	assert.Len(t, result.Records, 3)
@@ -298,17 +299,17 @@ func TestListRecords_StructuredFilter(t *testing.T) {
 		}{"status", "string", false},
 	)
 
-	_, err := s.CreateRecord(CreateRecordRequest{
+	_, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"status": "active"},
 	}, "user1")
 	require.NoError(t, err)
-	_, err = s.CreateRecord(CreateRecordRequest{
+	_, err = s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"status": "inactive"},
 	}, "user1")
 	require.NoError(t, err)
 
 	filter := `{"status":"active"}`
-	result, err := s.ListRecords(QueryRequest{
+	result, err := s.ListRecords(dto.RecordListQueryRequest{
 		TableID: tbl.ID, Limit: 10, Filter: filter,
 	}, "user1")
 	require.NoError(t, err)
@@ -328,13 +329,13 @@ func TestListRecords_StructuredFilterHiddenField(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	_, err := s.CreateRecord(CreateRecordRequest{
+	_, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"name": "test"},
 	}, "user1")
 	require.NoError(t, err)
 
 	filter := `{"secret_field":"value"}`
-	result, err := s.ListRecords(QueryRequest{
+	result, err := s.ListRecords(dto.RecordListQueryRequest{
 		TableID: tbl.ID, Limit: 10, Filter: filter,
 	}, "user1")
 	require.NoError(t, err)
@@ -354,16 +355,16 @@ func TestListRecords_KeywordFilter(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	_, err := s.CreateRecord(CreateRecordRequest{
+	_, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"name": "apple"},
 	}, "user1")
 	require.NoError(t, err)
-	_, err = s.CreateRecord(CreateRecordRequest{
+	_, err = s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"name": "banana"},
 	}, "user1")
 	require.NoError(t, err)
 
-	result, err := s.ListRecords(QueryRequest{
+	result, err := s.ListRecords(dto.RecordListQueryRequest{
 		TableID: tbl.ID, Limit: 10, Filter: "apple",
 	}, "user1")
 	require.NoError(t, err)
@@ -383,23 +384,23 @@ func TestListRecords_Pagination(t *testing.T) {
 	)
 
 	for i := 0; i < 25; i++ {
-		_, err := s.CreateRecord(CreateRecordRequest{
+		_, err := s.CreateRecord(dto.RecordCreateRequest{
 			TableID: tbl.ID, Data: map[string]any{"name": "item"},
 		}, "user1")
 		require.NoError(t, err)
 	}
 
-	page1, err := s.ListRecords(QueryRequest{TableID: tbl.ID, Limit: 10, Offset: 0}, "user1")
+	page1, err := s.ListRecords(dto.RecordListQueryRequest{TableID: tbl.ID, Limit: 10, Offset: 0}, "user1")
 	require.NoError(t, err)
 	assert.Len(t, page1.Records, 10)
 	assert.True(t, page1.HasMore)
 
-	page2, err := s.ListRecords(QueryRequest{TableID: tbl.ID, Limit: 10, Offset: 10}, "user1")
+	page2, err := s.ListRecords(dto.RecordListQueryRequest{TableID: tbl.ID, Limit: 10, Offset: 10}, "user1")
 	require.NoError(t, err)
 	assert.Len(t, page2.Records, 10)
 	assert.True(t, page2.HasMore)
 
-	page3, err := s.ListRecords(QueryRequest{TableID: tbl.ID, Limit: 10, Offset: 20}, "user1")
+	page3, err := s.ListRecords(dto.RecordListQueryRequest{TableID: tbl.ID, Limit: 10, Offset: 20}, "user1")
 	require.NoError(t, err)
 	assert.Len(t, page3.Records, 5)
 	assert.False(t, page3.HasMore)
@@ -417,7 +418,7 @@ func TestGetRecord_Success(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	created, _ := s.CreateRecord(CreateRecordRequest{
+	created, _ := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"name": "test"},
 	}, "user1")
 
@@ -450,7 +451,7 @@ func TestDeleteRecord_Success(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	record, _ := s.CreateRecord(CreateRecordRequest{
+	record, _ := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"name": "to-delete"},
 	}, "user1")
 
@@ -474,7 +475,7 @@ func TestDeleteRecord_SoftDelete(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	record, _ := s.CreateRecord(CreateRecordRequest{
+	record, _ := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"name": "soft"},
 	}, "user1")
 
@@ -508,10 +509,10 @@ func TestExportRecords_CSV(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	s.CreateRecord(CreateRecordRequest{
+	s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"name": "alice"},
 	}, "user1")
-	s.CreateRecord(CreateRecordRequest{
+	s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"name": "bob"},
 	}, "user1")
 
@@ -536,7 +537,7 @@ func TestExportRecords_JSON(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	s.CreateRecord(CreateRecordRequest{
+	s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"name": "alice"},
 	}, "user1")
 
@@ -576,10 +577,10 @@ func TestExportRecords_WithFilter(t *testing.T) {
 		}{"status", "string", false},
 	)
 
-	s.CreateRecord(CreateRecordRequest{
+	s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"status": "active"},
 	}, "user1")
-	s.CreateRecord(CreateRecordRequest{
+	s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"status": "inactive"},
 	}, "user1")
 
@@ -609,14 +610,14 @@ func TestBatchCreateRecords_ParameterBounds(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	records, err := s.BatchCreateRecords(CreateRecordRequest{
+	records, err := s.BatchCreateRecords(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "batch"},
 	}, "user1", 1)
 	require.NoError(t, err)
 	assert.Len(t, records, 1)
 
-	records, err = s.BatchCreateRecords(CreateRecordRequest{
+	records, err = s.BatchCreateRecords(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "batch"},
 	}, "user1", 100)
@@ -628,7 +629,7 @@ func TestBatchCreateRecords_TableNotExist(t *testing.T) {
 	db := setupTestDB(t)
 	s := NewRecordService(db)
 
-	_, err := s.BatchCreateRecords(CreateRecordRequest{
+	_, err := s.BatchCreateRecords(dto.RecordCreateRequest{
 		TableID: "tbl_nonexistent",
 		Data:    map[string]any{"name": "x"},
 	}, "user1", 5)
@@ -660,7 +661,7 @@ func TestValidateFieldValue_StringMaxLength(t *testing.T) {
 	db := setupTestDB(t)
 	s := NewRecordService(db)
 
-	config := FieldConfig{MaxLength: intPtr(5)}
+	config := dto.FieldConfig{MaxLength: intPtr(5)}
 	field := models.Field{Type: "string", Options: marshalConfig(t, config)}
 
 	assert.NoError(t, s.validateFieldValue(field, "hi"))
@@ -671,7 +672,7 @@ func TestValidateFieldValue_StringValidation(t *testing.T) {
 	db := setupTestDB(t)
 	s := NewRecordService(db)
 
-	config := FieldConfig{Validation: `^\d+$`}
+	config := dto.FieldConfig{Validation: `^\d+$`}
 	field := models.Field{Type: "string", Options: marshalConfig(t, config)}
 
 	assert.NoError(t, s.validateFieldValue(field, "123"))
@@ -780,12 +781,12 @@ func TestListRecords_DefaultLimit(t *testing.T) {
 	)
 
 	for i := 0; i < 25; i++ {
-		s.CreateRecord(CreateRecordRequest{
+		s.CreateRecord(dto.RecordCreateRequest{
 			TableID: tbl.ID, Data: map[string]any{"name": "item"},
 		}, "user1")
 	}
 
-	result, err := s.ListRecords(QueryRequest{TableID: tbl.ID}, "user1")
+	result, err := s.ListRecords(dto.RecordListQueryRequest{TableID: tbl.ID}, "user1")
 	require.NoError(t, err)
 	assert.Len(t, result.Records, 20)
 	assert.Equal(t, int64(25), result.Total)
@@ -876,19 +877,19 @@ func TestListRecords_KeywordFilter_ExceedsLimit(t *testing.T) {
 	defer func() { maxKeywordScanRecords = origMax }()
 
 	for i := 0; i < 6; i++ {
-		s.CreateRecord(CreateRecordRequest{
+		s.CreateRecord(dto.RecordCreateRequest{
 			TableID: tbl.ID, Data: map[string]any{"name": strings.Repeat("test", 10)},
 		}, "user1")
 	}
 
-	_, err := s.ListRecords(QueryRequest{
+	_, err := s.ListRecords(dto.RecordListQueryRequest{
 		TableID: tbl.ID, Limit: 10, Filter: "test",
 	}, "user1")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "keyword filter matched too many records")
 }
 
-func marshalConfig(t *testing.T, config FieldConfig) string {
+func marshalConfig(t *testing.T, config dto.FieldConfig) string {
 	t.Helper()
 	data, err := json.Marshal(config)
 	require.NoError(t, err)
@@ -1010,7 +1011,7 @@ func TestCreateRecord_NonMasterDeniedWritePermission(t *testing.T) {
 	require.NoError(t, db.Create(viewer).Error)
 	authz.ClearTokenCache()
 
-	_, err := s.CreateRecord(CreateRecordRequest{
+	_, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"name": "test"},
 	}, viewer.ID)
@@ -1034,7 +1035,7 @@ func TestCreateRecord_AttachmentFieldWithInvalidValue(t *testing.T) {
 		Options: "{}",
 	}).Error)
 
-	_, err := s.CreateRecord(CreateRecordRequest{
+	_, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"attachment": []interface{}{"fil_nonexistent"}},
 	}, "user1")
@@ -1057,7 +1058,7 @@ func TestCreateRecord_AttachmentFieldEmptyOK(t *testing.T) {
 		Options: "{}",
 	}).Error)
 
-	record, err := s.CreateRecord(CreateRecordRequest{
+	record, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"attachment": []string{}},
 	}, "user1")
@@ -1081,14 +1082,14 @@ func TestUpdateRecord_OptimisticLockSuccess(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	record, err := s.CreateRecord(CreateRecordRequest{
+	record, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"name": "original"},
 	}, "user1")
 	require.NoError(t, err)
 	assert.Equal(t, 1, record.Version)
 
-	updated, err := s.UpdateRecord(record.ID, UpdateRecordRequest{
+	updated, err := s.UpdateRecord(record.ID, dto.RecordUpdateRequest{
 		Data:    map[string]interface{}{"name": "updated_with_lock"},
 		Version: 1,
 	}, "user1")
@@ -1125,7 +1126,7 @@ func TestUpdateRecord_NonWritableField(t *testing.T) {
 	record := &models.Record{TableID: tbl.ID, Data: `{"name":"original"}`, Version: 1}
 	require.NoError(t, db.Create(record).Error)
 
-	_, err := s.UpdateRecord(record.ID, UpdateRecordRequest{
+	_, err := s.UpdateRecord(record.ID, dto.RecordUpdateRequest{
 		Data: map[string]interface{}{"name": "hacked"},
 	}, viewer.ID)
 	require.Error(t, err)
@@ -1148,16 +1149,16 @@ func TestListRecords_KeywordFilterOffsetBeyondResults(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	_, err := s.CreateRecord(CreateRecordRequest{
+	_, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]interface{}{"name": "apple"},
 	}, "user1")
 	require.NoError(t, err)
-	_, err = s.CreateRecord(CreateRecordRequest{
+	_, err = s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]interface{}{"name": "banana"},
 	}, "user1")
 	require.NoError(t, err)
 
-	result, err := s.ListRecords(QueryRequest{
+	result, err := s.ListRecords(dto.RecordListQueryRequest{
 		TableID: tbl.ID,
 		Limit:   10,
 		Offset:  100,
@@ -1300,12 +1301,12 @@ func TestListRecords_FieldSelection(t *testing.T) {
 		}{"status", "string", false},
 	)
 
-	_, err := s.CreateRecord(CreateRecordRequest{
+	_, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"name": "test", "status": "active"},
 	}, "user1")
 	require.NoError(t, err)
 
-	result, err := s.ListRecords(QueryRequest{
+	result, err := s.ListRecords(dto.RecordListQueryRequest{
 		TableID: tbl.ID, Limit: 10, Fields: "name",
 	}, "user1")
 	require.NoError(t, err)
@@ -1328,12 +1329,12 @@ func TestListRecords_FieldSelectionAllFields(t *testing.T) {
 		}{"name", "string", false},
 	)
 
-	_, err := s.CreateRecord(CreateRecordRequest{
+	_, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"name": "test"},
 	}, "user1")
 	require.NoError(t, err)
 
-	result, err := s.ListRecords(QueryRequest{
+	result, err := s.ListRecords(dto.RecordListQueryRequest{
 		TableID: tbl.ID, Limit: 10,
 	}, "user1")
 	require.NoError(t, err)
@@ -1360,7 +1361,7 @@ func TestGetRecord_FieldSelection(t *testing.T) {
 		}{"score", "number", false},
 	)
 
-	record, err := s.CreateRecord(CreateRecordRequest{
+	record, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"title": "hello", "score": 100},
 	}, "user1")
 	require.NoError(t, err)
@@ -1385,7 +1386,7 @@ func TestGetRecord_FieldSelectionAllFields(t *testing.T) {
 		}{"title", "string", false},
 	)
 
-	record, err := s.CreateRecord(CreateRecordRequest{
+	record, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID, Data: map[string]any{"title": "hello"},
 	}, "user1")
 	require.NoError(t, err)

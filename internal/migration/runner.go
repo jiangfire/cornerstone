@@ -15,6 +15,7 @@ import (
 	"github.com/jiangfire/cornerstone/internal/migration/source"
 	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/jiangfire/cornerstone/internal/services"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 )
@@ -293,7 +294,7 @@ func (r *Runner) ensureTargetDatabase() (*models.Database, error) {
 	if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
-	created, err := services.NewDatabaseService(r.db).CreateDatabase(services.CreateDBRequest{Name: name}, r.masterToken)
+	created, err := services.NewDatabaseService(r.db).CreateDatabase(dto.DatabaseCreateRequest{Name: name}, r.masterToken)
 	if err != nil {
 		return nil, err
 	}
@@ -366,7 +367,7 @@ func (r *Runner) ensureTargetTable(databaseID string, tablePlan PreviewTablePlan
 	var table models.Table
 	err := r.db.Where("database_id = ? AND name = ? AND deleted_at IS NULL", databaseID, tablePlan.TargetTable).First(&table).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
-		created, createErr := services.NewTableService(r.db).CreateTable(services.CreateTableRequest{
+		created, createErr := services.NewTableService(r.db).CreateTable(dto.TableCreateRequest{
 			DatabaseID: databaseID,
 			Name:       tablePlan.TargetTable,
 		}, r.masterToken)
@@ -394,7 +395,7 @@ func (r *Runner) ensureTargetTable(databaseID string, tablePlan PreviewTablePlan
 			continue
 		}
 		fieldType, _ := r.mapper.Map(column.Type)
-		if _, err := fieldSvc.CreateField(services.CreateFieldRequest{
+		if _, err := fieldSvc.CreateField(dto.FieldCreateRequest{
 			TableID:  table.ID,
 			Name:     column.Name,
 			Type:     fieldType,

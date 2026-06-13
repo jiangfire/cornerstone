@@ -13,6 +13,7 @@ import (
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
 	json "github.com/jiangfire/cornerstone/pkg/jsonx"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"gorm.io/gorm"
 )
 
@@ -79,42 +80,6 @@ func NewRecordService(db *gorm.DB) *RecordService {
 	return &RecordService{
 		db: db,
 	}
-}
-
-// CreateRecordRequest is the request to create a record
-type CreateRecordRequest struct {
-	TableID string                 `json:"table_id" binding:"required"`
-	Data    map[string]interface{} `json:"data" binding:"required"`
-}
-
-// UpdateRecordRequest is the request to update a record
-type UpdateRecordRequest struct {
-	Data    map[string]interface{} `json:"data" binding:"required"`
-	Version int                    `json:"version"` // optimistic lock version
-}
-
-// RecordResponse is the record API response
-type RecordResponse struct {
-	ID      string      `json:"id"`
-	TableID string      `json:"table_id"`
-	Data    interface{} `json:"data"`
-	Version int         `json:"version"`
-}
-
-// QueryRequest is the query request
-type QueryRequest struct {
-	TableID string `form:"table_id" binding:"required"`
-	Limit   int    `form:"limit" binding:"min=1,max=100"`
-	Offset  int    `form:"offset" binding:"min=0"`
-	Filter  string `form:"filter"` // Supports JSON filter or keyword search
-	Fields  string `form:"fields"` // Comma-separated field names to return in data
-}
-
-// QueryResponse is the query response
-type QueryResponse struct {
-	Records []RecordResponse `json:"records"`
-	Total   int64            `json:"total"`
-	HasMore bool             `json:"has_more"`
 }
 
 // checkTableAccess verifies table exists and user has access
@@ -195,7 +160,7 @@ func (s *RecordService) validateRecordData(tableID string, data map[string]inter
 	return nil
 }
 
-func (s *RecordService) validateAttachmentFieldValue(field models.Field, config FieldConfig, value interface{}, currentRecordID, userID string) error {
+func (s *RecordService) validateAttachmentFieldValue(field models.Field, config dto.FieldConfig, value interface{}, currentRecordID, userID string) error {
 	fileIDs, err := parseAttachmentValue(value)
 	if err != nil {
 		return err
@@ -299,7 +264,7 @@ func (s *RecordService) validateFieldValue(field models.Field, value interface{}
 }
 
 // validateFieldValueWithConfig validates a field value with pre-parsed config, avoiding repeated Unmarshal
-func (s *RecordService) validateFieldValueWithConfig(field models.Field, config FieldConfig, value interface{}) error {
+func (s *RecordService) validateFieldValueWithConfig(field models.Field, config dto.FieldConfig, value interface{}) error {
 	// Handle nil values - these should be handled by the caller, but we'll be defensive
 	if value == nil {
 		return nil
@@ -728,7 +693,7 @@ func (s *RecordService) syncRecordFieldIndexes(tx *gorm.DB, recordID, tableID st
 	return nil
 }
 
-func buildMySQLRecordListSQL(req QueryRequest, clauses []recordFilterClause) (string, []interface{}) {
+func buildMySQLRecordListSQL(req dto.RecordListQueryRequest, clauses []recordFilterClause) (string, []interface{}) {
 	if filters, ok := collectMySQLRecordFieldIndexFilters(clauses); ok {
 		return buildMySQLRecordFieldIndexListSQL(req, filters)
 	}
@@ -784,7 +749,7 @@ func collectMySQLRecordFieldIndexFilters(clauses []recordFilterClause) ([]record
 	return filters, true
 }
 
-func buildMySQLRecordFieldIndexListSQL(req QueryRequest, filters []recordFieldIndexFilter) (string, []interface{}) {
+func buildMySQLRecordFieldIndexListSQL(req dto.RecordListQueryRequest, filters []recordFieldIndexFilter) (string, []interface{}) {
 	subquery, args := buildMySQLRecordFieldIndexMatchedSubquery(req.TableID, filters)
 
 	var b strings.Builder
@@ -841,7 +806,7 @@ func buildMySQLRecordFieldIndexMatchedSubquery(tableID string, filters []recordF
 	return b.String(), args
 }
 
-func (s *RecordService) findRecordPage(req QueryRequest, clauses []recordFilterClause) ([]models.Record, error) {
+func (s *RecordService) findRecordPage(req dto.RecordListQueryRequest, clauses []recordFilterClause) ([]models.Record, error) {
 	var records []models.Record
 	if s.db.Name() == "mysql" {
 		sql, args := buildMySQLRecordListSQL(req, clauses)
@@ -1051,7 +1016,7 @@ func (s *RecordService) filterRecordsByReadablePayload(records []models.Record, 
 }
 
 // CreateRecord creates a new record
-func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*models.Record, error) {
+func (s *RecordService) CreateRecord(req dto.RecordCreateRequest, userID string) (*models.Record, error) {
 	// 1. Check table access (owner, admin, editor can create records)
 	if err := s.checkTableAccess(req.TableID, userID, []string{"owner", "admin", "editor"}); err != nil {
 		return nil, err
@@ -1127,7 +1092,7 @@ func (s *RecordService) CreateRecord(req CreateRecordRequest, userID string) (*m
 var maxKeywordScanRecords = 5000
 
 // ListRecords lists records with query and pagination support
-func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResponse, error) {
+func (s *RecordService) ListRecords(req dto.RecordListQueryRequest, userID string) (*dto.RecordListData, error) {
 	// 1. Check table access
 	if err := s.checkTableAccess(req.TableID, userID, []string{"owner", "admin", "editor", "viewer"}); err != nil {
 		return nil, err
@@ -1174,7 +1139,7 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 			if refsHidden {
 				// When referencing hidden/unknown fields, return empty results,
 				// preventing side-channel detection of hidden field values via 200 vs 400
-				return &QueryResponse{Records: []RecordResponse{}, Total: 0, HasMore: false}, nil
+				return &dto.RecordListData{Records: []dto.RecordObject{}, Total: 0, HasMore: false}, nil
 			}
 
 			records, err = s.findRecordPage(req, clauses)
@@ -1222,12 +1187,12 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 	}
 
 	// 7. Convert to response format
-	result := make([]RecordResponse, len(records))
+	result := make([]dto.RecordObject, len(records))
 	for i, r := range records {
 		data := s.filterReadableData(fields, readableFields, parseRecordPayload(r.Data))
 		data = filterDataFields(data, req.Fields)
 
-		result[i] = RecordResponse{
+		result[i] = dto.RecordObject{
 			ID:      r.ID,
 			TableID: r.TableID,
 			Data:    data,
@@ -1235,7 +1200,7 @@ func (s *RecordService) ListRecords(req QueryRequest, userID string) (*QueryResp
 		}
 	}
 
-	return &QueryResponse{
+	return &dto.RecordListData{
 		Records: result,
 		Total:   total,
 		HasMore: int64(req.Offset+len(records)) < total,
@@ -1361,7 +1326,7 @@ func (s *RecordService) ExportRecords(tableID, userID, format, filter string) ([
 }
 
 // GetRecord gets a single record
-func (s *RecordService) GetRecord(recordID, userID, fieldFilter string) (*RecordResponse, error) {
+func (s *RecordService) GetRecord(recordID, userID, fieldFilter string) (*dto.RecordObject, error) {
 	// 1. Get record
 	var record models.Record
 	err := s.db.Where("id = ? AND deleted_at IS NULL", recordID).First(&record).Error
@@ -1387,7 +1352,7 @@ func (s *RecordService) GetRecord(recordID, userID, fieldFilter string) (*Record
 	data := s.filterReadableData(fields, readableFields, parseRecordPayload(record.Data))
 	data = filterDataFields(data, fieldFilter)
 
-	return &RecordResponse{
+	return &dto.RecordObject{
 		ID:      record.ID,
 		TableID: record.TableID,
 		Data:    data,
@@ -1396,7 +1361,7 @@ func (s *RecordService) GetRecord(recordID, userID, fieldFilter string) (*Record
 }
 
 // UpdateRecord updates a record (optimistic locking)
-func (s *RecordService) UpdateRecord(recordID string, req UpdateRecordRequest, userID string) (*models.Record, error) {
+func (s *RecordService) UpdateRecord(recordID string, req dto.RecordUpdateRequest, userID string) (*models.Record, error) {
 	// 1. Get record
 	var record models.Record
 	err := s.db.Where("id = ? AND deleted_at IS NULL", recordID).First(&record).Error
@@ -1546,7 +1511,7 @@ func (s *RecordService) DeleteRecord(recordID, userID string) error {
 }
 
 // BatchCreateRecords creates multiple records at once
-func (s *RecordService) BatchCreateRecords(req CreateRecordRequest, userID string, count int) ([]*models.Record, error) {
+func (s *RecordService) BatchCreateRecords(req dto.RecordCreateRequest, userID string, count int) ([]*models.Record, error) {
 	// 1. Check table access
 	if err := s.checkTableAccess(req.TableID, userID, []string{"owner", "admin", "editor"}); err != nil {
 		return nil, err
@@ -1666,7 +1631,7 @@ func (s *RecordService) GenerateTestData(tableID, userID string, count int) ([]*
 		for _, field := range fields {
 			data[field.Name] = generateFieldValue(rng, field.Type)
 		}
-		record, err := s.CreateRecord(CreateRecordRequest{
+		record, err := s.CreateRecord(dto.RecordCreateRequest{
 			TableID: tableID,
 			Data:    data,
 		}, userID)

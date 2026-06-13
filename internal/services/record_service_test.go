@@ -12,6 +12,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
 // ============================================================
@@ -136,7 +137,7 @@ func TestValidateRecordData_PreParsesFieldConfig(t *testing.T) {
 	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "items"}
 	require.NoError(t, db.Create(tbl).Error)
 
-	config := FieldConfig{MaxLength: intPtr(5)}
+	config := dto.FieldConfig{MaxLength: intPtr(5)}
 	configJSON, _ := json.Marshal(config)
 	field := &models.Field{
 		TableID:  tbl.ID,
@@ -174,7 +175,7 @@ func TestBatchCreateRecords_LargeBatchSuccess(t *testing.T) {
 	require.NoError(t, db.Create(&models.Field{TableID: tbl.ID, Name: "name", Type: "string"}).Error)
 
 	// Batch create 150 records (exceeds default batch size 100), verify large batch scenario
-	records, err := s.BatchCreateRecords(CreateRecordRequest{
+	records, err := s.BatchCreateRecords(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "batch"},
 	}, "user1", 150)
@@ -198,7 +199,7 @@ func TestBatchCreateRecords_EmptyData(t *testing.T) {
 
 	require.NoError(t, db.Create(&models.Field{TableID: tbl.ID, Name: "name", Type: "string"}).Error)
 
-	records, err := s.BatchCreateRecords(CreateRecordRequest{
+	records, err := s.BatchCreateRecords(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "x"},
 	}, "user1", 0)
@@ -219,9 +220,9 @@ func TestFieldService_CheckFieldPermissions_Batch(t *testing.T) {
 	tbl := &models.Table{DatabaseID: dbModel.ID, Name: "items"}
 	require.NoError(t, db.Create(tbl).Error)
 
-	f1, err := s.CreateField(CreateFieldRequest{TableID: tbl.ID, Name: "a", Type: "string"}, "user1")
+	f1, err := s.CreateField(dto.FieldCreateRequest{TableID: tbl.ID, Name: "a", Type: "string"}, "user1")
 	require.NoError(t, err)
-	f2, err := s.CreateField(CreateFieldRequest{TableID: tbl.ID, Name: "b", Type: "string"}, "user1")
+	f2, err := s.CreateField(dto.FieldCreateRequest{TableID: tbl.ID, Name: "b", Type: "string"}, "user1")
 	require.NoError(t, err)
 
 	// Master token can access all fields
@@ -246,7 +247,7 @@ func TestBatchCreateRecords_AtomicRollback(t *testing.T) {
 	require.NoError(t, db.Create(&models.Field{TableID: tbl.ID, Name: "name", Type: "string"}).Error)
 
 	// First normally create 50 records
-	_, err := s.BatchCreateRecords(CreateRecordRequest{
+	_, err := s.BatchCreateRecords(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "batch"},
 	}, "user1", 50)
@@ -264,7 +265,7 @@ func TestBatchCreateRecords_AtomicRollback(t *testing.T) {
 	t.Cleanup(func() { _ = db.Callback().Create().Remove("test_batch_rollback") })
 
 	// Try to create 100 records, should fail and rollback
-	_, err = s.BatchCreateRecords(CreateRecordRequest{
+	_, err = s.BatchCreateRecords(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]any{"name": "batch2"},
 	}, "user1", 100)
@@ -306,7 +307,7 @@ func TestRecordService_UpdateRecord_VersionConflict(t *testing.T) {
 	record := &models.Record{TableID: tbl.ID, Data: `{"name":"alice"}`, Version: 1}
 	require.NoError(t, db.Create(record).Error)
 
-	_, err := s.UpdateRecord(record.ID, UpdateRecordRequest{
+	_, err := s.UpdateRecord(record.ID, dto.RecordUpdateRequest{
 		Data:    map[string]any{"name": "bob"},
 		Version: 999,
 	}, "user1")
@@ -318,7 +319,7 @@ func TestRecordService_UpdateRecord_NonexistentRecord(t *testing.T) {
 	db := setupTestDB(t)
 	s := NewRecordService(db)
 
-	_, err := s.UpdateRecord("rec_nonexistent", UpdateRecordRequest{
+	_, err := s.UpdateRecord("rec_nonexistent", dto.RecordUpdateRequest{
 		Data: map[string]any{"name": "bob"},
 	}, "user1")
 	assert.Error(t, err)
@@ -433,7 +434,7 @@ func TestBatchCreateRecords_AttachmentFieldWithFileIDs(t *testing.T) {
 		Options: "{}",
 	}).Error)
 
-	_, err := s.BatchCreateRecords(CreateRecordRequest{
+	_, err := s.BatchCreateRecords(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"doc": []string{"fil_123"}},
 	}, "user1", 3)
@@ -457,7 +458,7 @@ func TestBatchCreateRecords_RequiredFieldMissing(t *testing.T) {
 		Required: true,
 	}).Error)
 
-	_, err := s.BatchCreateRecords(CreateRecordRequest{
+	_, err := s.BatchCreateRecords(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{},
 	}, "user1", 5)
@@ -483,7 +484,7 @@ func TestBatchCreateRecords_NonWritableField(t *testing.T) {
 	require.NoError(t, db.Create(viewer).Error)
 	authz.ClearTokenCache()
 
-	_, err := s.BatchCreateRecords(CreateRecordRequest{
+	_, err := s.BatchCreateRecords(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"name": "test"},
 	}, viewer.ID, 3)
@@ -586,7 +587,7 @@ func TestRecordFieldIndexSync_CreateUpdateDeleteBatch(t *testing.T) {
 		}{"score", "number", false},
 	)
 
-	record, err := s.CreateRecord(CreateRecordRequest{
+	record, err := s.CreateRecord(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"status": "paid", "score": float64(10)},
 	}, "user1")
@@ -596,7 +597,7 @@ func TestRecordFieldIndexSync_CreateUpdateDeleteBatch(t *testing.T) {
 	require.NoError(t, db.Where("record_id = ? AND deleted_at IS NULL", record.ID).Find(&indexes).Error)
 	require.Len(t, indexes, 2)
 
-	_, err = s.UpdateRecord(record.ID, UpdateRecordRequest{
+	_, err = s.UpdateRecord(record.ID, dto.RecordUpdateRequest{
 		Data:    map[string]interface{}{"status": "refunded", "score": float64(20)},
 		Version: 1,
 	}, "user1")
@@ -620,7 +621,7 @@ func TestRecordFieldIndexSync_CreateUpdateDeleteBatch(t *testing.T) {
 	require.NoError(t, db.Model(&models.RecordFieldIndex{}).Where("record_id = ? AND deleted_at IS NULL", record.ID).Count(&liveCount).Error)
 	assert.Equal(t, int64(0), liveCount)
 
-	batchRecords, err := s.BatchCreateRecords(CreateRecordRequest{
+	batchRecords, err := s.BatchCreateRecords(dto.RecordCreateRequest{
 		TableID: tbl.ID,
 		Data:    map[string]interface{}{"status": "batch", "score": float64(30)},
 	}, "user1", 3)
@@ -675,7 +676,7 @@ func TestBuildStructuredFilterClauses_MySQLUsesRecordFieldIndexForSupportedScala
 }
 
 func TestBuildMySQLRecordListSQL_WithRecordFieldIndexFilters(t *testing.T) {
-	sql, args := buildMySQLRecordListSQL(QueryRequest{
+	sql, args := buildMySQLRecordListSQL(dto.RecordListQueryRequest{
 		TableID: "tbl_1",
 		Limit:   20,
 		Offset:  0,
@@ -763,7 +764,7 @@ func TestBuildStructuredFilterClauses_MySQLFallsBackForJSONField(t *testing.T) {
 }
 
 func TestBuildMySQLRecordListSQL_NoFilter(t *testing.T) {
-	sql, args := buildMySQLRecordListSQL(QueryRequest{
+	sql, args := buildMySQLRecordListSQL(dto.RecordListQueryRequest{
 		TableID: "tbl_1",
 		Limit:   50,
 		Offset:  10,
@@ -774,7 +775,7 @@ func TestBuildMySQLRecordListSQL_NoFilter(t *testing.T) {
 }
 
 func TestBuildMySQLRecordListSQL_WithStructuredClauses(t *testing.T) {
-	sql, args := buildMySQLRecordListSQL(QueryRequest{
+	sql, args := buildMySQLRecordListSQL(dto.RecordListQueryRequest{
 		TableID: "tbl_1",
 		Limit:   20,
 		Offset:  0,

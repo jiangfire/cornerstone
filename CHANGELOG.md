@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v1.7.2] - 2026-06-13
+
+### Changed
+
+- **Unified DTO package** - All request/response types consolidated into `pkg/dto`. Removed 18 duplicate type definitions from `internal/services/` (database, table, field, record, token, file services). Handler conversion functions (`tokenObjectFromResponse`, `tableObjectFromResponse`, `fieldObjectFromResponse`, `fileObjectFromModel`, `recordObjectFromModel`) deleted.
+- **RecordListData.Items → Records** - Renamed field for clarity in `dto.RecordListData`
+- **New DTO types** - Added `dto.RecordListQueryRequest` (simplified list query), `dto.BatchQueryData` (batch query response), and `Deprecated` field to `dto.FieldObject`
+
+### Fixed
+
+- **Swagger docs regenerated** - Updated to reflect consolidated dto types
+
 ## [v1.7.1] - 2026-06-13
 
 ### Changed

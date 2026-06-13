@@ -11,6 +11,7 @@ import (
 	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/jiangfire/cornerstone/internal/services"
 	pkgdb "github.com/jiangfire/cornerstone/pkg/db"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -34,11 +35,11 @@ func TestGetAuthTokenID_ResolvesTokenValue(t *testing.T) {
 	setupCLIEnv(t)
 
 	dbSvc := services.NewDatabaseService(pkgdb.DB())
-	createdDB, err := dbSvc.CreateDatabase(services.CreateDBRequest{Name: "tokenvaluedb"}, "cs_test_master_token")
+	createdDB, err := dbSvc.CreateDatabase(dto.DatabaseCreateRequest{Name: "tokenvaluedb"}, "cs_test_master_token")
 	require.NoError(t, err)
 
 	tokSvc := services.NewTokenService(pkgdb.DB())
-	client, err := tokSvc.CreateToken(services.CreateTokenRequest{
+	client, err := tokSvc.CreateToken(dto.TokenCreateRequest{
 		Name:   "viewer",
 		Scopes: `{"databases":{"` + createdDB.ID + `":"viewer"}}`,
 	})
@@ -63,7 +64,7 @@ func TestTokenListCmd_RegularTokenRequiresMaster(t *testing.T) {
 	setupCLIEnv(t)
 
 	tokSvc := services.NewTokenService(pkgdb.DB())
-	client, err := tokSvc.CreateToken(services.CreateTokenRequest{
+	client, err := tokSvc.CreateToken(dto.TokenCreateRequest{
 		Name:   "regular",
 		Scopes: "{}",
 	})
@@ -265,7 +266,7 @@ func TestDBCreateCmd_Success(t *testing.T) {
 func TestDBGetCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	svc := services.NewDatabaseService(pkgdb.DB())
-	created, err := svc.CreateDatabase(services.CreateDBRequest{
+	created, err := svc.CreateDatabase(dto.DatabaseCreateRequest{
 		Name:        "getdb",
 		Description: "get test",
 	}, "cs_test_master_token")
@@ -281,7 +282,7 @@ func TestDBGetCmd_Success(t *testing.T) {
 func TestDBUpdateCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	svc := services.NewDatabaseService(pkgdb.DB())
-	created, err := svc.CreateDatabase(services.CreateDBRequest{
+	created, err := svc.CreateDatabase(dto.DatabaseCreateRequest{
 		Name: "original",
 	}, "cs_test_master_token")
 	require.NoError(t, err)
@@ -298,7 +299,7 @@ func TestDBUpdateCmd_Success(t *testing.T) {
 func TestDBDeleteCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	svc := services.NewDatabaseService(pkgdb.DB())
-	created, err := svc.CreateDatabase(services.CreateDBRequest{
+	created, err := svc.CreateDatabase(dto.DatabaseCreateRequest{
 		Name: "delme",
 	}, "cs_test_master_token")
 	require.NoError(t, err)
@@ -321,7 +322,7 @@ func TestDBListCmd_NoMasterToken(t *testing.T) {
 func TestTableListCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	dbSvc := services.NewDatabaseService(pkgdb.DB())
-	createdDB, err := dbSvc.CreateDatabase(services.CreateDBRequest{
+	createdDB, err := dbSvc.CreateDatabase(dto.DatabaseCreateRequest{
 		Name: "tbltest",
 	}, "cs_test_master_token")
 	require.NoError(t, err)
@@ -336,7 +337,7 @@ func TestTableListCmd_Success(t *testing.T) {
 func TestTableCreateCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	dbSvc := services.NewDatabaseService(pkgdb.DB())
-	createdDB, err := dbSvc.CreateDatabase(services.CreateDBRequest{
+	createdDB, err := dbSvc.CreateDatabase(dto.DatabaseCreateRequest{
 		Name: "tblcreatedb",
 	}, "cs_test_master_token")
 	require.NoError(t, err)
@@ -352,10 +353,10 @@ func TestTableCreateCmd_Success(t *testing.T) {
 func TestTableGetCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	dbSvc := services.NewDatabaseService(pkgdb.DB())
-	createdDB, err := dbSvc.CreateDatabase(services.CreateDBRequest{Name: "tblgetdb"}, "cs_test_master_token")
+	createdDB, err := dbSvc.CreateDatabase(dto.DatabaseCreateRequest{Name: "tblgetdb"}, "cs_test_master_token")
 	require.NoError(t, err)
 	tblSvc := services.NewTableService(pkgdb.DB())
-	createdTbl, err := tblSvc.CreateTable(services.CreateTableRequest{
+	createdTbl, err := tblSvc.CreateTable(dto.TableCreateRequest{
 		DatabaseID:  createdDB.ID,
 		Name:        "gettbl",
 		Description: "get table",
@@ -372,10 +373,10 @@ func TestTableGetCmd_Success(t *testing.T) {
 func TestTableDeleteCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	dbSvc := services.NewDatabaseService(pkgdb.DB())
-	createdDB, err := dbSvc.CreateDatabase(services.CreateDBRequest{Name: "tblDdelDB"}, "cs_test_master_token")
+	createdDB, err := dbSvc.CreateDatabase(dto.DatabaseCreateRequest{Name: "tblDdelDB"}, "cs_test_master_token")
 	require.NoError(t, err)
 	tblSvc := services.NewTableService(pkgdb.DB())
-	createdTbl, err := tblSvc.CreateTable(services.CreateTableRequest{
+	createdTbl, err := tblSvc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: createdDB.ID,
 		Name:       "deltbl",
 	}, "cs_test_master_token")
@@ -391,10 +392,10 @@ func TestTableDeleteCmd_Success(t *testing.T) {
 func TestFieldListCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	dbSvc := services.NewDatabaseService(pkgdb.DB())
-	createdDB, err := dbSvc.CreateDatabase(services.CreateDBRequest{Name: "fldlistdb"}, "cs_test_master_token")
+	createdDB, err := dbSvc.CreateDatabase(dto.DatabaseCreateRequest{Name: "fldlistdb"}, "cs_test_master_token")
 	require.NoError(t, err)
 	tblSvc := services.NewTableService(pkgdb.DB())
-	createdTbl, err := tblSvc.CreateTable(services.CreateTableRequest{
+	createdTbl, err := tblSvc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: createdDB.ID,
 		Name:       "fldtbl",
 	}, "cs_test_master_token")
@@ -410,10 +411,10 @@ func TestFieldListCmd_Success(t *testing.T) {
 func TestFieldCreateCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	dbSvc := services.NewDatabaseService(pkgdb.DB())
-	createdDB, err := dbSvc.CreateDatabase(services.CreateDBRequest{Name: "fldcreatedb"}, "cs_test_master_token")
+	createdDB, err := dbSvc.CreateDatabase(dto.DatabaseCreateRequest{Name: "fldcreatedb"}, "cs_test_master_token")
 	require.NoError(t, err)
 	tblSvc := services.NewTableService(pkgdb.DB())
-	createdTbl, err := tblSvc.CreateTable(services.CreateTableRequest{
+	createdTbl, err := tblSvc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: createdDB.ID,
 		Name:       "fldtbl2",
 	}, "cs_test_master_token")
@@ -431,16 +432,16 @@ func TestFieldCreateCmd_Success(t *testing.T) {
 func TestFieldDeleteCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	dbSvc := services.NewDatabaseService(pkgdb.DB())
-	createdDB, err := dbSvc.CreateDatabase(services.CreateDBRequest{Name: "flddelDB"}, "cs_test_master_token")
+	createdDB, err := dbSvc.CreateDatabase(dto.DatabaseCreateRequest{Name: "flddelDB"}, "cs_test_master_token")
 	require.NoError(t, err)
 	tblSvc := services.NewTableService(pkgdb.DB())
-	createdTbl, err := tblSvc.CreateTable(services.CreateTableRequest{
+	createdTbl, err := tblSvc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: createdDB.ID,
 		Name:       "fldtbl3",
 	}, "cs_test_master_token")
 	require.NoError(t, err)
 	fldSvc := services.NewFieldService(pkgdb.DB())
-	createdFld, err := fldSvc.CreateField(services.CreateFieldRequest{
+	createdFld, err := fldSvc.CreateField(dto.FieldCreateRequest{
 		TableID: createdTbl.ID,
 		Name:    "delfld",
 		Type:    "string",
@@ -476,7 +477,7 @@ func TestTokenCreateCmd_Success(t *testing.T) {
 func TestTokenDeleteCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	tokSvc := services.NewTokenService(pkgdb.DB())
-	created, err := tokSvc.CreateToken(services.CreateTokenRequest{
+	created, err := tokSvc.CreateToken(dto.TokenCreateRequest{
 		Name:   "deltok",
 		Scopes: "{}",
 	})
@@ -492,10 +493,10 @@ func TestTokenDeleteCmd_Success(t *testing.T) {
 func TestRecordListCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	dbSvc := services.NewDatabaseService(pkgdb.DB())
-	createdDB, err := dbSvc.CreateDatabase(services.CreateDBRequest{Name: "reclistdb"}, "cs_test_master_token")
+	createdDB, err := dbSvc.CreateDatabase(dto.DatabaseCreateRequest{Name: "reclistdb"}, "cs_test_master_token")
 	require.NoError(t, err)
 	tblSvc := services.NewTableService(pkgdb.DB())
-	createdTbl, err := tblSvc.CreateTable(services.CreateTableRequest{
+	createdTbl, err := tblSvc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: createdDB.ID,
 		Name:       "rectbl",
 	}, "cs_test_master_token")
@@ -566,16 +567,16 @@ func TestCacheClearCmd_Success(t *testing.T) {
 func TestRecordCreateCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	dbSvc := services.NewDatabaseService(pkgdb.DB())
-	createdDB, err := dbSvc.CreateDatabase(services.CreateDBRequest{Name: "reccreatedb"}, "cs_test_master_token")
+	createdDB, err := dbSvc.CreateDatabase(dto.DatabaseCreateRequest{Name: "reccreatedb"}, "cs_test_master_token")
 	require.NoError(t, err)
 	tblSvc := services.NewTableService(pkgdb.DB())
-	createdTbl, err := tblSvc.CreateTable(services.CreateTableRequest{
+	createdTbl, err := tblSvc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: createdDB.ID,
 		Name:       "rectbl2",
 	}, "cs_test_master_token")
 	require.NoError(t, err)
 	fldSvc := services.NewFieldService(pkgdb.DB())
-	_, err = fldSvc.CreateField(services.CreateFieldRequest{
+	_, err = fldSvc.CreateField(dto.FieldCreateRequest{
 		TableID: createdTbl.ID,
 		Name:    "title",
 		Type:    "string",
@@ -592,16 +593,16 @@ func TestRecordCreateCmd_Success(t *testing.T) {
 func TestRecordBatchCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	dbSvc := services.NewDatabaseService(pkgdb.DB())
-	createdDB, err := dbSvc.CreateDatabase(services.CreateDBRequest{Name: "recbatchdb"}, "cs_test_master_token")
+	createdDB, err := dbSvc.CreateDatabase(dto.DatabaseCreateRequest{Name: "recbatchdb"}, "cs_test_master_token")
 	require.NoError(t, err)
 	tblSvc := services.NewTableService(pkgdb.DB())
-	createdTbl, err := tblSvc.CreateTable(services.CreateTableRequest{
+	createdTbl, err := tblSvc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: createdDB.ID,
 		Name:       "rectbl3",
 	}, "cs_test_master_token")
 	require.NoError(t, err)
 	fldSvc := services.NewFieldService(pkgdb.DB())
-	_, err = fldSvc.CreateField(services.CreateFieldRequest{
+	_, err = fldSvc.CreateField(dto.FieldCreateRequest{
 		TableID: createdTbl.ID,
 		Name:    "name",
 		Type:    "string",
@@ -618,23 +619,23 @@ func TestRecordBatchCmd_Success(t *testing.T) {
 func TestRecordDeleteCmd_Success(t *testing.T) {
 	setupCLIEnv(t)
 	dbSvc := services.NewDatabaseService(pkgdb.DB())
-	createdDB, err := dbSvc.CreateDatabase(services.CreateDBRequest{Name: "recdeldb"}, "cs_test_master_token")
+	createdDB, err := dbSvc.CreateDatabase(dto.DatabaseCreateRequest{Name: "recdeldb"}, "cs_test_master_token")
 	require.NoError(t, err)
 	tblSvc := services.NewTableService(pkgdb.DB())
-	createdTbl, err := tblSvc.CreateTable(services.CreateTableRequest{
+	createdTbl, err := tblSvc.CreateTable(dto.TableCreateRequest{
 		DatabaseID: createdDB.ID,
 		Name:       "rectbl4",
 	}, "cs_test_master_token")
 	require.NoError(t, err)
 	fldSvc := services.NewFieldService(pkgdb.DB())
-	_, err = fldSvc.CreateField(services.CreateFieldRequest{
+	_, err = fldSvc.CreateField(dto.FieldCreateRequest{
 		TableID: createdTbl.ID,
 		Name:    "val",
 		Type:    "string",
 	}, "cs_test_master_token")
 	require.NoError(t, err)
 	recSvc := services.NewRecordService(pkgdb.DB())
-	createdRec, err := recSvc.CreateRecord(services.CreateRecordRequest{
+	createdRec, err := recSvc.CreateRecord(dto.RecordCreateRequest{
 		TableID: createdTbl.ID,
 		Data:    map[string]interface{}{"val": "x"},
 	}, "cs_test_master_token")

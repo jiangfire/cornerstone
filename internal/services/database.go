@@ -9,6 +9,7 @@ import (
 
 	"github.com/jiangfire/cornerstone/internal/authz"
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"gopkg.in/yaml.v3"
 	"gorm.io/gorm"
 )
@@ -44,22 +45,6 @@ func (s *DatabaseService) ResolveDatabase(identifier string) (*models.Database, 
 	return nil, fmt.Errorf("database query failed: %w", err)
 }
 
-type CreateDBRequest struct {
-	Name        string `json:"name" binding:"required,min=2,max=255"`
-	Description string `json:"description" binding:"max=500"`
-}
-
-type UpdateDBRequest struct {
-	Name        string `json:"name" binding:"required,min=2,max=255"`
-	Description string `json:"description" binding:"max=500"`
-}
-
-type DBResponse struct {
-	ID          string `json:"id"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-}
-
 func validateDatabaseName(name string) error {
 	name = strings.TrimSpace(name)
 	if len(name) < 2 || len(name) > 255 {
@@ -93,7 +78,7 @@ func sanitizeDatabaseInput(name, description string) (string, string) {
 	return name, description
 }
 
-func (s *DatabaseService) CreateDatabase(req CreateDBRequest, ownerID string) (*models.Database, error) {
+func (s *DatabaseService) CreateDatabase(req dto.DatabaseCreateRequest, ownerID string) (*models.Database, error) {
 	authorizer, err := authz.NewAuthorizer(s.db, ownerID)
 	if err != nil {
 		return nil, err
@@ -137,7 +122,7 @@ func (s *DatabaseService) CreateDatabase(req CreateDBRequest, ownerID string) (*
 	return &database, nil
 }
 
-func (s *DatabaseService) ListDatabases(userID string) ([]DBResponse, error) {
+func (s *DatabaseService) ListDatabases(userID string) ([]dto.DatabaseObject, error) {
 	authorizer, err := authz.NewAuthorizer(s.db, userID)
 	if err != nil {
 		return nil, err
@@ -151,7 +136,7 @@ func (s *DatabaseService) ListDatabases(userID string) ([]DBResponse, error) {
 			return nil, err
 		}
 		if len(ids) == 0 {
-			return []DBResponse{}, nil
+			return []dto.DatabaseObject{}, nil
 		}
 		query = query.Where("id IN ?", ids)
 	}
@@ -160,9 +145,9 @@ func (s *DatabaseService) ListDatabases(userID string) ([]DBResponse, error) {
 		return nil, fmt.Errorf("database query failed: %w", err)
 	}
 
-	dbs := make([]DBResponse, len(databases))
+	dbs := make([]dto.DatabaseObject, len(databases))
 	for i, d := range databases {
-		dbs[i] = DBResponse{
+		dbs[i] = dto.DatabaseObject{
 			ID:          d.ID,
 			Name:        d.Name,
 			Description: d.Description,
@@ -172,7 +157,7 @@ func (s *DatabaseService) ListDatabases(userID string) ([]DBResponse, error) {
 	return dbs, nil
 }
 
-func (s *DatabaseService) GetDatabase(dbID, userID string) (*DBResponse, error) {
+func (s *DatabaseService) GetDatabase(dbID, userID string) (*dto.DatabaseObject, error) {
 	// Resolve identifier (supports ID or name)
 	database, err := s.ResolveDatabase(dbID)
 	if err != nil {
@@ -187,14 +172,14 @@ func (s *DatabaseService) GetDatabase(dbID, userID string) (*DBResponse, error) 
 		return nil, errors.New("permission denied: cannot access this database")
 	}
 
-	return &DBResponse{
+	return &dto.DatabaseObject{
 		ID:          database.ID,
 		Name:        database.Name,
 		Description: database.Description,
 	}, nil
 }
 
-func (s *DatabaseService) UpdateDatabase(dbID string, req UpdateDBRequest, userID string) (*models.Database, error) {
+func (s *DatabaseService) UpdateDatabase(dbID string, req dto.DatabaseUpdateRequest, userID string) (*models.Database, error) {
 	// Resolve identifier (supports ID or name)
 	database, err := s.ResolveDatabase(dbID)
 	if err != nil {
@@ -268,30 +253,13 @@ func (s *DatabaseService) DeleteDatabase(dbID, userID string) error {
 }
 
 // CreateDatabaseWithTables creates a database with nested tables and fields from a JSON definition
-type CreateTableWithFieldsRequest struct {
-	Name        string `json:"name" binding:"required"`
-	Description string `json:"description"`
-	Fields      []struct {
-		Name        string `json:"name" binding:"required"`
-		Type        string `json:"type" binding:"required"`
-		Description string `json:"description"`
-		Required    bool   `json:"required"`
-	} `json:"fields"`
-}
-
-type CreateDBWithTablesRequest struct {
-	Name        string                         `json:"name" binding:"required,min=2,max=255"`
-	Description string                         `json:"description"`
-	Tables      []CreateTableWithFieldsRequest `json:"tables"`
-}
-
 type CreateDBWithTablesResult struct {
 	Database *models.Database `json:"database"`
 	Tables   []*models.Table  `json:"tables"`
 	Fields   []*models.Field  `json:"fields"`
 }
 
-func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest, ownerID string) (*CreateDBWithTablesResult, error) {
+func (s *DatabaseService) CreateDatabaseWithTables(req dto.DatabaseBulkCreateRequest, ownerID string) (*CreateDBWithTablesResult, error) {
 	authorizer, err := authz.NewAuthorizer(s.db, ownerID)
 	if err != nil {
 		return nil, err
@@ -347,7 +315,7 @@ func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest
 				return fmt.Errorf("table name validation failed: %w", err)
 			}
 
-			table, err := tableService.CreateTable(CreateTableRequest{
+			table, err := tableService.CreateTable(dto.TableCreateRequest{
 				DatabaseID:  database.ID,
 				Name:        tableReq.Name,
 				Description: tableReq.Description,
@@ -368,7 +336,7 @@ func (s *DatabaseService) CreateDatabaseWithTables(req CreateDBWithTablesRequest
 					return fmt.Errorf("field type validation failed: %w", err)
 				}
 
-				field, err := fieldService.CreateField(CreateFieldRequest{
+				field, err := fieldService.CreateField(dto.FieldCreateRequest{
 					TableID:     table.ID,
 					Name:        fieldReq.Name,
 					Type:        fieldReq.Type,
@@ -410,7 +378,7 @@ tables:
 
 // ImportYAML parses a YAML document and creates a database with nested tables and fields.
 func (s *DatabaseService) ImportYAML(data []byte, ownerID string) (*CreateDBWithTablesResult, error) {
-	var req CreateDBWithTablesRequest
+	var req dto.DatabaseBulkCreateRequest
 	if err := yaml.Unmarshal(data, &req); err != nil {
 		return nil, fmt.Errorf("invalid YAML format: %w", err)
 	}

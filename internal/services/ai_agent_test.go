@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/jiangfire/cornerstone/internal/models"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 )
 
 func TestGetToolDefinitions(t *testing.T) {
@@ -81,7 +82,7 @@ func TestExecuteAITool_GetSchema(t *testing.T) {
 		assert.Equal(t, table.ID, resMap["table_id"])
 		assert.Equal(t, "users", resMap["table_name"])
 
-		fields, ok := resMap["fields"].([]FieldResponse)
+		fields, ok := resMap["fields"].([]dto.FieldObject)
 		require.True(t, ok)
 		assert.Len(t, fields, 2)
 	})
@@ -100,7 +101,7 @@ func TestExecuteAITool_GetSchema(t *testing.T) {
 		assert.Equal(t, database.ID, resMap["database_id"])
 		assert.Equal(t, "TestDB", resMap["database_name"])
 
-		tables, ok := resMap["tables"].([]TableResponse)
+		tables, ok := resMap["tables"].([]dto.TableObject)
 		require.True(t, ok)
 		assert.Len(t, tables, 1)
 	})

@@ -8,6 +8,7 @@ import (
 	appdb "github.com/jiangfire/cornerstone/internal/db"
 	"github.com/jiangfire/cornerstone/internal/models"
 	"github.com/jiangfire/cornerstone/internal/services"
+	"github.com/jiangfire/cornerstone/pkg/dto"
 	"github.com/jiangfire/cornerstone/pkg/db"
 	"github.com/spf13/cobra"
 )
@@ -72,7 +73,7 @@ var recordListCmd = &cobra.Command{
 			return err
 		}
 		svc := services.NewRecordService(db.DB())
-		result, err := svc.ListRecords(services.QueryRequest{
+		result, err := svc.ListRecords(dto.RecordListQueryRequest{
 			TableID: args[0],
 			Limit:   limit,
 			Offset:  offset,
@@ -107,7 +108,7 @@ var recordCreateCmd = &cobra.Command{
 			return err
 		}
 		svc := services.NewRecordService(db.DB())
-		record, err := svc.CreateRecord(services.CreateRecordRequest{
+		record, err := svc.CreateRecord(dto.RecordCreateRequest{
 			TableID: args[0],
 			Data:    data,
 		}, token)
@@ -162,7 +163,7 @@ var recordUpdateCmd = &cobra.Command{
 			return err
 		}
 		svc := services.NewRecordService(db.DB())
-		record, err := svc.UpdateRecord(args[0], services.UpdateRecordRequest{
+		record, err := svc.UpdateRecord(args[0], dto.RecordUpdateRequest{
 			Data:    data,
 			Version: version,
 		}, token)
@@ -224,7 +225,7 @@ var recordBatchCmd = &cobra.Command{
 			return err
 		}
 		svc := services.NewRecordService(db.DB())
-		records, err := svc.BatchCreateRecords(services.CreateRecordRequest{
+		records, err := svc.BatchCreateRecords(dto.RecordCreateRequest{
 			TableID: args[0],
 			Data:    data,
 		}, token, count)
